@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { logout } from "../api/auth";
 import api from "../api/client";
 
 export default function Dashboard() {
@@ -31,6 +32,9 @@ export default function Dashboard() {
     <div className="container mt-5">
       <h1>📊 Dashboard</h1>
       <p>{message || "Loading..."}</p>
+      <button className="btn btn-danger mt-3" onClick={logout}>
+        Log Out
+      </button>
     </div>
   );
 }
