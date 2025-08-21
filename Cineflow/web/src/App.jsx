@@ -1,12 +1,17 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home.jsx";
+import Navbar from "./components/Navbar";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard.jsx";
 import PrivateRoute from "./components/PrivateRoute";
+import Footer from "./components/Footer";
 
 export default function App() {
   return (
+    <div className="d-flex flex-column min-vh-100">
+    <Navbar />
+      <main className="flex-grow-1">
       <Routes>
         {/* Home Page */}
         <Route path="/" element={<Home />} />
@@ -23,6 +28,9 @@ export default function App() {
         </PrivateRoute>
       } 
       />
-      </Routes>
+       </Routes>
+      </main>
+    <Footer />
+    </div>
   );
 }
