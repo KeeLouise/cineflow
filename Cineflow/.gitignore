@@ -1,1 +1,13 @@
 /Weekly Briefs
+# macOS junk
+.DS_Store
+
+# Python junk
+__pycache__/
+*.pyc
+
+# Node junk
+node_modules/
+
+# Vite build
+dist/
