@@ -73,6 +73,13 @@ REST_FRAMEWORK = {
     )
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "cineflow-cache",
+    }
+}
+
 ROOT_URLCONF = 'cineflow.urls'
 
 TEMPLATES = [
