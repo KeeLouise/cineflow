@@ -11,3 +11,46 @@
 .navbar .btn + .btn {
   margin-left: 0.25rem;
 }
+/* White → black gradient background */
+.big-navbar {
+  background: linear-gradient(to right, black 20%, rgb(144, 58, 144) 80%);
+  min-height: 250px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Logo styling */
+.brand-logo {
+  width: 500px;
+  height: 250px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Navbar link colors — light on dark side */
+.navbar .nav-link {
+  color: #f0f0f0;
+  transition: color 0.2s ease;
+  font-size: 3em;
+}
+.navbar .nav-link:hover {
+  color: #ffcc00; /* example hover color */
+}
+
+/* Mobile adjustments */
+@media (max-width: 992px) {
+  .brand-logo {
+    width: 320px;
+    height: auto;
+  }
+  .big-navbar {
+    min-height: unset;
+    background: linear-gradient(to right, white 0%, white 45%, #000 100%);
+  }
+}
+
+@media (max-width: 576px) {
+  .brand-logo {
+    width: 240px;
+  }
+}
