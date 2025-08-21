@@ -1,1 +1,6 @@
-/Weekly Briefs
+# macOS
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
