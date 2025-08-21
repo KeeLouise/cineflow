@@ -1,0 +1,17 @@
+
+# macOS junk
+.DS_Store
+
+# Python junk
+__pycache__/
+*.pyc
+
+# Node junk
+node_modules/
+
+# Vite build
+dist/.DS_Store
+__pycache__/
+*.pyc
+node_modules/
+dist/
