@@ -1,0 +1,13 @@
+.navbar .nav-link.active {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.navbar .navbar-brand {
+  letter-spacing: 0.3px;
+}
+
+.navbar .btn + .btn {
+  margin-left: 0.25rem;
+}
