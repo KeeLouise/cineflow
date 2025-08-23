@@ -85,6 +85,85 @@ def search_movies(request):
         return err
     return Response(data, status=200)
 
+# --- EXTRA ENDPOINTS FOR HOME SECTIONS ---  - KR 21/08/2025
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def now_playing(request):
+    """
+    What's on in cinemas (TMDB /movie/now_playing)
+    Optional query params:
+      - region (default: "US"), e.g., "IE"
+      - page (default: "1")
+    Cached for 10 minutes to reduce TMDB calls. - KR 21/08/2025
+    """
+    region = request.query_params.get("region", "US")
+    page = request.query_params.get("page", "1")
+
+    cache_key = f"tmdb:now_playing:{region}:p{page}"
+    data = cache.get(cache_key)
+    if not data:
+        data, err = _tmdb_get("/movie/now_playing", {"region": region, "page": page})
+        if err:
+            return err
+        cache.set(cache_key, data, 60 * 10)  # 10 mins
+    return Response(data, status=200)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def streaming_trending(request):
+    """
+    Trending on streaming (TMDB /discover/movie)
+    Query params:
+      - region (default "US") => watch_region
+      - providers (comma-separated TMDB provider IDs, optional) => with_watch_providers
+      - types (default "flatrate,ads,free") => with_watch_monetization_types
+      - page (default "1")
+    Cached for 10 minutes. - KR 21/08/2025
+    """
+    region = request.query_params.get("region", "US")
+    providers = request.query_params.get("providers", "") 
+    types = request.query_params.get("types", "flatrate,ads,free")
+    page = request.query_params.get("page", "1")
+
+    params = {
+        "watch_region": region,
+        "with_watch_monetization_types": types,
+        "sort_by": "popularity.desc",
+        "page": page,
+    }
+    if providers:
+        params["with_watch_providers"] = providers
+
+    cache_key = f"tmdb:streaming:{region}:{providers}:{types}:p{page}"
+    data = cache.get(cache_key)
+    if not data:
+        data, err = _tmdb_get("/discover/movie", params)
+        if err:
+            return err
+        cache.set(cache_key, data, 60 * 10)
+    return Response(data, status=200)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def providers_movies(request):
+    """
+    List available streaming providers for movies in a region
+    (TMDB /watch/providers/movie). Use to build a provider picker.
+    Query: region (default "US"). Cached for 1 hour. - KR 21/08/2025
+    """
+    region = request.query_params.get("region", "US")
+    cache_key = f"tmdb:providers:movie:{region}"
+    data = cache.get(cache_key)
+    if not data:
+        data, err = _tmdb_get("/watch/providers/movie", {"watch_region": region})
+        if err:
+            return err
+        cache.set(cache_key, data, 60 * 60)  # 1 hour
+    return Response(data, status=200)
+
 
 @api_view(["POST"])
 @permission_classes([AllowAny])  
