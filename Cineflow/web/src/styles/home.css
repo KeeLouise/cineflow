@@ -31,3 +31,102 @@
   transform: translateY(-3px);
   opacity: 0.9;
 }
+
+  
+/* Wrap provides positioning surface for arrow buttons - KR 22/08/2025 */
+.reel-wrap {
+  position: relative;
+}
+
+/* Arrow buttons sit over the edges of the reel, center-aligned vertically - KR 22/08/2025 */
+.reel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  width: 40px;
+  height: 64px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.2s ease;
+}
+.reel-btn:hover {
+  background: rgba(0, 0, 0, 0.65);
+}
+.reel-btn.left {
+  left: 8px;
+}
+.reel-btn.right {
+  right: 8px;
+}
+
+.h-scroll > .poster-card { width: 100%; }
+
+/* Horizontal poster reel layout (no Bootstrap grid) - KR 22/08/2025 */
+.h-scroll {
+  display: grid;
+  grid-auto-flow: column;                 /* lay items left-to-right - KR 22/08/2025 */
+  grid-auto-columns: clamp(160px, 18vw, 220px); /* each card width - KR 22/08/2025 */
+  gap: 1rem;                              /* space between cards - KR 22/08/2025 */
+  overflow-x: auto;                        /* enable horizontal scroll - KR 22/08/2025 */
+  scroll-snap-type: x mandatory;           /* snap scrolling to cards - KR 22/08/2025 */
+  padding: 0 .5rem;                        /* small side padding - KR 22/08/2025 */
+  -webkit-overflow-scrolling: touch;       /* smooth on iOS - KR 22/08/2025 */
+}
+
+/* Optional scrollbar styling - KR 22/08/2025 */
+.h-scroll::-webkit-scrollbar { height: 10px; }
+.h-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 6px; }
+.h-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); }
+
+/* Ensure each card uses the computed column width fully - KR 22/08/2025 */
+.h-scroll > .poster-card { width: 100%; }
+
+/* Poster card presentation - KR 22/08/2025 */
+.poster-card {
+  scroll-snap-align: start;
+  background: #111;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.poster-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.35);
+}
+
+/* Poster image sizing - KR 22/08/2025 */
+.poster-img {
+  width: 100%;
+  height: clamp(220px, 30vw, 340px);
+  object-fit: cover;
+  display: block;
+}
+
+/* Fallback block if no image - KR 22/08/2025 */
+.poster-fallback {
+  height: clamp(220px, 30vw, 340px);
+  background: #2b2b2b;
+}
+
+/* Text underneath each poster - KR 22/08/2025 */
+.poster-meta { padding: 0.6rem 0.75rem; }
+.poster-meta .title {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff;
+  line-height: 1.2;
+}
+.poster-meta .sub {
+  font-size: 0.8rem;
+  color: #b8b8b8;
+}

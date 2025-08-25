@@ -1,6 +1,18 @@
 // Home.jsx - Main landing page for Cineflow - KR 21/08/2025
-import React, { useEffect, useState } from "react";
-import { fetchNowPlaying, fetchStreamingTrending } from "../api/movies"; // calls Django proxy - KR 21/08/2025
+import React, { useEffect, useRef, useState } from "react";
+import {
+  fetchNowPlaying,
+  fetchStreamingTrending,
+} from "../api/movies"; // calls Django proxy - KR 21/08/2025
+import "@/styles/home.css"; // make sure this is imported so reel styles apply - KR 22/08/2025
+
+// util: format 'YYYY-MM-DD' -> 'DD/MM/YYYY' (fallbacks to "—") - KR 25/08/2025
+const formatDate = (iso) => {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+};
+
 
 export default function Home() {
   // Local state for each section - KR 21/08/2025
@@ -13,6 +25,19 @@ export default function Home() {
   const REGION = "IE";
   // Providers empty = all platforms (add picker later) - KR 21/08/2025
   const PROVIDERS = "";
+
+  // refs for horizontal reels - KR 22/08/2025
+  const cinemaRef = useRef(null);
+  const streamingRef = useRef(null);
+
+  // util: scroll reels by one “card” width * ~3 each click - KR 22/08/2025
+  const scrollReel = (ref, dir = 1) => {
+    const el = ref.current;
+    if (!el) return;
+    const card = el.querySelector(".poster-card");
+    const step = card ? Math.round(card.getBoundingClientRect().width * 3) : 600;
+    el.scrollBy({ left: dir * step, behavior: "smooth" });
+  };
 
   // Fetch both sections in parallel on mount - KR 21/08/2025
   useEffect(() => {
@@ -33,73 +58,118 @@ export default function Home() {
     })();
   }, []);
 
-  if (loading) return <div className="container py-5">Loading…</div>;
+  if (loading) return <div className="container-fluid py-5">Loading…</div>;
 
   return (
-    <div className="container py-5">
+    <div className="container-fluid py-5">
       <h1 className="mb-4">Welcome to Cineflow</h1>
       {err && <div className="alert alert-danger">{err}</div>}
 
       {/* What's on in Cinemas - KR 21/08/2025 */}
       <h2 className="mb-3">🎟️ What’s on in Cinemas</h2>
-      <div className="row g-4 mb-5">
-        {cinema.length ? (
-          cinema.map((m) => (
-            <div key={m.id} className="col-6 col-md-3">
-              <div className="card h-100 shadow-sm">
+
+      {/* Reel wrapper with arrows (NO Bootstrap row/col here) - KR 22/08/2025 */}
+      <div className="reel-wrap mb-5">
+        <button
+          type="button"
+          className="reel-btn left"
+          aria-label="Scroll cinemas left"
+          onClick={() => scrollReel(cinemaRef, -1)}
+        >
+          ‹
+        </button>
+
+        <div ref={cinemaRef} className="h-scroll">
+          {cinema.length ? (
+            cinema.map((m) => (
+              <article key={m.id} className="poster-card">
                 {m.poster_path ? (
                   <img
-                    className="card-img-top"
+                    className="poster-img"
                     src={`https://image.tmdb.org/t/p/w500${m.poster_path}`}
                     alt={m.title}
                   />
                 ) : (
-                  // CSS note: define `.poster-fallback` height in your CSS file - KR 21/08/2025
-                  <div className="card-img-top poster-fallback d-flex align-items-center justify-content-center text-muted">
+                  // CSS note: define `.poster-fallback` height in CSS - KR 21/08/2025
+                  <div className="poster-fallback d-flex align-items-center justify-content-center text-muted">
                     No Image
                   </div>
                 )}
-                <div className="card-body">
-                  <h6 className="card-title mb-1">{m.title}</h6>
-                  <small className="text-muted">{m.release_date || "—"}</small>
+                <div className="poster-meta">
+                  <div className="title">{m.title}</div>
+                  <div className="sub text-muted">
+                    Release Date: {formatDate(m.release_date)}
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="text-muted">No cinema listings.</div>
-        )}
+              </article>
+            ))
+          ) : (
+            <div className="text-muted p-2">No cinema listings.</div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          className="reel-btn right"
+          aria-label="Scroll cinemas right"
+          onClick={() => scrollReel(cinemaRef, 1)}
+        >
+          ›
+        </button>
       </div>
 
       {/* Trending on Streaming - KR 21/08/2025 */}
       <h2 className="mb-3">📺 Trending on Streaming</h2>
-      <div className="row g-4">
-        {streaming.length ? (
-          streaming.map((m) => (
-            <div key={m.id} className="col-6 col-md-3">
-              <div className="card h-100 shadow-sm">
+
+      {/* Reel wrapper with arrows (NO Bootstrap row/col here) - KR 22/08/2025 */}
+      <div className="reel-wrap">
+        <button
+          type="button"
+          className="reel-btn left"
+          aria-label="Scroll streaming left"
+          onClick={() => scrollReel(streamingRef, -1)}
+        >
+          ‹
+        </button>
+
+        <div ref={streamingRef} className="h-scroll">
+          {streaming.length ? (
+            streaming.map((m) => (
+              <article key={m.id} className="poster-card">
                 {m.poster_path ? (
                   <img
-                    className="card-img-top"
+                    className="poster-img"
                     src={`https://image.tmdb.org/t/p/w500${m.poster_path}`}
                     alt={m.title}
                   />
                 ) : (
                   // CSS note: reuse `.poster-fallback` - KR 21/08/2025
-                  <div className="card-img-top poster-fallback d-flex align-items-center justify-content-center text-muted">
+                  <div className="poster-fallback d-flex align-items-center justify-content-center text-muted">
                     No Image
                   </div>
                 )}
-                <div className="card-body">
-                  <h6 className="card-title mb-1">{m.title}</h6>
-                  <small className="text-muted">{m.release_date || "—"}</small>
+                
+                <div className="poster-meta">
+                  <div className="title">{m.title}</div>
+                  <div className="sub text-muted">
+                    Release Date: {formatDate(m.release_date)}
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="text-muted">No streaming results.</div>
-        )}
+              </article>
+            ))
+          ) : (
+            <div className="text-muted p-2">No streaming results.</div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          className="reel-btn right"
+          aria-label="Scroll streaming right"
+          onClick={() => scrollReel(streamingRef, 1)}
+        >
+          ›
+        </button>
       </div>
     </div>
   );
