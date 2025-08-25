@@ -1,9 +1,10 @@
 // Home.jsx - Main landing page for Cineflow - KR 21/08/2025
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useRef as useRefAlias } from "react";
 import {
   fetchNowPlaying,
   fetchStreamingTrending,
   searchMovies,
+  searchByPerson,
 } from "../api/movies"; // calls Django proxy - KR 21/08/2025
 import SearchBar from "@/components/SearchBar.jsx"; // hero search - KR 25/08/2025
 import SkeletonRow from "@/components/SkeletonRow.jsx"; // shimmer loaders - KR 25/08/2025
@@ -34,10 +35,9 @@ export default function Home() {
   // Search state (suggestions + results) - KR 25/08/2025
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
-  const [loadingSearch, setLoadingSearch] = useState(false);
-  const debounced = useDebounced(query, 450); // results rail debounce - KR 25/08/2025
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const debounced = useDebounced(query, 450); // results rail debounce - KR 25/08/2025
 
   // Loading + error - KR 21/08/2025
   const [loadingCinema, setLoadingCinema] = useState(true);
@@ -53,6 +53,9 @@ export default function Home() {
   const cinemaRef = useRef(null);
   const streamingRef = useRef(null);
   const searchRef = useRef(null);
+
+  // remember last query sent to backend to avoid re-fetching identical text - KR 25/08/2025
+  const lastQueryRef = useRef("");
 
   // helper for rail scroll buttons - KR 25/08/2025
   const scrollReel = (ref, dir = 1) => {
@@ -84,58 +87,78 @@ export default function Home() {
         setLoadingStreaming(false);
       }
     })();
-  }, []);
+  }, []); // mount only - KR 21/08/2025
 
-  // Suggestion handler (called by SearchBar) - KR 25/08/2025
-  const handleSearch = async (q) => {
-    // guard tiny inputs - KR 25/08/2025
-    if (!q || q.trim().length < 2) {
-      setSuggestions([]);
-      return;
-    }
-    try {
-      setLoadingSearch(true);
-      const data = await searchMovies(q.trim());
-      setSuggestions(
-        (data.results || [])
-          .slice(0, 8)
-          .map((m) => ({ id: m.id, label: m.title }))
-      );
-    } catch {
-      setSuggestions([]);
-    } finally {
-      setLoadingSearch(false);
-    }
-  };
-
-  // Full results rail when user pauses typing - KR 25/08/2025
+  // Full results rail + suggestions when user pauses typing (single source of truth) - KR 25/08/2025
   useEffect(() => {
     let active = true;
-    const run = async () => {
-      if (!debounced || debounced.trim().length < 2) {
-        setResults([]);
-        setSearching(false);
-        return;
-      }
+    const q = debounced?.trim();
+
+    // if input too short, clear state - KR 25/08/2025
+    if (!q || q.length < 2) {
+      setResults([]);
+      setSuggestions([]);
+      setSearching(false);
+      lastQueryRef.current = "";
+      return;
+    }
+
+    // skip if query hasn't actually changed (prevents dup calls on same text) - KR 25/08/2025
+    if (lastQueryRef.current === q) return;
+    lastQueryRef.current = q;
+
+    const controller = new AbortController();
+
+    (async () => {
       setSearching(true);
       try {
-        const data = await searchMovies(debounced.trim());
-        if (active) setResults(data.results || []);
-      } catch {
-        if (active) setResults([]);
+        // titles + person credits together - KR 25/08/2025
+        const [byTitle, byPerson] = await Promise.all([
+          searchMovies(q, { signal: controller.signal }),
+          searchByPerson(q, { signal: controller.signal }),
+        ]);
+
+        const merged = [...(byTitle.results || []), ...(byPerson.results || [])];
+
+        // Dedupe by TMDB id - KR 25/08/2025
+        const seen = new Set();
+        const uniq = merged.filter((m) => {
+          if (!m?.id) return false;
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+
+        if (!active) return;
+
+        // update both rails + suggestions from the same payload - KR 25/08/2025
+        setResults(uniq);
+        setSuggestions(uniq.slice(0, 8).map((m) => ({ id: m.id, label: m.title })));
+      } catch (e) {
+        if (e.name !== "AbortError") {
+          console.error("Search failed:", e);
+          if (active) {
+            setResults([]);
+            setSuggestions([]);
+          }
+        }
       } finally {
         if (active) setSearching(false);
       }
-    };
-    run();
+    })();
+
+    // cleanup cancels in-flight request on fast typing / unmount - KR 25/08/2025
     return () => {
       active = false;
+      controller.abort();
     };
   }, [debounced]);
 
   // helper to render one poster card (used by all rails) - KR 25/08/2025
-  const PosterCard = ({ m }) => (
-    <article className="poster-card">
+  // helper to render one poster card (used by all rails) - KR 25/08/2025
+const PosterCard = ({ m }) => (
+  <article className="poster-card">
+    <div className="poster-media">
       {m.poster_path ? (
         <img
           className="poster-img"
@@ -148,12 +171,27 @@ export default function Home() {
           No Image
         </div>
       )}
-      <div className="poster-meta">
-        <div className="title">{m.title}</div>
-        <div className="sub text-muted">Release Date: {formatDate(m.release_date)}</div>
+
+      {/* rating pill (TMDB out of 10) - KR 25/08/2025 */}
+      {m.vote_average ? (
+        <span className="badge-rating">{m.vote_average.toFixed(1)}</span>
+      ) : null}
+
+      {/* dark gradient overlay for legibility - KR 25/08/2025 */}
+      <div className="poster-overlay" />
+    </div>
+
+    <div className="poster-meta">
+      <div className="title" title={m.title}>{m.title}</div>
+      <div className="sub text-muted">
+        {/* year chip + formatted date - KR 25/08/2025 */}
+        <span className="chip-year">
+          {(m.release_date || "").slice(0, 4) || "—"}
+        </span>
       </div>
-    </article>
-  );
+    </div>
+  </article>
+);
 
   return (
     <div className="container-fluid py-5">
@@ -163,18 +201,23 @@ export default function Home() {
           <h1 className="display-5 mb-3">Welcome to Cineflow</h1>
           <p className="lead mb-4">Search for your favourite films</p>
 
-          {/* SearchBar with suggestions (type-ahead) - KR 25/08/2025 */}
+          {/* SearchBar with suggestions (type-ahead) - single source of truth (no onSearch) - KR 25/08/2025 */}
           <div className="searchbar-wrapper mx-auto">
             <SearchBar
               value={query}
-              onChange={setQuery}
-              onSearch={handleSearch}
-              isLoading={loadingSearch}
+              onChange={(v) => {
+                setQuery(v);
+                // allow same text to re-trigger if user edits and returns - KR 25/08/2025
+                if (v.trim() !== lastQueryRef.current) {
+                  // let the debounced effect decide when to fetch
+                }
+              }}
+              isLoading={searching}
               suggestions={suggestions}
               onSelectSuggestion={(s) => {
                 // replace text with chosen suggestion - KR 25/08/2025
                 setQuery(s.label);
-                // optional: could navigate to a detail page here
+                // debounced effect will run; if identical text, lastQueryRef prevents refetch - KR 25/08/2025
               }}
             />
           </div>
@@ -186,7 +229,9 @@ export default function Home() {
       {/* If user is searching, show search rail first - KR 25/08/2025 */}
       {query.trim().length >= 2 && (
         <>
+        <div className="section-head mb-3 d-flex align-items-center justify-content-between">
           <h2 className="mb-3">🔎 Results for “{debounced}”</h2>
+          </div>
           {searching ? (
             <SkeletonRow count={8} />
           ) : results.length ? (
@@ -220,9 +265,11 @@ export default function Home() {
           )}
         </>
       )}
-
       {/* What's on in Cinemas - KR 21/08/2025 */}
-      <h2 className="mb-3">🎟️ What’s on in Cinemas</h2>
+<div className="section-head mb-3 d-flex align-items-center justify-content-between">
+  <h2 className="m-0">🎟️ What’s on in Cinemas</h2>
+  <a className="link-ghost" href="#" aria-label="View all now playing">View all</a>
+</div>
       <div className="reel-wrap mb-5">
         <button
           type="button"
@@ -252,9 +299,10 @@ export default function Home() {
           ›
         </button>
       </div>
-
-      {/* Trending on Streaming - KR 21/08/2025 */}
-      <h2 className="mb-3">📺 Trending on Streaming</h2>
+<div className="section-head mb-3 d-flex align-items-center justify-content-between">
+  <h2 className="m-0">Trending on Streaming</h2>
+  <a className="link-ghost" href="#" aria-label="View all now playing">View all</a>
+</div>
       <div className="reel-wrap">
         <button
           type="button"
