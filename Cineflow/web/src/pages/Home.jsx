@@ -1,3 +1,4 @@
+// Home.jsx - Main landing page for Cineflow - KR 21/08/2025
 import React, { useEffect, useRef, useState } from "react";
 import {
   fetchNowPlaying,
@@ -30,9 +31,11 @@ export default function Home() {
   const [cinema, setCinema] = useState([]);
   const [streaming, setStreaming] = useState([]);
 
-  // Search state - KR 25/08/2025
-  const [term, setTerm] = useState("");
-  const debounced = useDebounced(term, 450); // reduce API spam - KR 25/08/2025
+  // Search state (suggestions + results) - KR 25/08/2025
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+  const debounced = useDebounced(query, 450); // results rail debounce - KR 25/08/2025
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
 
@@ -41,8 +44,9 @@ export default function Home() {
   const [loadingStreaming, setLoadingStreaming] = useState(true);
   const [err, setErr] = useState("");
 
+  // Region defaults (make user-selectable later) - KR 21/08/2025
   const REGION = "IE";
-
+  // Providers empty = all platforms (add picker later) - KR 21/08/2025
   const PROVIDERS = "";
 
   // refs for horizontal reels - KR 25/08/2025
@@ -50,6 +54,7 @@ export default function Home() {
   const streamingRef = useRef(null);
   const searchRef = useRef(null);
 
+  // helper for rail scroll buttons - KR 25/08/2025
   const scrollReel = (ref, dir = 1) => {
     const el = ref.current;
     if (!el) return;
@@ -81,7 +86,29 @@ export default function Home() {
     })();
   }, []);
 
-  // Fire search when user stops typing - KR 25/08/2025
+  // Suggestion handler (called by SearchBar) - KR 25/08/2025
+  const handleSearch = async (q) => {
+    // guard tiny inputs - KR 25/08/2025
+    if (!q || q.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      setLoadingSearch(true);
+      const data = await searchMovies(q.trim());
+      setSuggestions(
+        (data.results || [])
+          .slice(0, 8)
+          .map((m) => ({ id: m.id, label: m.title }))
+      );
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoadingSearch(false);
+    }
+  };
+
+  // Full results rail when user pauses typing - KR 25/08/2025
   useEffect(() => {
     let active = true;
     const run = async () => {
@@ -94,8 +121,8 @@ export default function Home() {
       try {
         const data = await searchMovies(debounced.trim());
         if (active) setResults(data.results || []);
-      } catch (e) {
-        console.error("Search failed:", e);
+      } catch {
+        if (active) setResults([]);
       } finally {
         if (active) setSearching(false);
       }
@@ -135,8 +162,21 @@ export default function Home() {
         <div className="container text-center">
           <h1 className="display-5 mb-3">Welcome to Cineflow</h1>
           <p className="lead mb-4">Search for your favourite films</p>
+
+          {/* SearchBar with suggestions (type-ahead) - KR 25/08/2025 */}
           <div className="searchbar-wrapper mx-auto">
-            <SearchBar value={term} onChange={setTerm} />
+            <SearchBar
+              value={query}
+              onChange={setQuery}
+              onSearch={handleSearch}
+              isLoading={loadingSearch}
+              suggestions={suggestions}
+              onSelectSuggestion={(s) => {
+                // replace text with chosen suggestion - KR 25/08/2025
+                setQuery(s.label);
+                // optional: could navigate to a detail page here
+              }}
+            />
           </div>
         </div>
       </section>
@@ -144,7 +184,7 @@ export default function Home() {
       {err && <div className="alert alert-danger">{err}</div>}
 
       {/* If user is searching, show search rail first - KR 25/08/2025 */}
-      {term.trim().length >= 2 && (
+      {query.trim().length >= 2 && (
         <>
           <h2 className="mb-3">🔎 Results for “{debounced}”</h2>
           {searching ? (
