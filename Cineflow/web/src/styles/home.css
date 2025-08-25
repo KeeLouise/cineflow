@@ -253,3 +253,84 @@
   0% { background-position: 100% 0; }
   100% { background-position: 0 0; }
 }
+
+
+/* --- Poster chrome upgrades - KR 25/08/2025 --- */
+.poster-card {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0f0f10;
+  transition: transform .18s ease, box-shadow .18s ease, outline-color .18s ease;
+  outline: 1px solid rgba(255,255,255,0.06);
+}
+.poster-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+  outline-color: rgba(255,255,255,0.12);
+}
+
+.poster-media { position: relative; }
+
+/* soft bottom gradient for readability - KR 25/08/2025 */
+.poster-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.65) 10%, rgba(0,0,0,0.0) 55%);
+  pointer-events: none;
+}
+
+/* rating pill (top-left) - KR 25/08/2025 */
+.badge-rating {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #0a0d12;
+  background: linear-gradient(135deg, #44ff9a, #44e9ff);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+}
+
+.poster-meta { padding: 0.6rem 0.75rem; }
+.poster-meta .chip-year {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.poster-meta .label {
+  margin-left: 4px;
+  margin-right: 6px;
+  opacity: .8;
+}
+
+.reel-btn {
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* Section header polish - KR 25/08/2025 */
+.section-head h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+.link-ghost {
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  transition: background .2s ease, color .2s ease;
+}
+.link-ghost:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}

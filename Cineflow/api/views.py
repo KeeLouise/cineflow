@@ -164,6 +164,59 @@ def providers_movies(request):
         cache.set(cache_key, data, 60 * 60)  # 1 hour
     return Response(data, status=200)
 
+# People search -> movies by actor - KR 25/08/2025
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def person_movies(request):
+    """
+    Given a person name (e.g., 'Anne Hathaway'), return their movie credits.
+    Steps:
+      1) /search/person -> pick top match to get person_id
+      2) /person/{id}/movie_credits -> return 'cast' list
+    Cached per query for 10 minutes. - KR 25/08/2025
+    """
+    q = request.query_params.get("q", "").strip()
+    if not q:
+        return Response({"results": []}, status=200)
+
+    cache_key = f"tmdb:person_movies:{q.lower()}"
+    data = cache.get(cache_key)
+    if data:
+        return Response(data, status=200)
+
+    # 1) find the person id
+    person_data, err = _tmdb_get("/search/person", {"query": q})
+    if err:
+        return err
+
+    results = (person_data or {}).get("results", [])
+    if not results:
+        return Response({"results": []}, status=200)
+
+    person_id = results[0].get("id")
+    if not person_id:
+        return Response({"results": []}, status=200)
+
+    # 2) fetch movie credits for that person
+    credits, err2 = _tmdb_get(f"/person/{person_id}/movie_credits")
+    if err2:
+        return err2
+
+    movies = (credits or {}).get("cast", [])
+
+    # sort by popularity desc, drop duplicates - KR 25/08/2025
+    seen = set()
+    cleaned = []
+    for m in sorted(movies, key=lambda x: x.get("popularity", 0), reverse=True):
+        mid = m.get("id")
+        if mid and mid not in seen:
+            seen.add(mid)
+            cleaned.append(m)
+
+    payload = {"results": cleaned}
+    cache.set(cache_key, payload, 60 * 10)
+    return Response(payload, status=200)
+
 
 @api_view(["POST"])
 @permission_classes([AllowAny])  
