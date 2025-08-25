@@ -1,5 +1,6 @@
 .hero {
-  min-height: 100vh;
+  padding: 24px 0;
+  min-height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9,15 +10,16 @@
 }
 
 .hero h1 {
-  font-size: 3.5rem;
+  font-size: 2.25rem;
   font-weight: 700;
-  margin-bottom: 1rem;
-  letter-spacing: 2px;
+  margin-bottom: 0.5rem;
+  letter-spacing: 1px;
 }
 
 .hero p {
-  font-size: 1.25rem;
+  font-size: 1rem; 
   color: #dcdcdc;
+  margin-bottom: 0;
 }
 
 .hero .btn-custom {
@@ -33,12 +35,10 @@
 }
 
   
-/* Wrap provides positioning surface for arrow buttons - KR 22/08/2025 */
 .reel-wrap {
   position: relative;
 }
 
-/* Arrow buttons sit over the edges of the reel, center-aligned vertically - KR 22/08/2025 */
 .reel-btn {
   position: absolute;
   top: 50%;
@@ -69,27 +69,23 @@
 
 .h-scroll > .poster-card { width: 100%; }
 
-/* Horizontal poster reel layout (no Bootstrap grid) - KR 22/08/2025 */
 .h-scroll {
   display: grid;
-  grid-auto-flow: column;                 /* lay items left-to-right - KR 22/08/2025 */
-  grid-auto-columns: clamp(160px, 18vw, 220px); /* each card width - KR 22/08/2025 */
-  gap: 1rem;                              /* space between cards - KR 22/08/2025 */
-  overflow-x: auto;                        /* enable horizontal scroll - KR 22/08/2025 */
-  scroll-snap-type: x mandatory;           /* snap scrolling to cards - KR 22/08/2025 */
-  padding: 0 .5rem;                        /* small side padding - KR 22/08/2025 */
-  -webkit-overflow-scrolling: touch;       /* smooth on iOS - KR 22/08/2025 */
+  grid-auto-flow: column;                
+  grid-auto-columns: clamp(160px, 18vw, 220px);
+  gap: 1rem;                             
+  overflow-x: auto;                       
+  scroll-snap-type: x mandatory;          
+  padding: 0 .5rem;                        
+  -webkit-overflow-scrolling: touch;     
 }
 
-/* Optional scrollbar styling - KR 22/08/2025 */
 .h-scroll::-webkit-scrollbar { height: 10px; }
 .h-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 6px; }
 .h-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); }
 
-/* Ensure each card uses the computed column width fully - KR 22/08/2025 */
 .h-scroll > .poster-card { width: 100%; }
 
-/* Poster card presentation - KR 22/08/2025 */
 .poster-card {
   scroll-snap-align: start;
   background: #111;
@@ -117,16 +113,74 @@
   background: #2b2b2b;
 }
 
+.hero-search {
+  padding: 2rem 0;           
+}
+
+.hero-search .searchbar-wrapper {
+  max-width: 800px;       
+}
+
 /* Text underneath each poster - KR 22/08/2025 */
 .poster-meta { padding: 0.6rem 0.75rem; }
 .poster-meta .title {
   margin: 0 0 0.25rem;
   font-weight: 600;
   font-size: 0.95rem;
-  color: #fff;
+  color: #fff !important;
   line-height: 1.2;
 }
 .poster-meta .sub {
   font-size: 0.8rem;
-  color: #b8b8b8;
+  color: #fff !important;
+}
+
+
+.search-input {
+  width: 100%;
+  height: 44px;                
+  border: 0;                  
+  background: transparent;      
+  color: #fff;
+  padding: 0 16px 0 14px;      
+  outline: none;
+}
+.search-input::placeholder {
+  color: rgba(255,255,255,0.6);
+}
+
+
+.poster-card {
+  width: 180px;
+  flex: 0 0 auto;
+}
+.poster-img, .poster-fallback {
+  width: 100%;
+  height: 270px;    
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+/* --- Skeleton shimmer - KR 25/08/2025 --- */
+.skel .poster-img,
+.skel .skel-box {
+  background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 37%, #2a2a2a 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: 8px;
+}
+.skel .poster-meta .skel-line {
+  height: 10px;
+  margin-top: 8px;
+  background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 37%, #2a2a2a 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: 4px;
+}
+.skel .poster-meta .skel-line.w-80 { width: 80%; }
+.skel .poster-meta .skel-line.w-50 { width: 50%; }
+
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
 }
