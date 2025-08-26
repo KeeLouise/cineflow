@@ -2,6 +2,13 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from io import BytesIO
+from PIL import Image
+from colorthief import ColorThief
+import re
+
+# Pre-validate the incoming TMDB path for safety - KR 26/08/2025
+_TMDB_PATH_RE = re.compile(r"^/t/p/(original|w500|w780|w342|w154|w92)/[A-Za-z0-9._-]+$")
 
 # Import user registration serializer - KR 21/08/2025
 from .serializers import RegisterSerializer
@@ -47,6 +54,56 @@ def _tmdb_get(path, params=None):
 
 # ---- API Endpoints ---- KR 21/08/2025
 
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def poster_palette(request):
+    """
+    Extract a small color palette (3 swatches) from a TMDB poster image.
+    Query: ?path=/t/p/w500/abcdef.jpg
+    Returns: {"palette": [[r,g,b],[r,g,b],[r,g,b]]}  - KR 26/08/2025
+    """
+    path = request.query_params.get("path", "")
+    if not path or not _TMDB_PATH_RE.match(path):
+        return Response({"detail": "Invalid or missing TMDB path"}, status=400)
+
+    # Build the full TMDB image URL - KR 26/08/2025
+    url = f"https://image.tmdb.org{path}"
+
+    try:
+        r = requests.get(url, timeout=8)
+        r.raise_for_status()
+        # Ensure image retrieved- KR 26/08/2025
+        ctype = r.headers.get("Content-Type", "")
+        if "image" not in ctype:
+            return Response({"detail": "TMDB did not return an image", "ctype": ctype}, status=502)
+
+        # Load image into PIL, force RGB for ColorThief - KR 26/08/2025
+        img = Image.open(BytesIO(r.content)).convert("RGB")
+
+        bio = BytesIO()
+        img.save(bio, format="PNG")
+        bio.seek(0)
+
+        ct = ColorThief(bio)
+        palette = ct.get_palette(color_count=3, quality=10) or []
+
+        # Normalize to lists - KR 26/08/2025
+        palette = [list(swatch) for swatch in palette][:3]
+
+        # Fallback if palette too short - KR 26/08/2025
+        while len(palette) < 2:
+            palette.append([20, 20, 20])
+
+        return Response({"palette": palette}, status=200)
+
+    except requests.RequestException as e:
+        # Network/HTTP errors - KR 26/08/2025
+        return Response({"detail": "Failed to fetch poster", "error": str(e)}, status=502)
+    except Exception as e:
+        # Color extraction / PIL errors - KR 26/08/2025
+        return Response({"detail": "Palette extraction failed", "error": str(e)}, status=500)
+    
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def trending_movies(request):
@@ -243,27 +300,40 @@ def register(request):
 def movie_detail(request, tmdb_id: int):
     """
     Return a single movie's detail and credits merged into one payload.
-    Cached for 30 minutes to reduce API calls. - KR 25/08/2025
+    Cached for 30 minutes to reduce API calls. - KR 26/08/2025
+    Now includes trailers and watch/providers via append_to_response. - KR 26/08/2025
     """
-    cache_key = f"tmdb:movie:{tmdb_id}:detail+credits"
+
+    region = request.query_params.get("region", "IE").upper()
+
+    # include region in cache key so it won't cross-contaminate provider blocks - KR 26/08/2025
+    cache_key = f"tmdb:movie:{tmdb_id}:detail+credits+videos+providers:{region}"
     data = cache.get(cache_key)
     if data:
         return Response(data, status=200)
     
-    #fetch core details - KR 26/08/2025
-    details, err = _tmdb_get(f"/movie/{tmdb_id}")
+    # fetch core details + credits + videos + providers in one call - KR 26/08/2025
+    params = {"append_to_response": "videos,credits,watch/providers"}
+    details, err = _tmdb_get(f"/movie/{tmdb_id}", params)
     if err:
         return err
-    
-    #fetch credits (cast and crew) - KR 26/08/2025
-    credits, err2 = _tmdb_get(f"/movie/{tmdb_id}/credits")
-    if err2:
-        return err2
-    
-    #merge minimally - KR 26/08/2025
-    merged = details or {}
-    merged["credits"] = credits or {"cast": [], "crew": []}
 
-    #cache for 30 mins - KR 26/08/2025
+    merged = details or {}
+    
+    merged["credits"] = (merged.get("credits") or {"cast": [], "crew": []})
+
+    # normalise providers to the requested region (fallback to US, else empty) - KR 26/08/2025
+    wp = merged.get("watch/providers") or {}
+    region_block = {}
+    try:
+        region_block = (wp.get("results", {}) or {}).get(region) \
+                       or (wp.get("results", {}) or {}).get("US") \
+                       or {}
+    except Exception:
+        region_block = {}
+    # expose a simple `providers` object the frontend can read (flatrate/ads/free/rent/buy) - KR 26/08/2025
+    merged["providers"] = region_block
+
+    # cache for 30 mins - KR 26/08/2025
     cache.set(cache_key, merged, 60 * 30)
     return Response(merged, status=200)

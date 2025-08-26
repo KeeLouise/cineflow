@@ -1,73 +1,202 @@
-.movie-hero {
-  position: relative;
-  color: #fff;
-  background: #0f0f0f;
+/* --- Poster-derived colour defaults - KR 26/08/2025 --- */
+:root {
+  --movie-bg-start: #141414;
+  --movie-bg-end: #000000;
+  --movie-accent: #232323;
 }
 
-.movie-hero__backdrop {
-  position: absolute;
-  inset: 0;
-  opacity: 0.25;
-  background-size: cover;
-  background-position: center;
-  filter: blur(6px);
+/* --- Page wrapper uses gradient - KR 26/08/2025 --- */
+.movie-page {
+  min-height: 100vh;
+  background: linear-gradient(
+    180deg,
+    var(--movie-bg-start) 0%,
+    var(--movie-bg-end) 100%
+  );
+  color: #eaeaea;
 }
-.movie-hero__backdrop.has-bg { opacity: 0.35; }
+
+/* Poster sizing - KR 26/08/2025 */
+.movie-poster,
+.movie-poster.fallback {
+  width: clamp(220px, 22vw, 320px);
+  aspect-ratio: 2 / 3;
+  border-radius: 14px;
+  background: #1a1a1a;
+  box-shadow: 0 14px 28px rgba(0,0,0,0.45);
+  object-fit: cover;
+}
 
 .movie-title {
-  font-weight: 700;
-}
-
-.movie-poster {
-  width: clamp(180px, 22vw, 320px);
-  height: clamp(270px, 32vw, 480px);
-  object-fit: cover;
-  border-radius: 12px;
-  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
-  background: #1b1b1b;
-}
-.movie-poster.fallback {
-  width: clamp(180px, 22vw, 320px);
-  height: clamp(270px, 32vw, 480px);
-  border-radius: 12px;
-  background: #2a2a2a;
+  font-weight: 800;
+  letter-spacing: .3px;
+  font-size: clamp(1.8rem, 2.5vw, 2.6rem);
+  margin-bottom: .75rem;
 }
 
 .movie-overview {
-  color: #e6e6e6;
+  color: #d0d0d0;
+  line-height: 1.65;
+  max-width: 70ch;
+  font-size: 1.05rem;
 }
 
-/* reuse horizontal reel pattern for cast - KR 26/08/2025 */
+/* Chips reuse accent - KR 26/08/2025 */
+.movie-meta .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  background: #1a1a1a;
+  border: 1px solid #282828;
+  color: #ddd;
+  padding: 6px 10px;
+  border-radius: 999px;
+  margin: 0 .5rem .5rem 0;
+  font-size: .9rem;
+}
+.movie-meta .chip-soft {
+  background: #141414;
+  border-color: #242424;
+}
+.movie-meta .chip.rating {
+  background: var(--movie-accent);
+  border-color: rgba(255,255,255,0.06);
+  color: #e2e8f0;
+}
+.movie-meta .chip .muted {
+  opacity: .75;
+}
+
+.chip.chip-ghost {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.10);
+  color: #e8e8e8;
+}
+.chip.chip-ghost.rating {
+  background: var(--movie-accent, rgba(255,255,255,0.08));
+  border-color: rgba(255,255,255,0.12);
+  color: #eaf2ff;
+}
+
+/* Content stack - KR 26/08/2025 */
+.section-stack {
+  padding: 28px 0 44px;
+}
+.card-block {
+  background: #0f0f0f;
+  border: 1px solid #1f1f1f;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+  margin-bottom: 20px;
+}
+
+/* Cast strip - KR 26/08/2025 */
 .cast-strip {
-  grid-auto-columns: clamp(140px, 16vw, 180px);
-  gap: 0.75rem;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: clamp(140px, 14vw, 180px);
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
 }
 .cast-card {
+  scroll-snap-align: start;
   background: #111;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35);
 }
 .cast-img {
   width: 100%;
-  height: clamp(180px, 24vw, 220px);
+  height: clamp(180px, 24vw, 240px);
   object-fit: cover;
   display: block;
-  background: #1f1f1f;
-}
-.cast-img.fallback {
-  display: grid;
-  place-items: center;
+  background: #222;
 }
 .cast-meta {
-  padding: 0.5rem 0.6rem;
+  padding: 8px 10px 12px;
 }
 .cast-meta .name {
   font-weight: 600;
-  font-size: 0.95rem;
-  color: #fff;
+  font-size: .95rem;
 }
 .cast-meta .role {
-  font-size: 0.82rem;
+  font-size: .8rem;
+  opacity: .85;
+}
+
+/* Cast strip block with glass look */
+.cast-block {
+  composes: glass-block;
+}
+
+/* Providers + Trailer keep your existing styling - KR 26/08/2025 */
+.providers-block .provider-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.providers-block .label {
+  font-size: 0.9rem;
   color: #cfcfcf;
+}
+.providers-block .logos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.provider-chip {
+  height: 38px;
+  min-width: 38px;
+  border-radius: 8px;
+  background: #1b1b1b;
+  display: grid;
+  place-items: center;
+  padding: 6px 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.provider-chip img {
+  max-height: 24px;
+  width: auto;
+  display: block;
+}
+
+.glass-block {
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+}
+
+/* Trailer block with glass look */
+.trailer-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 2rem 0;
+}
+.trailer-block {
+  composes: glass-block;
+
+}
+
+.trailer-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 2rem 0;
+}
+.trailer-wrapper iframe {
+  width: 100%;
+  max-width: 900px;
+  aspect-ratio: 16 / 9;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.45);
 }

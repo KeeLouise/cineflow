@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import register, trending_movies, search_movies, now_playing, streaming_trending, providers_movies, person_movies, movie_detail
+from .views import register, trending_movies, search_movies, now_playing, streaming_trending, providers_movies, person_movies, movie_detail, poster_palette
 from core.views import ping, secure_view
 
 urlpatterns = [
@@ -13,4 +13,5 @@ urlpatterns = [
     path("movies/providers/", providers_movies, name="movies_providers"),
     path("movies/by_person/", person_movies, name="person_movies"),
     path("movies/<int:tmdb_id>/", movie_detail, name="api_movie_detail"),  # KR 25/08/2025
+    path("movies/poster_palette/", poster_palette, name="api_poster_palette"),  # KR 26/08/2025
 ]

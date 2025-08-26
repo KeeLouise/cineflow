@@ -10,6 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "axios": "^1.11.0",
+    "bootstrap": "^5.3.8",
+    "color-thief-browser": "^2.0.2",
+    "colorthief": "^2.6.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.1"
