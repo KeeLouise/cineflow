@@ -26,7 +26,7 @@ def _tmdb_get(path, params=None):
 
     # If API key is missing, return a 500 response - KR 21/08/2025
     if not TMDB_KEY:
-        return None, Response({"detail": "TMBD_API_KEY not set on server"}, status=500)
+        return None, Response({"detail": "TMDB_API_KEY not set on server"}, status=500)
     
     url = f"{TMDB_BASE}{path}" 
     p = {"api_key": TMDB_KEY}    # Always include API key - KR 21/08/2025
@@ -41,7 +41,7 @@ def _tmdb_get(path, params=None):
     except requests.RequestException as e:
         # Catch network errors, bad status codes, etc. - KR 21/08/2025
         return None, Response(
-            {"detail": "TMBD request failed", "error": str(e)}, 
+            {"detail": "TMDB request failed", "error": str(e)}, 
             status=502
         ) 
 
@@ -237,3 +237,33 @@ def register(request):
     
     # Return field-specific validation errors
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def movie_detail(request, tmdb_id: int):
+    """
+    Return a single movie's detail and credits merged into one payload.
+    Cached for 30 minutes to reduce API calls. - KR 25/08/2025
+    """
+    cache_key = f"tmdb:movie:{tmdb_id}:detail+credits"
+    data = cache.get(cache_key)
+    if data:
+        return Response(data, status=200)
+    
+    #fetch core details - KR 26/08/2025
+    details, err = _tmdb_get(f"/movie/{tmdb_id}")
+    if err:
+        return err
+    
+    #fetch credits (cast and crew) - KR 26/08/2025
+    credits, err2 = _tmdb_get(f"/movie/{tmdb_id}/credits")
+    if err2:
+        return err2
+    
+    #merge minimally - KR 26/08/2025
+    merged = details or {}
+    merged["credits"] = credits or {"cast": [], "crew": []}
+
+    #cache for 30 mins - KR 26/08/2025
+    cache.set(cache_key, merged, 60 * 30)
+    return Response(merged, status=200)
