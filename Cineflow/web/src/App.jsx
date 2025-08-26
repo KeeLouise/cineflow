@@ -6,6 +6,7 @@ import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
 import Footer from "./components/Footer.jsx";
 import PrivateRoute from "@/components/PrivateRoute";
+import MovieDetail from "@/pages/MovieDetail.jsx";
 
 export default function App() {
   return (
@@ -16,14 +17,8 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
+          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>}/>
+          <Route path="/movie/:id" element={<MovieDetail />} />
         </Routes>
       </main>
       <Footer />
