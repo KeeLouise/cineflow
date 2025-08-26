@@ -39,3 +39,10 @@ export async function searchByPerson(q) {
   if (!res.ok) throw new Error(`Backend error ${res.status}`);
   return res.json();
 }
+
+// Fetch a single movie detail and credits from Django proxy - KR 26/08/2025
+export async function fetchMovieDetail(id) {
+  const res = await fetch(`/api/movies/${id}/`);
+  if (!res.ok) throw new Error(`Backend error ${res.status}`);
+  return res.json();
+}
