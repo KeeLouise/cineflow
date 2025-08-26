@@ -1,4 +1,5 @@
 // Home.jsx - Main landing page for Cineflow - KR 21/08/2025
+import { Link } from "react-router-dom";
 import React, { useEffect, useRef, useState, useRef as useRefAlias } from "react";
 import {
   fetchNowPlaying,
@@ -158,6 +159,7 @@ export default function Home() {
   // helper to render one poster card (used by all rails) - KR 25/08/2025
 const PosterCard = ({ m }) => (
   <article className="poster-card">
+    <Link to={`/movie/${m.id}`} className="text-decoration-none">
     <div className="poster-media">
       {m.poster_path ? (
         <img
@@ -190,6 +192,7 @@ const PosterCard = ({ m }) => (
         </span>
       </div>
     </div>
+    </Link>
   </article>
 );
 
