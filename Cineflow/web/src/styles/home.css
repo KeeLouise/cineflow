@@ -349,3 +349,33 @@
   background: rgba(255,255,255,0.08);
   color: #fff;
 }
+
+/* Provider filter chips */
+.provider-filter .pf-row {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.pf-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgb(156, 14, 156);
+  color: #eee;
+  font-size: .9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+.pf-chip:hover { transform: translateY(-1px); }
+
+.pf-chip.active {
+  background: #2563eb;          
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.pf-chip.clear { opacity: .85; }
+.pf-chip.clear.active { opacity: 1; }

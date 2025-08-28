@@ -1,6 +1,5 @@
-// Home.jsx - Main landing page for Cineflow - KR 21/08/2025
 import { Link } from "react-router-dom";
-import React, { useEffect, useRef, useState, useRef as useRefAlias } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   fetchNowPlaying,
   fetchStreamingTrending,
@@ -28,6 +27,14 @@ function useDebounced(value, delay = 400) {
   return debounced;
 }
 
+// Allowed providers using TMDB IDs - KR 28/08/2025
+const PROVIDER_OPTIONS = [
+  { id: 8,   label: "Netflix" },
+  { id: 337, label: "Disney+" },
+  { id: 531, label: "Paramount+" },
+  { id: 9,   label: "Prime Video" },
+];
+
 export default function Home() {
   // Local state for each section - KR 21/08/2025
   const [cinema, setCinema] = useState([]);
@@ -48,7 +55,7 @@ export default function Home() {
   // Region defaults (make user-selectable later) - KR 21/08/2025
   const REGION = "IE";
   // Providers empty = all platforms (add picker later) - KR 21/08/2025
-  const PROVIDERS = "";
+  const [selectedProviders, setSelectedProviders] = useState([]); // [] = all - KR 28/08/2025
 
   // refs for horizontal reels - KR 25/08/2025
   const cinemaRef = useRef(null);
@@ -67,28 +74,44 @@ export default function Home() {
     el.scrollBy({ left: dir * step, behavior: "smooth" });
   };
 
-  // Fetch both sections in parallel on mount - KR 21/08/2025
+  // Fetch "Now Playing" on mount - KR 21/08/2025
   useEffect(() => {
     (async () => {
       try {
         setLoadingCinema(true);
-        setLoadingStreaming(true);
-        const [np, st] = await Promise.all([
-          fetchNowPlaying(REGION, 1),
-          fetchStreamingTrending({ region: REGION, providers: PROVIDERS, page: 1 }),
-        ]);
+        const np = await fetchNowPlaying(REGION, 1);
         setCinema(np.results || []);
-        setLoadingCinema(false);
-        setStreaming(st.results || []);
-        setLoadingStreaming(false);
       } catch (e) {
         console.error("Home load failed:", e);
         setErr("Could not load content. Please try again.");
+      } finally {
         setLoadingCinema(false);
-        setLoadingStreaming(false);
       }
     })();
   }, []); // mount only - KR 21/08/2025
+
+  // Refetch "Trending on Streaming" when provider filter changes - KR 28/08/2025
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoadingStreaming(true);
+        const providersParam = selectedProviders.length
+          ? selectedProviders.join("|") // TMDB expects pipe-separated IDs
+          : "";
+        const st = await fetchStreamingTrending({
+          region: REGION,
+          providers: providersParam,
+          page: 1,
+        });
+        setStreaming(st.results || []);
+      } catch (e) {
+        console.error("Streaming fetch failed:", e);
+        setStreaming([]);
+      } finally {
+        setLoadingStreaming(false);
+      }
+    })();
+  }, [selectedProviders]);
 
   // Full results rail + suggestions when user pauses typing (single source of truth) - KR 25/08/2025
   useEffect(() => {
@@ -155,187 +178,228 @@ export default function Home() {
     };
   }, [debounced]);
 
+  // Provider filter UI - KR 28/08/2025
+  const toggleProvider = (id) => {
+    setSelectedProviders((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+  const clearProviders = () => setSelectedProviders([]);
+
   // helper to render one poster card (used by all rails) - KR 25/08/2025
-const PosterCard = ({ m }) => (
-  <article className="poster-card">
-    <Link to={`/movie/${m.id}`} className="text-decoration-none">
-    <div className="poster-media">
-      {m.poster_path ? (
-        <img
-          className="poster-img"
-          src={`https://image.tmdb.org/t/p/w500${m.poster_path}`}
-          alt={m.title}
-          loading="lazy"
-        />
-      ) : (
-        <div className="poster-fallback d-flex align-items-center justify-content-center text-muted">
-          No Image
+  const PosterCard = ({ m }) => (
+    <article className="poster-card">
+      <Link to={`/movie/${m.id}`} className="text-decoration-none">
+        <div className="poster-media">
+          {m.poster_path ? (
+            <img
+              className="poster-img"
+              src={`https://image.tmdb.org/t/p/w500${m.poster_path}`}
+              alt={m.title}
+              loading="lazy"
+            />
+          ) : (
+            <div className="poster-fallback d-flex align-items-center justify-content-center text-muted">
+              No Image
+            </div>
+          )}
+
+          {/* rating pill (TMDB out of 10) - KR 25/08/2025 */}
+          {m.vote_average ? (
+            <span className="badge-rating">{m.vote_average.toFixed(1)}</span>
+          ) : null}
+
+          {/* dark gradient overlay for legibility - KR 25/08/2025 */}
+          <div className="poster-overlay" />
         </div>
-      )}
 
-      {/* rating pill (TMDB out of 10) - KR 25/08/2025 */}
-      {m.vote_average ? (
-        <span className="badge-rating">{m.vote_average.toFixed(1)}</span>
-      ) : null}
-
-      {/* dark gradient overlay for legibility - KR 25/08/2025 */}
-      <div className="poster-overlay" />
-    </div>
-
-    <div className="poster-meta">
-      <div className="title" title={m.title}>{m.title}</div>
-      <div className="sub text-muted">
-        {/* year chip + formatted date - KR 25/08/2025 */}
-        <span className="chip-year">
-          {(m.release_date || "").slice(0, 4) || "—"}
-        </span>
-      </div>
-    </div>
-    </Link>
-  </article>
-);
+        <div className="poster-meta">
+          <div className="title" title={m.title}>{m.title}</div>
+          <div className="sub text-muted">
+            {/* year chip + formatted date - KR 25/08/2025 */}
+            <span className="chip-year">
+              {(m.release_date || "").slice(0, 4) || "—"}
+            </span>
+          </div>
+        </div>
+      </Link>
+    </article>
+  );
 
   return (
     <div className="home-page">
-    <div className="container-fluid py-5">
-      {/* Hero search wrapper - KR 25/08/2025 */}
-      <section className="hero-search mb-5">
-        <div className="container text-center">
-          <h1 className="display-5 mb-3">Welcome to Cineflow</h1>
-          <p className="lead mb-4">Search for your favourite films</p>
+      <div className="container-fluid py-5">
+        {/* Hero search wrapper - KR 25/08/2025 */}
+        <section className="hero-search mb-5">
+          <div className="container text-center">
+            <h1 className="display-5 mb-3">Welcome to Cineflow</h1>
+            <p className="lead mb-4">Search for your favourite films</p>
 
-          {/* SearchBar with suggestions (type-ahead) - single source of truth (no onSearch) - KR 25/08/2025 */}
-          <div className="searchbar-wrapper mx-auto">
-            <SearchBar
-              value={query}
-              onChange={(v) => {
-                setQuery(v);
-                // allow same text to re-trigger if user edits and returns - KR 25/08/2025
-                if (v.trim() !== lastQueryRef.current) {
-                  // let the debounced effect decide when to fetch
-                }
-              }}
-              isLoading={searching}
-              suggestions={suggestions}
-              onSelectSuggestion={(s) => {
-                // replace text with chosen suggestion - KR 25/08/2025
-                setQuery(s.label);
-                // debounced effect will run; if identical text, lastQueryRef prevents refetch - KR 25/08/2025
-              }}
-            />
-          </div>
-        </div>
-      </section>
-
-      {err && <div className="alert alert-danger">{err}</div>}
-
-      {/* If user is searching, show search rail first - KR 25/08/2025 */}
-      {query.trim().length >= 2 && (
-        <>
-        <div className="section-head mb-3 d-flex align-items-center justify-content-between">
-          <h2 className="mb-3">🔎 Results for “{debounced}”</h2>
-          </div>
-          {searching ? (
-            <SkeletonRow count={8} />
-          ) : results.length ? (
-            <div className="reel-wrap mb-5">
-              <button
-                type="button"
-                className="reel-btn left"
-                aria-label="Scroll search left"
-                onClick={() => scrollReel(searchRef, -1)}
-              >
-                ‹
-              </button>
-
-              <div ref={searchRef} className="h-scroll">
-                {results.map((m) => (
-                  <PosterCard key={`s-${m.id}`} m={m} />
-                ))}
-              </div>
-
-              <button
-                type="button"
-                className="reel-btn right"
-                aria-label="Scroll search right"
-                onClick={() => scrollReel(searchRef, 1)}
-              >
-                ›
-              </button>
+            {/* SearchBar with suggestions (type-ahead) - single source of truth (no onSearch) - KR 25/08/2025 */}
+            <div className="searchbar-wrapper mx-auto">
+              <SearchBar
+                value={query}
+                onChange={(v) => {
+                  setQuery(v);
+                  // allow same text to re-trigger if user edits and returns - KR 25/08/2025
+                  if (v.trim() !== lastQueryRef.current) {
+                    // let the debounced effect decide when to fetch
+                  }
+                }}
+                isLoading={searching}
+                suggestions={suggestions}
+                onSelectSuggestion={(s) => {
+                  // replace text with chosen suggestion - KR 25/08/2025
+                  setQuery(s.label);
+                  // debounced effect will run; if identical text, lastQueryRef prevents refetch - KR 25/08/2025
+                }}
+              />
             </div>
-          ) : (
-            <div className="text-muted mb-4">No results found.</div>
-          )}
-        </>
-      )}
-      {/* What's on in Cinemas - KR 21/08/2025 */}
-<div className="section-head mb-3 d-flex align-items-center justify-content-between">
-  <h2 className="m-0">🎟️ What’s on in Cinemas</h2>
-  <a className="link-ghost" href="#" aria-label="View all now playing">View all</a>
-</div>
-      <div className="reel-wrap mb-5">
-        <button
-          type="button"
-          className="reel-btn left"
-          aria-label="Scroll cinemas left"
-          onClick={() => scrollReel(cinemaRef, -1)}
-        >
-          ‹
-        </button>
+          </div>
+        </section>
 
-        <div ref={cinemaRef} className="h-scroll">
-          {loadingCinema ? (
-            <SkeletonRow count={8} />
-          ) : cinema.length ? (
-            cinema.map((m) => <PosterCard key={`c-${m.id}`} m={m} />)
-          ) : (
-            <div className="text-muted p-2">No cinema listings.</div>
-          )}
+        {err && <div className="alert alert-danger">{err}</div>}
+
+        {/* If user is searching, show search rail first - KR 25/08/2025 */}
+        {query.trim().length >= 2 && (
+          <>
+            <div className="section-head mb-3 d-flex align-items-center justify-content-between">
+              <h2 className="mb-3">🔎 Results for “{debounced}”</h2>
+            </div>
+            {searching ? (
+              <SkeletonRow count={8} />
+            ) : results.length ? (
+              <div className="reel-wrap mb-5">
+                <button
+                  type="button"
+                  className="reel-btn left"
+                  aria-label="Scroll search left"
+                  onClick={() => scrollReel(searchRef, -1)}
+                >
+                  ‹
+                </button>
+
+                <div ref={searchRef} className="h-scroll">
+                  {results.map((m) => (
+                    <PosterCard key={`s-${m.id}`} m={m} />
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="reel-btn right"
+                  aria-label="Scroll search right"
+                  onClick={() => scrollReel(searchRef, 1)}
+                >
+                  ›
+                </button>
+              </div>
+            ) : (
+              <div className="text-muted mb-4">No results found.</div>
+            )}
+          </>
+        )}
+
+        {/* What's on in Cinemas - KR 21/08/2025 */}
+        <div className="section-head mb-3 d-flex align-items-center justify-content-between">
+          <h2 className="m-0">🎟️ What’s on in Cinemas</h2>
+          <a className="link-ghost" href="#" aria-label="View all now playing">View all</a>
+        </div>
+        <div className="reel-wrap mb-5">
+          <button
+            type="button"
+            className="reel-btn left"
+            aria-label="Scroll cinemas left"
+            onClick={() => scrollReel(cinemaRef, -1)}
+          >
+            ‹
+          </button>
+
+          <div ref={cinemaRef} className="h-scroll">
+            {loadingCinema ? (
+              <SkeletonRow count={8} />
+            ) : cinema.length ? (
+              cinema.map((m) => <PosterCard key={`c-${m.id}`} m={m} />)
+            ) : (
+              <div className="text-muted p-2">No cinema listings.</div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="reel-btn right"
+            aria-label="Scroll cinemas right"
+            onClick={() => scrollReel(cinemaRef, 1)}
+          >
+            ›
+          </button>
         </div>
 
-        <button
-          type="button"
-          className="reel-btn right"
-          aria-label="Scroll cinemas right"
-          onClick={() => scrollReel(cinemaRef, 1)}
-        >
-          ›
-        </button>
-      </div>
-<div className="section-head mb-3 d-flex align-items-center justify-content-between">
-  <h2 className="m-0">Trending on Streaming</h2>
-  <a className="link-ghost" href="#" aria-label="View all now playing">View all</a>
-</div>
-      <div className="reel-wrap">
-        <button
-          type="button"
-          className="reel-btn left"
-          aria-label="Scroll streaming left"
-          onClick={() => scrollReel(streamingRef, -1)}
-        >
-          ‹
-        </button>
-
-        <div ref={streamingRef} className="h-scroll">
-          {loadingStreaming ? (
-            <SkeletonRow count={8} />
-          ) : streaming.length ? (
-            streaming.map((m) => <PosterCard key={`t-${m.id}`} m={m} />)
-          ) : (
-            <div className="text-muted p-2">No streaming results.</div>
-          )}
+        {/* Trending on Streaming + provider filter - KR 28/08/2025 */}
+        <div className="section-head mb-2 d-flex align-items-center justify-content-between">
+          <h2 className="m-0">📺 Trending on Streaming</h2>
+          <a className="link-ghost" href="#" aria-label="View all streaming">View all</a>
         </div>
 
-        <button
-          type="button"
-          className="reel-btn right"
-          aria-label="Scroll streaming right"
-          onClick={() => scrollReel(streamingRef, 1)}
-        >
-          ›
-        </button>
+        {/* Provider filter chips - KR 28/08/2025 */}
+        <div className="provider-filter mb-3">
+          <div className="pf-row">
+            {PROVIDER_OPTIONS.map((p) => {
+              const active = selectedProviders.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`pf-chip ${active ? "active" : ""}`}
+                  onClick={() => toggleProvider(p.id)}
+                  aria-pressed={active}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              className={`pf-chip clear ${selectedProviders.length === 0 ? "active" : ""}`}
+              onClick={clearProviders}
+              aria-pressed={selectedProviders.length === 0}
+              title="Show all providers"
+            >
+              All
+            </button>
+          </div>
+        </div>
+
+        <div className="reel-wrap">
+          <button
+            type="button"
+            className="reel-btn left"
+            aria-label="Scroll streaming left"
+            onClick={() => scrollReel(streamingRef, -1)}
+          >
+            ‹
+          </button>
+
+          <div ref={streamingRef} className="h-scroll">
+            {loadingStreaming ? (
+              <SkeletonRow count={8} />
+            ) : streaming.length ? (
+              streaming.map((m) => <PosterCard key={`t-${m.id}`} m={m} />)
+            ) : (
+              <div className="text-muted p-2">No streaming results.</div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="reel-btn right"
+            aria-label="Scroll streaming right"
+            onClick={() => scrollReel(streamingRef, 1)}
+          >
+            ›
+          </button>
+        </div>
       </div>
-    </div>
     </div>
   );
 }
