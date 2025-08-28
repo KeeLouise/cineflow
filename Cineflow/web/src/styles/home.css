@@ -34,6 +34,21 @@
   opacity: 0.9;
 }
 
+.home-page {
+  min-height: 100vh;
+  background: linear-gradient(
+    180deg,
+    #312f2f 0%,   /* deep near-black */
+    #000000 100%  /* pure black bottom */
+  );
+  color: #eaeaea; /* readable text */
+}
+
+.home-page h1,
+.home-page h2,
+.home-page p {
+  color: white; /* ensure headings and text show up clearly */
+}
   
 .reel-wrap {
   position: relative;

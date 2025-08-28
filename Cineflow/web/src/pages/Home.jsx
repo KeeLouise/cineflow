@@ -156,7 +156,6 @@ export default function Home() {
   }, [debounced]);
 
   // helper to render one poster card (used by all rails) - KR 25/08/2025
-  // helper to render one poster card (used by all rails) - KR 25/08/2025
 const PosterCard = ({ m }) => (
   <article className="poster-card">
     <Link to={`/movie/${m.id}`} className="text-decoration-none">
@@ -197,6 +196,7 @@ const PosterCard = ({ m }) => (
 );
 
   return (
+    <div className="home-page">
     <div className="container-fluid py-5">
       {/* Hero search wrapper - KR 25/08/2025 */}
       <section className="hero-search mb-5">
@@ -335,6 +335,7 @@ const PosterCard = ({ m }) => (
           ›
         </button>
       </div>
+    </div>
     </div>
   );
 }
