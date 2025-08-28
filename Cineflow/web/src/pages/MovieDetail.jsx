@@ -1,3 +1,4 @@
+// MovieDetail.jsx - Detail page with poster-derived colours - KR 26/08/2025
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchMovieDetail } from "@/api/movies";
@@ -9,6 +10,18 @@ const formatDate = (iso) => {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+};
+
+// map a provider name to a link (home for big 4, otherwise JustWatch search) - KR 26/08/2025
+const providerLink = (name, title, region = "IE") => {
+  const n = (name || "").toLowerCase();
+  if (n.includes("netflix")) return "https://www.netflix.com/";
+  if (n.includes("disney")) return "https://www.disneyplus.com/";
+  if (n.includes("prime")) return "https://www.primevideo.com/";
+  if (n.includes("paramount")) return "https://www.paramountplus.com/";
+  // fallback: JustWatch search for this title in the user region - KR 26/08/2025
+  const q = encodeURIComponent(title || "");
+  return `https://www.justwatch.com/${region.toLowerCase()}/search?q=${q}`;
 };
 
 export default function MovieDetail() {
@@ -49,13 +62,14 @@ export default function MovieDetail() {
         const end    = palette[1] ? `rgb(${palette[1].join(",")})` : "rgb(0,0,0)";
         const accent = palette[2] ? `rgb(${palette[2].join(",")})` : "rgb(35,35,35)";
         if (active) {
-          // set on :root so the full-page gradient uses these values - KR 26/08/2025
+          // set on :root so the full-page gradient and chips can use these values - KR 26/08/2025
           const rootStyle = document.documentElement.style;
           rootStyle.setProperty("--movie-bg-start", start);
           rootStyle.setProperty("--movie-bg-end", end);
           rootStyle.setProperty("--movie-accent", accent);
         }
       } catch {
+        // swallow; CSS has safe defaults - KR 26/08/2025
       }
     })();
     return () => { active = false; };
@@ -81,7 +95,6 @@ export default function MovieDetail() {
   const {
     title,
     poster_path,
-    backdrop_path, // not used as background - KR 26/08/2025
     overview,
     release_date,
     runtime,
@@ -90,18 +103,24 @@ export default function MovieDetail() {
     vote_count,
     credits = { cast: [], crew: [] },
     videos = { results: [] },
-    watch_providers = { results: {} },
+    watch_providers = { results: {} }, // if backend older than providers-normalised - KR 26/08/2025
+    providers,                          // preferred (if backend added merged['providers']) - KR 26/08/2025
   } = data;
+
+  // region fallback chain for provider blocks - KR 26/08/2025
+  const ieProviders =
+    providers ||
+    watch_providers.results?.IE ||
+    watch_providers.results?.US ||
+    {};
 
   const cast = (credits.cast || []).slice(0, 14); // trim cast strip - KR 26/08/2025
   const trailer = (videos.results || []).find(
     (v) => v.site === "YouTube" && v.type === "Trailer"
   );
-  
-  const ieProviders = data.providers || {};  // has flatrate / ads / free / rent / buy
 
+  // page wrapper for gradient - KR 26/08/2025
   return (
-    // page wrapper for gradient - KR 26/08/2025
     <div className="movie-page">
       <div className="container py-5">
         <div className="row g-4 align-items-start">
@@ -128,7 +147,7 @@ export default function MovieDetail() {
               {runtime ? <span className="chip">{runtime} min</span> : null}
               {genres.length ? (
                 <span className="chip chip-soft">
-                  {genres.map(g => g.name).join(" • ")}
+                  {genres.map((g) => g.name).join(" • ")}
                 </span>
               ) : null}
               {vote_average ? (
@@ -153,61 +172,150 @@ export default function MovieDetail() {
 
       {/* Content sections - KR 26/08/2025 */}
       <div className="container section-stack">
-        {/* Where to Watch - KR 26/08/2025 */}
-        {(ieProviders.flatrate?.length || ieProviders.rent?.length || ieProviders.buy?.length) ? (
-          <section className="providers-block card-block">
+        {/* Where to Watch (clickable chips) - KR 26/08/2025 */}
+        {(ieProviders.flatrate?.length ||
+          ieProviders.ads?.length ||
+          ieProviders.free?.length ||
+          ieProviders.rent?.length ||
+          ieProviders.buy?.length) ? (
+          <section className="providers-block card-block glass">
             <h2 className="h5 mb-3">Where to Watch</h2>
 
-            <div className="provider-row">
-              <div className="label">Included</div>
-              <div className="logos">
-                {(ieProviders.flatrate || []).map((p) => (
-                  <div className="provider-chip" key={`f-${p.provider_id}`}>
-                    <img
-                      src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                      alt={p.provider_name}
-                      loading="lazy"
-                    />
-                  </div>
-                ))}
+            {/* Included with subscription - KR 26/08/2025 */}
+            {(ieProviders.flatrate || []).length > 0 && (
+              <div className="provider-row">
+                <div className="label">Included</div>
+                <div className="logos">
+                  {ieProviders.flatrate.map((p) => (
+                    <a
+                      key={`fl-${p.provider_id}`}
+                      className="provider-chip"
+                      href={providerLink(p.provider_name, title, "IE")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${p.provider_name}`}
+                      aria-label={`Open ${p.provider_name}`}
+                    >
+                      <img
+                        src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                        alt={p.provider_name}
+                        loading="lazy"
+                      />
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="provider-row">
-              <div className="label">Rent</div>
-              <div className="logos">
-                {(ieProviders.rent || []).map((p) => (
-                  <div className="provider-chip" key={`r-${p.provider_id}`}>
-                    <img
-                      src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                      alt={p.provider_name}
-                      loading="lazy"
-                    />
-                  </div>
-                ))}
+            {/* Ad-supported - KR 26/08/2025 */}
+            {(ieProviders.ads || []).length > 0 && (
+              <div className="provider-row">
+                <div className="label">Ad-supported</div>
+                <div className="logos">
+                  {ieProviders.ads.map((p) => (
+                    <a
+                      key={`ads-${p.provider_id}`}
+                      className="provider-chip"
+                      href={providerLink(p.provider_name, title, "IE")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${p.provider_name}`}
+                      aria-label={`Open ${p.provider_name}`}
+                    >
+                      <img
+                        src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                        alt={p.provider_name}
+                        loading="lazy"
+                      />
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="provider-row">
-              <div className="label">Buy</div>
-              <div className="logos">
-                {(ieProviders.buy || []).map((p) => (
-                  <div className="provider-chip" key={`b-${p.provider_id}`}>
-                    <img
-                      src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                      alt={p.provider_name}
-                      loading="lazy"
-                    />
-                  </div>
-                ))}
+            {/* Free - KR 26/08/2025 */}
+            {(ieProviders.free || []).length > 0 && (
+              <div className="provider-row">
+                <div className="label">Free</div>
+                <div className="logos">
+                  {ieProviders.free.map((p) => (
+                    <a
+                      key={`free-${p.provider_id}`}
+                      className="provider-chip"
+                      href={providerLink(p.provider_name, title, "IE")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${p.provider_name}`}
+                      aria-label={`Open ${p.provider_name}`}
+                    >
+                      <img
+                        src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                        alt={p.provider_name}
+                        loading="lazy"
+                      />
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Rent - KR 26/08/2025 */}
+            {(ieProviders.rent || []).length > 0 && (
+              <div className="provider-row">
+                <div className="label">Rent</div>
+                <div className="logos">
+                  {ieProviders.rent.map((p) => (
+                    <a
+                      key={`rent-${p.provider_id}`}
+                      className="provider-chip"
+                      href={providerLink(p.provider_name, title, "IE")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${p.provider_name}`}
+                      aria-label={`Open ${p.provider_name}`}
+                    >
+                      <img
+                        src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                        alt={p.provider_name}
+                        loading="lazy"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Buy - KR 26/08/2025 */}
+            {(ieProviders.buy || []).length > 0 && (
+              <div className="provider-row">
+                <div className="label">Buy</div>
+                <div className="logos">
+                  {ieProviders.buy.map((p) => (
+                    <a
+                      key={`buy-${p.provider_id}`}
+                      className="provider-chip"
+                      href={providerLink(p.provider_name, title, "IE")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${p.provider_name}`}
+                      aria-label={`Open ${p.provider_name}`}
+                    >
+                      <img
+                        src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                        alt={p.provider_name}
+                        loading="lazy"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         ) : null}
 
         {/* Trailer (YouTube) - KR 26/08/2025 */}
         {trailer ? (
-          <section className="card-block glass-block">
+          <section className="card-block glass">
             <h2 className="h5 mb-3">Trailer</h2>
             <div className="trailer-wrapper">
               <iframe
@@ -222,7 +330,7 @@ export default function MovieDetail() {
 
         {/* Top Cast strip - KR 26/08/2025 */}
         {cast.length ? (
-          <section className="card-block glass-block">
+          <section className="card-block glass">
             <h2 className="h5 mb-3">Top Cast</h2>
             <div className="h-scroll cast-strip">
               {cast.map((p) => (

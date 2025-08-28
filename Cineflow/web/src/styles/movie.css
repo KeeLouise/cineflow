@@ -35,7 +35,7 @@
 }
 
 .movie-overview {
-  color: #d0d0d0;
+  color: white;
   line-height: 1.65;
   max-width: 70ch;
   font-size: 1.05rem;
@@ -89,6 +89,14 @@
   padding: 16px;
   box-shadow: 0 10px 24px rgba(0,0,0,0.25);
   margin-bottom: 20px;
+}
+
+/* glass card variant for blocks - KR 26/08/2025 */
+.card-block.glass {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
 }
 
 /* Cast strip - KR 26/08/2025 */
@@ -148,22 +156,36 @@
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+/* clickable chip look & feel - KR 26/08/2025 */
 .provider-chip {
-  height: 38px;
-  min-width: 38px;
-  border-radius: 8px;
-  background: #1b1b1b;
+  height: 50px;
+  min-width: 70px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
   display: grid;
   place-items: center;
   padding: 6px 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
+  text-decoration: none; /* anchor reset */
 }
 .provider-chip img {
-  max-height: 24px;
+  max-height: 40px;
   width: auto;
   display: block;
 }
 
+.provider-chip:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.09);
+  border-color: rgba(255,255,255,0.16);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+}
+.provider-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(180, 220, 255, 0.35);
+}
 .glass-block {
   border-radius: 16px;
   padding: 16px;
