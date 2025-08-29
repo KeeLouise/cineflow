@@ -174,15 +174,24 @@ def streaming_trending(request):
     Trending on streaming (TMDB /discover/movie)
     Query params:
       - region (default "US") => watch_region
-      - providers (comma-separated TMDB provider IDs, optional) => with_watch_providers
-      - types (default "flatrate,ads,free") => with_watch_monetization_types
+      - providers (pipe-separated TMDB provider IDs, optional) => with_watch_providers
+      - types (default depends: flatrate if providers present, else flatrate,ads,free)
       - page (default "1")
-    Cached for 10 minutes. - KR 21/08/2025
+      - broad (0/1) → when 1 and providers present, allow ads/free too
+      - debug (1) → include _debug_params in the response
+    Cached for 10 minutes.
     """
     region = request.query_params.get("region", "US")
-    providers = request.query_params.get("providers", "") 
-    types = request.query_params.get("types", "flatrate,ads,free")
+    providers = request.query_params.get("providers", "")
     page = request.query_params.get("page", "1")
+    broad = request.query_params.get("broad") in ("1", "true", "yes")
+    debug = request.query_params.get("debug") in ("1", "true", "yes")
+
+    # If providers are selected, default to stricter catalog (subscription only) - KR 29/08/2025
+    if providers:
+        types = request.query_params.get("types", "flatrate" if not broad else "flatrate,ads,free")
+    else:
+        types = request.query_params.get("types", "flatrate,ads,free")
 
     params = {
         "watch_region": region,
@@ -191,7 +200,7 @@ def streaming_trending(request):
         "page": page,
     }
     if providers:
-        params["with_watch_providers"] = providers
+        params["with_watch_providers"] = providers  # TMDB wants pipe-separated IDs
 
     cache_key = f"tmdb:streaming:{region}:{providers}:{types}:p{page}"
     data = cache.get(cache_key)
@@ -199,9 +208,50 @@ def streaming_trending(request):
         data, err = _tmdb_get("/discover/movie", params)
         if err:
             return err
+        # Attach debug echo if requested
+        if debug:
+            data = dict(data)
+            data["_debug_params"] = params
         cache.set(cache_key, data, 60 * 10)
+
+    elif debug:
+        # Ensure debug shows for cached responses too
+        d = dict(data)
+        d["_debug_params"] = params
+        return Response(d, status=200)
+
     return Response(data, status=200)
 
+def _tmdb_get(path, params=None):
+    """
+    Generic helper to call the TMDB API.
+    - Builds the full URL with `TMDB_BASE` + endpoint path.
+    - Adds the API key automatically to all requests.
+    - Handles exceptions and timeouts.
+    - Returns (data, None) on success OR (None, Response) on error.
+    """
+
+    if not TMDB_KEY:
+        return None, Response({"detail": "TMDB_API_KEY not set on server"}, status=500)
+
+    url = f"{TMDB_BASE}{path}"
+    p = {"api_key": TMDB_KEY}
+    if params:
+        p.update(params)
+
+    try:
+        # Log the final URL including query params for debugging
+        full_url = requests.Request('GET', url, params=p).prepare().url
+        print("[TMDB GET]", full_url)
+
+        r = requests.get(url, params=p, timeout=6)
+        r.raise_for_status()
+        return r.json(), None
+    except requests.RequestException as e:
+        return None, Response(
+            {"detail": "TMDB request failed", "error": str(e)},
+            status=502
+        )
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
