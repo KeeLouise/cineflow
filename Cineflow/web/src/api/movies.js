@@ -1,48 +1,77 @@
-const API_KEY = import.meta.env.VITE_TMDB_API_KEY;  
-const BASE_URL = "https://api.themoviedb.org/3";  // Not used directly anymore
+import api from "./client"; // axios instance with baseURL: '/api'
 
-//Fetch trending movies of the week (from Django backend). - KR 21/08/2025
- 
-export async function fetchTrendingMovies() {
-  const res = await fetch("/api/movies/trending/");
-  if (!res.ok) throw new Error(`Backend error ${res.status}`);
-  return res.json();  // JSON data forwarded from TMDB
+// --- Helpers --- KR 28/08/2025
+
+export function buildProvidersParam(ids) {
+  return Array.isArray(ids) && ids.length ? ids.join("|") : "";
 }
 
-//Search movies by title (from Django backend).
+// --- Movie API wrappers (Django backend proxies TMDB) --- KR 21/08/2025
 
-export async function searchMovies(q) {
-  const res = await fetch(`/api/movies/search/?q=${encodeURIComponent(q)}`);
-  if (!res.ok) throw new Error(`Backend error ${res.status}`);
-  return res.json();
+// Fetch trending movies of the week (from Django backend). - KR 21/08/2025
+export async function fetchTrendingMovies() {
+  const { data } = await api.get("/movies/trending/");
+  return data; // JSON data forwarded from TMDB
+}
+
+// Search movies by title (from Django backend). - KR 21/08/2025
+export async function searchMovies(q, opts = {}) {
+  const { signal } = opts;
+  const { data } = await api.get("/movies/search/", {
+    params: { q },
+    signal,
+  });
+  return data;
+}
+
+// Search by person/actor -> movie credits (via Django backend). - KR 25/08/2025
+export async function searchByPerson(q, opts = {}) {
+  const { signal } = opts;
+  const { data } = await api.get("/movies/by_person/", {
+    params: { q },
+    signal,
+  });
+  return data;
 }
 
 // Fetch what's currently playing in cinemas. - KR 21/08/2025
-export async function fetchNowPlaying(region = "IE", page = 1) {
-  const res = await fetch(`/api/movies/now_playing/?region=${region}&page=${page}`);
-  if (!res.ok) throw new Error(`Backend error ${res.status}`);
-  return res.json();
+export async function fetchNowPlaying(region = "GB", page = 1) {
+  const { data } = await api.get("/movies/now_playing/", {
+    params: { region, page },
+  });
+  return data;
 }
 
-// Trending on streaming - KR 21/08/2025
-export async function fetchStreamingTrending({ region = "IE", providers = "", page = 1, types = "flatrate,ads,free" } = {}) {
-  const qs = new URLSearchParams({ region, page, types });
-  if (providers) qs.set("providers", providers);
-  const res = await fetch(`/api/movies/streaming_trending/?${qs.toString()}`);
-  if (!res.ok) throw new Error(`Backend error ${res.status}`);
-  return res.json();
+export async function fetchStreamingTrending({
+  region = "GB",
+  providers = "",
+  types = "flatrate,ads,free",
+  page = 1,
+}) {
+  const params = {
+    region,
+    ...(providers ? { providers } : {}),
+    types,
+    page,
+  };
+
+  // DEV: bypass cache + get the params the server sent to TMDB
+  if (import.meta.env.DEV) params.debug = 1;
+
+  const { data } = await api.get("/movies/streaming_trending/", { params });
+
+  if (import.meta.env.DEV && data?._debug_params) {
+    console.log("[DISCOVER DEBUG] sent-to-TMDB:", data._debug_params);
+    console.log("[DISCOVER DEBUG] results:", data?.results?.length ?? 0);
+  }
+
+  return data;
 }
 
-// search by person/actor - KR 25/08/2025
-export async function searchByPerson(q) {
-  const res = await fetch(`/api/movies/by_person/?q=${encodeURIComponent(q)}`);
-  if (!res.ok) throw new Error(`Backend error ${res.status}`);
-  return res.json();
-}
-
-// Fetch a single movie detail and credits from Django proxy - KR 26/08/2025
-export async function fetchMovieDetail(id) {
-  const res = await fetch(`/api/movies/${id}/`);
-  if (!res.ok) throw new Error(`Backend error ${res.status}`);
-  return res.json();
+// Fetch a single movie detail (+credits,+videos,+providers). - KR 26/08/2025
+export async function fetchMovieDetail(id, region = "GB") {
+  const { data } = await api.get(`/movies/${id}/`, {
+    params: { region },
+  });
+  return data;
 }

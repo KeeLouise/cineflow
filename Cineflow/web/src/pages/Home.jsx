@@ -53,9 +53,18 @@ export default function Home() {
   const [err, setErr] = useState("");
 
   // Region defaults (make user-selectable later) - KR 21/08/2025
-  const REGION = "IE";
-  // Providers empty = all platforms (add picker later) - KR 21/08/2025
-  const [selectedProviders, setSelectedProviders] = useState([]); // [] = all - KR 28/08/2025
+  const REGION = "GB";
+
+  // Provider filter (chips) - KR 28/08/2025
+  const [selectedProviders, setSelectedProviders] = useState([]); // [] = all
+
+  // Monetization types toggle (chip) - KR 28/08/2025
+  const [includeRentBuy, setIncludeRentBuy] = useState(true); // default ON for broader results
+
+  // Paging for streaming rail - KR 28/08/2025
+  const [streamingPage, setStreamingPage] = useState(1);       // ADDED BACK
+  const [streamingHasMore, setStreamingHasMore] = useState(true); // ADDED BACK
+  const [fallbackNote, setFallbackNote] = useState("");        // ADDED BACK (UI hint when few results)
 
   // refs for horizontal reels - KR 25/08/2025
   const cinemaRef = useRef(null);
@@ -74,7 +83,7 @@ export default function Home() {
     el.scrollBy({ left: dir * step, behavior: "smooth" });
   };
 
-  // Fetch "Now Playing" on mount - KR 21/08/2025
+  // Fetch "What's on in Cinemas" on mount - KR 21/08/2025
   useEffect(() => {
     (async () => {
       try {
@@ -82,7 +91,7 @@ export default function Home() {
         const np = await fetchNowPlaying(REGION, 1);
         setCinema(np.results || []);
       } catch (e) {
-        console.error("Home load failed:", e);
+        console.error("Now playing load failed:", e);
         setErr("Could not load content. Please try again.");
       } finally {
         setLoadingCinema(false);
@@ -90,28 +99,47 @@ export default function Home() {
     })();
   }, []); // mount only - KR 21/08/2025
 
-  // Refetch "Trending on Streaming" when provider filter changes - KR 28/08/2025
+  // Refetch streaming when provider filter / monetization changes - KR 28/08/2025
   useEffect(() => {
     (async () => {
       try {
         setLoadingStreaming(true);
+
         const providersParam = selectedProviders.length
-          ? selectedProviders.join("|") // TMDB expects pipe-separated IDs
+          ? selectedProviders.join("|")
           : "";
+
+        // strict by default when any provider selected; otherwise allow ads/free
+        const baseTypes = selectedProviders.length ? "flatrate" : "flatrate,ads,free";
+        const types = includeRentBuy ? "rent,buy"
+        :  (selectedProviders.length ? "flatrate" : "flatrate,ads,free");
+
         const st = await fetchStreamingTrending({
           region: REGION,
           providers: providersParam,
+          types,
           page: 1,
         });
-        setStreaming(st.results || []);
+
+        const list = st.results || [];
+        setStreaming(list);
+        setStreamingPage(1);                 // reset paging
+        setStreamingHasMore(list.length >= 20); // naive check for more pages
+        setFallbackNote(
+          list.length < 10 && (providersParam || includeRentBuy)
+            ? "Limited results for this selection. Try adding providers or toggling rent/buy."
+            : ""
+        );
       } catch (e) {
         console.error("Streaming fetch failed:", e);
         setStreaming([]);
+        setStreamingHasMore(false);
+        setFallbackNote("No streaming results for this selection.");
       } finally {
         setLoadingStreaming(false);
       }
     })();
-  }, [selectedProviders]);
+  }, [selectedProviders, includeRentBuy]); // KR 28/08/2025
 
   // Full results rail + suggestions when user pauses typing (single source of truth) - KR 25/08/2025
   useEffect(() => {
@@ -178,7 +206,7 @@ export default function Home() {
     };
   }, [debounced]);
 
-  // Provider filter UI - KR 28/08/2025
+  // Provider filter UI (chips) - KR 28/08/2025
   const toggleProvider = (id) => {
     setSelectedProviders((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -342,7 +370,7 @@ export default function Home() {
         </div>
 
         {/* Provider filter chips - KR 28/08/2025 */}
-        <div className="provider-filter mb-3">
+        <div className="provider-filter mb-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
           <div className="pf-row">
             {PROVIDER_OPTIONS.map((p) => {
               const active = selectedProviders.includes(p.id);
@@ -368,7 +396,24 @@ export default function Home() {
               All
             </button>
           </div>
+
+          {/* Monetization chip to widen results - KR 28/08/2025 */}
+          <button
+            type="button"
+            className={`pf-chip ${includeRentBuy ? "active" : ""}`}
+            onClick={() => setIncludeRentBuy((v) => !v)}
+            aria-pressed={includeRentBuy}
+            title="Include rent/buy options to widen results"
+          >
+            Rent/Buy
+          </button>
         </div>
+
+        {fallbackNote && (
+          <div className="alert alert-warning py-2 px-3 mb-3" role="status">
+            {fallbackNote}
+          </div>
+        )}
 
         <div className="reel-wrap">
           <button
