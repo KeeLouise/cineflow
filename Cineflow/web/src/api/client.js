@@ -1,23 +1,27 @@
 import axios from 'axios'
 
 // Create a base Axios instance pointing to Django backend via Vite proxy - KR 18/08/2025
-const api = axios.create({ baseURL: '/api' });    
+const api = axios.create({ baseURL: '/api' });
 
 // Attach access token to every request if it exists in localStorage - KR 18/08/2025
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("access");
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
+  const token = localStorage.getItem("access");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
 });
 
-//prevents multiple refresh requests - KR 21/08/2025
+// prevents multiple refresh requests - KR 21/08/2025
 let isRefreshing = false;
 let pendingQueue = [];
 
+// single-shot redirect guard to avoid loops - KR 29/08/2025
+let didRedirectToLogin = false;
+
 const processQueue = (error, token = null) => {
   pendingQueue.forEach(({ resolve, reject, original }) => {
-    if (error) reject(error);
-    else {
+    if (error) {
+      reject(error);
+    } else {
       original.headers.Authorization = `Bearer ${token}`;
       resolve(api(original));
     }
@@ -25,61 +29,49 @@ const processQueue = (error, token = null) => {
   pendingQueue = [];
 };
 
-// Handle expired access tokens automatically - KR 19/08/2025
+// Utility: identify endpoints that it should never try to refresh for - KR 29/08/2025
+const isTokenEndpoint = (url = "") =>
+  url.includes("/api/token/") || url.includes("/token/");
+
+// Utility: dev/HMR/static requests to ignore - KR 29/08/2025
+const isHmrOrStatic = (url = "") =>
+  url.startsWith("/@") ||
+  url.includes("@react-refresh") ||
+  url.includes("vite") ||
+  url.endsWith(".map") ||
+  url.endsWith(".ico");
+
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const original = error.config;  
+    const original = error.config || {};
+    const status = error.response?.status;
 
-    // if request failed with 401 and hasn't already been retried - KR 19/08/2025
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true;  // mark as retried
+    // Guards
+    const isApi = typeof original.url === "string" && original.url.startsWith("/api/");
+    const isDev = !!import.meta?.env?.DEV;
+    const isHmr =
+      typeof original.url === "string" &&
+      (original.url.startsWith("/@") ||
+       original.url.includes("@react-refresh") ||
+       original.url.includes("vite/client"));
 
-      // if another refresh request is already happening, queue this request - KR 21/08/2025
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          pendingQueue.push({ resolve, reject, original });
-        });
-      }
-
-      isRefreshing = true;
-      try {
-        // grab refresh token from storage - KR 19/08/2025
-        const refresh = localStorage.getItem("refresh");
-        if (!refresh) throw new Error("No refresh token");
-
-        // request a new access token from Django using the refresh token - KR 19/08/2025
-        const { data } = await axios.post("/api/token/refresh/", { refresh });
-
-        // save the new access token in localStorage - KR 20/08/2025
-        localStorage.setItem("access", data.access);
-
-        // attach new access token to the original request headers - KR 20/08/2025
-        original.headers.Authorization = `Bearer ${data.access}`;
-
-        // process all queued requests with new token - KR 20/08/2025
-        processQueue(null, data.access);
-
-        // retry the original request with the new token - KR 20/08/2025
-        return api(original);
-
-      } catch (e) {
-        // refresh failed (expired/invalid) - force logout - KR 20/08/2025
-        localStorage.removeItem("access");
-        localStorage.removeItem("refresh");
-
-        // fail all queued requests too - KR 20/08/2025
-        processQueue(e, null);
-
-        // redirect only if not already on login page - KR 20/08/2025
-        if (window.location.pathname !== "/login") {
-          window.location.href = "/login";
-        }
-      } finally {
-        isRefreshing = false; // allow future refresh attempts - KR 20/08/2025
-      }
+    // Only try refresh if it's an API call and 401
+    if (status === 401 && isApi && !original._retry) {
+      original._retry = true;
     }
-    // any other error - reject - KR 20/08/2025
+
+    // Avoid redirect loops during dev
+    if (isDev || !isApi || isHmr) {
+      return Promise.reject(error);
+    }
+
+    if (status === 401) {
+      localStorage.removeItem("access");
+      localStorage.removeItem("refresh");
+      window.location.href = "/login";
+    }
+
     return Promise.reject(error);
   }
 );
