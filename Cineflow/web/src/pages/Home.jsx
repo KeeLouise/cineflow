@@ -1,3 +1,4 @@
+// Home.jsx - Main landing page for Cineflow - KR 21/08/2025
 import { Link } from "react-router-dom";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -62,14 +63,22 @@ export default function Home() {
   const [includeRentBuy, setIncludeRentBuy] = useState(true); // default ON for broader results
 
   // Paging for streaming rail - KR 28/08/2025
-  const [streamingPage, setStreamingPage] = useState(1);       // ADDED BACK
-  const [streamingHasMore, setStreamingHasMore] = useState(true); // ADDED BACK
-  const [fallbackNote, setFallbackNote] = useState("");        // ADDED BACK (UI hint when few results)
+  const [streamingPage, setStreamingPage] = useState(1);
+  const [streamingHasMore, setStreamingHasMore] = useState(true);
+  const [fallbackNote, setFallbackNote] = useState(""); // UI hint when few results - KR 28/08/2025
+
+  // Paging for cinemas rail - KR 29/08/2025
+  const [cinemaPage, setCinemaPage] = useState(1);
+  const [cinemaHasMore, setCinemaHasMore] = useState(true);
 
   // refs for horizontal reels - KR 25/08/2025
   const cinemaRef = useRef(null);
   const streamingRef = useRef(null);
   const searchRef = useRef(null);
+
+  // Infinite-scroll sentinels - KR 29/08/2025
+  const cinemaSentinelRef = useRef(null);
+  const streamingSentinelRef = useRef(null);
 
   // remember last query sent to backend to avoid re-fetching identical text - KR 25/08/2025
   const lastQueryRef = useRef("");
@@ -89,7 +98,10 @@ export default function Home() {
       try {
         setLoadingCinema(true);
         const np = await fetchNowPlaying(REGION, 1);
-        setCinema(np.results || []);
+        const list = np.results || [];
+        setCinema(list);
+        setCinemaPage(1);
+        setCinemaHasMore((np.page || 1) < (np.total_pages || 1)); // there are more pages? - KR 29/08/2025
       } catch (e) {
         console.error("Now playing load failed:", e);
         setErr("Could not load content. Please try again.");
@@ -109,10 +121,9 @@ export default function Home() {
           ? selectedProviders.join("|")
           : "";
 
-        // strict by default when any provider selected; otherwise allow ads/free
+        // strict if any providers selected; else allow ads/free - KR 29/08/2025
         const baseTypes = selectedProviders.length ? "flatrate" : "flatrate,ads,free";
-        const types = includeRentBuy ? "rent,buy"
-        :  (selectedProviders.length ? "flatrate" : "flatrate,ads,free");
+        const types = includeRentBuy ? `${baseTypes},rent,buy` : baseTypes;
 
         const st = await fetchStreamingTrending({
           region: REGION,
@@ -123,8 +134,8 @@ export default function Home() {
 
         const list = st.results || [];
         setStreaming(list);
-        setStreamingPage(1);                 // reset paging
-        setStreamingHasMore(list.length >= 20); // naive check for more pages
+        setStreamingPage(1); // reset paging
+        setStreamingHasMore((st.page || 1) < (st.total_pages || 1)); // there are more pages? - KR 29/08/2025
         setFallbackNote(
           list.length < 10 && (providersParam || includeRentBuy)
             ? "Limited results for this selection. Try adding providers or toggling rent/buy."
@@ -140,6 +151,111 @@ export default function Home() {
       }
     })();
   }, [selectedProviders, includeRentBuy]); // KR 28/08/2025
+
+  // Load more streaming (infinite scroll) - KR 29/08/2025
+  const loadMoreStreaming = async () => {
+    if (!streamingHasMore || loadingStreaming) return;
+    try {
+      setLoadingStreaming(true);
+
+      const providersParam = selectedProviders.length
+        ? selectedProviders.join("|")
+        : "";
+
+      const baseTypes = selectedProviders.length ? "flatrate" : "flatrate,ads,free";
+      const types = includeRentBuy ? `${baseTypes},rent,buy` : baseTypes;
+
+      const nextPage = streamingPage + 1;
+      const st = await fetchStreamingTrending({
+        region: REGION,
+        providers: providersParam,
+        types,
+        page: nextPage,
+      });
+
+      const more = st.results || [];
+      // Dedupe on append - KR 29/08/2025
+      const seen = new Set(streaming.map((m) => m.id));
+      const merged = [...streaming, ...more.filter((m) => m?.id && !seen.has(m.id))];
+
+      setStreaming(merged);
+      setStreamingPage(nextPage);
+      setStreamingHasMore((st.page || nextPage) < (st.total_pages || nextPage));
+    } catch (e) {
+      console.error("Load more streaming failed:", e);
+      setStreamingHasMore(false);
+    } finally {
+      setLoadingStreaming(false);
+    }
+  };
+
+  // Load more cinemas (infinite scroll) - KR 29/08/2025
+  const loadMoreCinema = async () => {
+    if (!cinemaHasMore || loadingCinema) return;
+    try {
+      setLoadingCinema(true);
+      const nextPage = cinemaPage + 1;
+      const np = await fetchNowPlaying(REGION, nextPage);
+      const more = np.results || [];
+
+      // Dedupe on append - KR 29/08/2025
+      const seen = new Set(cinema.map((m) => m.id));
+      const merged = [...cinema, ...more.filter((m) => m?.id && !seen.has(m.id))];
+
+      setCinema(merged);
+      setCinemaPage(nextPage);
+      setCinemaHasMore((np.page || nextPage) < (np.total_pages || nextPage));
+    } catch (e) {
+      console.error("Load more cinemas failed:", e);
+      setCinemaHasMore(false);
+    } finally {
+      setLoadingCinema(false);
+    }
+  };
+
+ // IntersectionObserver for Streaming inside horizontal scroller - KR 01/09/2025
+useEffect(() => {
+  if (!streamingHasMore) return;
+  const rootEl = streamingRef.current;
+  const target = streamingSentinelRef.current;
+  if (!rootEl || !target) return;
+
+  const io = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) loadMoreStreaming();
+    },
+    {
+      root: rootEl,                 
+      rootMargin: "0px 800px 0px 0px", // prefetch ~800px before right edge - KR 01/09/2025
+      threshold: 0,
+    }
+  );
+
+  io.observe(target);
+  return () => io.disconnect();
+}, [streamingHasMore, loadMoreStreaming]);
+
+  // IntersectionObserver for cinema sentinel - KR 29/08/2025
+  useEffect(() => {
+    if (!cinemaHasMore) return;
+    const rootEl = cinemaRef.current;
+    const target = cinemaSentinelRef.current;
+    if (!rootEl || !target) return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMoreCinema();
+      },
+      {
+        root:rootEl,
+        rootMargin: "0px 800px 0px 0px",
+        threshold: 0,
+      }
+    );
+
+    io.observe(target);
+    return () => io.disconnect();
+  }, [cinemaHasMore, loadMoreCinema]);
 
   // Full results rail + suggestions when user pauses typing (single source of truth) - KR 25/08/2025
   useEffect(() => {
@@ -333,7 +449,7 @@ export default function Home() {
           <h2 className="m-0">🎟️ What’s on in Cinemas</h2>
           <a className="link-ghost" href="#" aria-label="View all now playing">View all</a>
         </div>
-        <div className="reel-wrap mb-5">
+        <div className="reel-wrap mb-3">
           <button
             type="button"
             className="reel-btn left"
@@ -344,13 +460,16 @@ export default function Home() {
           </button>
 
           <div ref={cinemaRef} className="h-scroll">
-            {loadingCinema ? (
+            {loadingCinema && cinema.length === 0 ? (
               <SkeletonRow count={8} />
             ) : cinema.length ? (
               cinema.map((m) => <PosterCard key={`c-${m.id}`} m={m} />)
             ) : (
               <div className="text-muted p-2">No cinema listings.</div>
             )}
+
+          {/* Infinite scroll sentinel for cinemas - KR 29/08/2025 */}
+        <div ref={cinemaSentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
           </div>
 
           <button
@@ -362,6 +481,7 @@ export default function Home() {
             ›
           </button>
         </div>
+        
 
         {/* Trending on Streaming + provider filter - KR 28/08/2025 */}
         <div className="section-head mb-2 d-flex align-items-center justify-content-between">
@@ -426,13 +546,17 @@ export default function Home() {
           </button>
 
           <div ref={streamingRef} className="h-scroll">
-            {loadingStreaming ? (
+            {loadingStreaming && streaming.length === 0 ? (
               <SkeletonRow count={8} />
             ) : streaming.length ? (
               streaming.map((m) => <PosterCard key={`t-${m.id}`} m={m} />)
             ) : (
               <div className="text-muted p-2">No streaming results.</div>
             )}
+
+            {/* Infinite scroll for streaming - KR 29/08/2025 */}
+        <div ref={streamingSentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
+
           </div>
 
           <button
@@ -444,6 +568,7 @@ export default function Home() {
             ›
           </button>
         </div>
+        
       </div>
     </div>
   );

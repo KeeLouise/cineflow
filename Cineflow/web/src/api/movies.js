@@ -55,15 +55,7 @@ export async function fetchStreamingTrending({
     page,
   };
 
-  // DEV: bypass cache + get the params the server sent to TMDB
-  if (import.meta.env.DEV) params.debug = 1;
-
   const { data } = await api.get("/movies/streaming_trending/", { params });
-
-  if (import.meta.env.DEV && data?._debug_params) {
-    console.log("[DISCOVER DEBUG] sent-to-TMDB:", data._debug_params);
-    console.log("[DISCOVER DEBUG] results:", data?.results?.length ?? 0);
-  }
 
   return data;
 }
