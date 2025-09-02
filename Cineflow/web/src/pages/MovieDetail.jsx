@@ -349,7 +349,7 @@ export default function MovieDetail() {
                   )}
                   <div className="cast-meta">
                     <div className="name">{p.name}</div>
-                    <div className="role text-muted">{p.character || "—"}</div>
+                    <div className="role text-white">{p.character || "—"}</div>
                   </div>
                 </article>
               ))}
