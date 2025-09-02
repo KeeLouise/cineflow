@@ -11,3 +11,11 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         #Django's built-in user creation to hash the password properly - KR 19/08/2025
         return User.objects.create_user(**validated_data)
+    
+
+from .models import MoodKeyword
+
+class MoodKeywordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MoodKeyword
+        fields = ["id", "mood", "keyword_id", "keyword_name", "weight"]
