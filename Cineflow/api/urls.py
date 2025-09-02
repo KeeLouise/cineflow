@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import register, trending_movies, search_movies, now_playing, streaming_trending, providers_movies, person_movies, movie_detail, poster_palette, mood_discover, mood_refresh_snapshot, moods_config, mood_pins_mutate, mood_keywords_mutate, mood_seed_from_movie
+from .views import trending_movies, search_movies, now_playing, streaming_trending, providers_movies, person_movies, movie_detail, poster_palette, mood_discover, mood_refresh_snapshot
 from core.views import ping, secure_view
 from django.urls import path
 from rest_framework_simplejwt.views import (
@@ -30,9 +30,5 @@ urlpatterns = [
     # Protected mood endpoint (requires JWT)
     path("movies/mood/<str:mood_key>/", mood_discover, name="mood-discover"),
     path("moods/refresh/", mood_refresh_snapshot, name="mood-refresh"),
-    path("moods/admin/refresh/", mood_refresh_snapshot, name="mood_refresh_snapshot"),  
-    path("moods/admin/config/", moods_config, name="moods_config"),                     
-    path("moods/admin/pins/", mood_pins_mutate, name="mood_pins_mutate"),               
-    path("moods/admin/keywords/", mood_keywords_mutate, name="mood_keywords_mutate"),  
-    path("moods/admin/seed_keywords/", mood_seed_from_movie, name="mood_seed_from_movie"),
+    
 ]
