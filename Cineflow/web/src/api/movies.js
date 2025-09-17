@@ -83,8 +83,7 @@ export async function fetchMovieDetail(id, region = "GB", { signal } = {}) {
   return data;
 }
 
-// Mood-based discover (requires auth) - KR 01/09/2025
-
+// Mood-based discover (requires auth) - KR 02/09/2025
 export async function fetchMoodDiscover(
   {
     mood,
@@ -93,20 +92,36 @@ export async function fetchMoodDiscover(
     types = "flatrate,ads,free",
     page = 1,
     debug = false,
-    broad = false, 
-  },
+    broad = false,
+    fast = false,
+    // NEW filters — KR 10/09/2025
+    decade = "",          // "2020s", "2010s", ...
+    tmdbMin = "",         // number/string -> vote_average.gte
+    cfMin = "",           // number/string -> cineflow score minimum
+  } = {},
   { signal } = {}
 ) {
   if (!mood) throw new Error("mood is required");
 
   const params = {
-    region,
-    ...(providers ? { providers } : {}),
-    types,
-    page,
-    ...(debug ? { debug: 1 } : {}),
-    ...(broad ? { broad: 1 } : {}),
-  };
+  region,
+  page,
+  types, // e.g. "flatrate,ads,free" (MUST be commas)
+
+  // Provider constraints
+  ...(providers ? { providers, broad: 1 } : {}), // widen monetization when provider selected
+
+  // Filters — use names the backend actually parses
+  ...(decade ? { decade } : {}),
+  ...(tmdbMin !== "" && tmdbMin != null ? { vote_average_gte: Number(tmdbMin) } : {}),
+
+  // If "cfMin" was meant to control mood strictness, map it properly:
+  ...(cfMin ? { mood_strength: cfMin } : {}), // expect 'strict' | 'balanced' | 'loose'
+
+  // Flags
+  ...(debug ? { debug: 1 } : {}),
+  ...(fast ? { fast: 1 } : {}),
+};
 
   const { data } = await api.get(`/movies/mood/${mood}/`, { params, signal });
   return data;
