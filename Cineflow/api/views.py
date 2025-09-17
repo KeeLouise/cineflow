@@ -1,8 +1,6 @@
-# api/views.py
-
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser  # + IsAuthenticated for mood, IsAdminUser for admin endpoints - KR 01/09/2025
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from io import BytesIO
 from PIL import Image
@@ -140,6 +138,81 @@ def _apply_pins(mood_key: str, items: list, *, region: str = "GB"):
             seen.add(mid)
             out.append(m)
     return out
+
+# Filters — KR 17/09/2025
+
+def _parse_filters_from_request(request):
+    """
+    Parse optional filters from query params.
+    Aliases supported for your frontend:
+      - with_decade -> maps to year_from/year_to (e.g., "1990s")
+      - tmdb_min    -> vote_average.gte
+    Optional:
+      - min_votes, runtime_gte/lte, lang (original language), sort_by
+    """
+    q = request.query_params
+
+    # decade → years (accepts with_decade or decade)
+    decade = (q.get("with_decade") or q.get("decade") or "").strip()
+    y_from = q.get("year_from")
+    y_to   = q.get("year_to")
+    decade_map = {
+        "2020s": (2020, 2029),
+        "2010s": (2010, 2019),
+        "2000s": (2000, 2009),
+        "1990s": (1990, 1999),
+        "1980s": (1980, 1989),
+        "1970s": (1970, 1979),
+        "1960s": (1960, 1969),
+    }
+    year_from = int(y_from) if y_from and y_from.isdigit() else None
+    year_to   = int(y_to)   if y_to   and y_to.isdigit()   else None
+    if decade in decade_map and (year_from is None and year_to is None):
+        year_from, year_to = decade_map[decade]
+
+    # TMDB rating lower bound (accept tmdb_min or vote_average_gte)
+    vote_avg_gte = q.get("tmdb_min", q.get("vote_average_gte"))
+    try:
+        vote_avg_gte = float(vote_avg_gte) if vote_avg_gte not in (None, "", "null") else None
+    except Exception:
+        vote_avg_gte = None
+
+    # Optional helpers to keep results sane when rating is high
+    min_votes = q.get("min_votes")
+    try:
+        min_votes = int(min_votes) if min_votes not in (None, "", "null") else None
+    except Exception:
+        min_votes = None
+    if min_votes is None and vote_avg_gte is not None and vote_avg_gte >= 7:
+        min_votes = 50
+
+    # Misc
+    def _int(name, lo=None, hi=None):
+        val = q.get(name)
+        if val is None or val == "": return None
+        try:
+            iv = int(val)
+            if lo is not None: iv = max(lo, iv)
+            if hi is not None: iv = min(hi, iv)
+            return iv
+        except Exception:
+            return None
+
+    runtime_gte = _int("runtime_gte", lo=40)
+    runtime_lte = _int("runtime_lte", hi=240)
+    lang        = (q.get("lang") or "").strip()[:5] or None
+    sort_by     = (q.get("sort_by") or "").strip() or None
+
+    return {
+        "year_from": year_from,
+        "year_to": year_to,
+        "vote_average_gte": vote_avg_gte,
+        "min_votes": min_votes,
+        "runtime_gte": runtime_gte,
+        "runtime_lte": runtime_lte,
+        "lang": lang,
+        "sort_by": sort_by,
+    }
 
 # API Endpoints - KR 21/08/2025
 
@@ -465,7 +538,7 @@ KEYWORDS_BASE = {
     "dark_gritty":  ["9716", "9710", "9824"],           
 }
 
-#  Admin-configurable overrides (cache) — KR 03/09/2025
+#  Admin-configurable overrides (cache) — KR 17/09/2025
 
 # cache keys
 _OVR_PINS_KEY     = "mood:pins:overrides"     
@@ -499,17 +572,19 @@ def _effective_keywords_for(mood: str) -> list[str]:
             out.append(kw)
     return out
 
-# Use OR for include sets to broaden results (pipe '|' in TMDB means OR). — KR 02/09/2025
+# Added light gating toggles to enforce mood tone while keeping volume. — KR 17/09/2025
 MOOD_RULES = {
     "feelgood": {
         "include_genres_any": ["35", "10751", "10402", "10749", "16", "12"], 
-        "exclude_genres": ["27"],
+        "exclude_genres": ["27", "53", "80", "9648"],  # keep dark genres out
         "sort_by": "popularity.desc",
+        "enforce_genre_gate": True,
     },
     "heartwarming": {
         "include_genres_any": ["18", "10751", "10749"],
         "exclude_genres": ["27", "53"],
         "sort_by": "popularity.desc",
+        "enforce_genre_gate": True,
     },
     "high_energy": {
         "include_genres_any": ["28", "12", "53", "878"],
@@ -530,12 +605,13 @@ MOOD_RULES = {
         "include_genres_any": ["10749", "35", "18"],
         "exclude_genres": ["27", "53"],
         "sort_by": "popularity.desc",
+        "enforce_genre_gate": True,
     },
     "family": {
         "include_genres_any": ["10751", "16", "12"],
         "exclude_genres": ["27", "53", "80"],
-        "cert_country": "GB",
         "sort_by": "popularity.desc",
+        "enforce_genre_gate": True,
     },
     "scary": {
         "include_genres_any": ["27", "53"],
@@ -546,23 +622,60 @@ MOOD_RULES = {
         "include_genres_any": ["18", "10749"],
         "exclude_genres": ["27", "53"],
         "sort_by": "popularity.desc",
+        "enforce_genre_gate": True,
     },
     "dark_gritty": {
         "include_genres_any": ["80", "53", "18"],
         "exclude_genres": ["10751", "16", "10402", "10749"], 
+        "sort_by": "popularity.desc",
     },
 }
 
+def _extract_genre_id_strings(movie: dict) -> set[str]:
+    ids = set()
+    if isinstance(movie.get("genre_ids"), list):
+        for g in movie["genre_ids"]:
+            try:
+                ids.add(str(int(g)))
+            except Exception:
+                pass
+    elif isinstance(movie.get("genres"), list):
+        for g in movie["genres"]:
+            try:
+                ids.add(str(int(g.get("id"))))
+            except Exception:
+                pass
+    return ids
+
+def _passes_genre_gate(mood_key: str, movie: dict) -> bool:
+    rules = MOOD_RULES.get(mood_key) or {}
+    if not rules.get("enforce_genre_gate"):
+        # Always respect excludes even when gate is off
+        exc = set(rules.get("exclude_genres") or [])
+        return not (_extract_genre_id_strings(movie) & exc)
+    inc = set(rules.get("include_genres_any") or [])
+    exc = set(rules.get("exclude_genres") or [])
+    gids = _extract_genre_id_strings(movie)
+    if not gids:
+        return False
+    if inc and not (gids & inc):
+        return False
+    if exc and (gids & exc):
+        return False
+    return True
+
 def build_discover_params(
-    mood_key: str, *, region="GB", providers="", types="flatrate,ads,free", page=1
+    mood_key: str, *, region="GB", providers="", types="flatrate,ads,free", page=1, filters: dict | None = None
 ):
     """
     Build TMDB /discover/movie params from MOOD_RULES.
     - Uses OR for include sets to broaden (pipe `|`).
     - Exclusions remain comma-joined (ANDed).
     - Keyword IDs use admin-augmented set. - KR 03/09/2025
+    - Applies optional filters (decade/year range, rating, votes, runtime, lang, sort). - KR 10/09/2025
     """
     rules = MOOD_RULES.get(mood_key) or {}
+    filters = filters or {}
 
     include_any = rules.get("include_genres_any") or []
     with_genres = "|".join(include_any) if include_any else None
@@ -586,25 +699,31 @@ def build_discover_params(
         p["without_genres"] = exclude
     if providers:
         p["with_watch_providers"] = providers
-    if rules.get("cert_country"):
-        p["certification_country"] = rules["cert_country"]
+    # --- Filters
+    if filters.get("year_from"):
+        p["primary_release_date.gte"] = f"{filters['year_from']}-01-01"
+    if filters.get("year_to"):
+        p["primary_release_date.lte"] = f"{filters['year_to']}-12-31"
+    if filters.get("vote_average_gte") is not None:
+        p["vote_average.gte"] = str(filters["vote_average_gte"])
+    if filters.get("min_votes"):
+        p["vote_count.gte"] = str(filters["min_votes"])
+    if filters.get("runtime_gte"):
+        p["with_runtime.gte"] = str(filters["runtime_gte"])
+    if filters.get("runtime_lte"):
+        p["with_runtime.lte"] = str(filters["runtime_lte"])
+    if filters.get("lang"):
+        p["with_original_language"] = filters["lang"]
+    if filters.get("sort_by"):
+        p["sort_by"] = filters["sort_by"]
 
     return p
-
-#  Mood discover — blend & score + daily snapshot + pins — KR 02/09/2025
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])  # mood is for logged in users only - KR 01/09/2025
 def mood_discover(request, mood_key: str):
     """
     Mood-based discover with keyword enrichment, pins, and daily snapshot stability.
-    Query params:
-      - region (default GB)
-      - providers (pipe-separated TMDB IDs)
-      - types (default flatrate,ads,free)
-      - page (default 1)
-      - broad (0/1) -> when 1, start with the widest monetization set
-      - debug (0/1) -> echo _debug_params + snapshot meta - KR 02/09/2025
     """
     if mood_key not in MOOD_RULES:
         return Response({"detail": f"Unknown mood '{mood_key}'"}, status=400)
@@ -615,10 +734,14 @@ def mood_discover(request, mood_key: str):
     page      = max(1, int(request.query_params.get("page", "1") or 1))
     broad     = request.query_params.get("broad") in ("1", "true", "yes")
     debug     = request.query_params.get("debug") in ("1", "true", "yes")
+    providers_selected = bool(providers)
 
-    # 1) Build base params with genres+keywords (page ignored for snapshot building)
+    # Parse filters (decade/rating/etc.) - KR 17/09/2025
+    filters = _parse_filters_from_request(request)
+
+    # 1) Build base params
     base = build_discover_params(
-        mood_key, region=region, providers=providers, types=types_in, page=1
+        mood_key, region=region, providers=providers, types=types_in, page=1, filters=filters
     )
 
     # 2) Blend & score approach to keep lists on theme — KR 02/09/2025
@@ -630,7 +753,6 @@ def mood_discover(request, mood_key: str):
             p.pop("with_keywords", None)
         elif which == "keyword_only":
             p.pop("with_genres", None)
-            p.pop("with_watch_providers", None)
         return p
 
     def _maybe_widen_types(p: dict, do_widen: bool):
@@ -643,12 +765,15 @@ def mood_discover(request, mood_key: str):
         return q
 
     def _snapshot_key_for(bucket_name: str, par: dict):
+        # include filters in key so cache variants don't bleed - KR 17/09/2025
+        f = filters
+        ftag = f"y{f.get('year_from','-')}-{f.get('year_to','-')}-rt{f.get('runtime_gte','-')}-{f.get('runtime_lte','-')}-mv{f.get('min_votes','-')}-lg{f.get('lang','-')}-sb{f.get('sort_by','-')}-va{f.get('vote_average_gte','-')}"
         return (
-            f"snap2:{bucket_name}:{mood_key}:{region}:"
+            f"snap2f:{bucket_name}:{mood_key}:{region}:"
             f"{par.get('with_watch_providers','-')}:"
             f"{par.get('with_watch_monetization_types','-')}:"
             f"ex{bool(par.get('without_genres'))}:"
-            f"kw{bool(par.get('with_keywords'))}:v1"
+            f"kw{bool(par.get('with_keywords'))}:{ftag}:v1"
         )
 
     def _get_snapshot(par: dict, bucket_name: str):
@@ -661,7 +786,8 @@ def mood_discover(request, mood_key: str):
 
     strict_p = dict(base)
 
-    if broad:
+    # If user selected a provider OR asked for broad, use wide monetization so catalogs are fuller - KR 17/09/2025
+    if broad or providers_selected:
         strict_p["with_watch_monetization_types"] = "ads,buy,flatrate,free,rent"
 
     genre_p      = _bucket_params(strict_p, which="genre_only")
@@ -672,7 +798,7 @@ def mood_discover(request, mood_key: str):
     genre_wide   = _maybe_widen_types(genre_p,   True)
     keyword_wide = _maybe_widen_types(keyword_p, True)
 
-    # Build snapshots (day-stable) — KR 02/09/2025
+    # Build snapshots — KR 02/09/2025
     snap_strict      = _get_snapshot(strict_p,     "strict")
     snap_strict_wide = _get_snapshot(strict_wide,  "strict_wide")
     snap_genre       = _get_snapshot(genre_p,      "genre")
@@ -699,6 +825,9 @@ def mood_discover(request, mood_key: str):
     genre_ids    = {m.get("id") for m in (snap_genre.get("results", []) or [])} \
                  | {m.get("id") for m in (snap_genre_wide.get("results", []) or [])}
 
+    # Apply mood gates - KR 17/09/2025
+    candidates = [m for m in candidates if _passes_genre_gate(mood_key, m)]
+
     def _score(m):
         mid   = m.get("id")
         pop   = float(m.get("popularity") or 0.0)
@@ -707,14 +836,30 @@ def mood_discover(request, mood_key: str):
         if mid in strict_ids: s += 2.0
         if mid in kw_ids:     s += 1.0
         if mid in genre_ids:  s += 1.0
-        s += pop * 0.01                  # normalize popularity influence
-        if vcnt < 25: s -= 0.25          # nudge down very low-signal titles
-        return (-s, -pop, mid or 0)      # sort ascending = highest score first
+        s += pop * 0.01                  
+        if vcnt < 25: s -= 0.25          
+        return (-s, -pop, mid or 0)     
 
     candidates.sort(key=_score)
 
     # 3) Apply pins (float anchors to the top) — KR 02/09/2025
     stable = _apply_pins(mood_key, candidates, region=region)
+
+    # Provider-only fallback to increase volume but STILL mood-gated (genres). — KR 10/09/2025
+    if providers_selected and len(stable) < 20:
+        prov_only = {
+            "watch_region": region,
+            "with_watch_providers": providers,
+            "with_watch_monetization_types": "ads,buy,flatrate,free,rent",
+            "sort_by": "popularity.desc",
+            "page": 1,
+        }
+        prov_snap = _collect_discover_pages(prov_only, max_pages=5)
+        # Keep only items that pass the mood genre gate to preserve tone
+        prov_items = [m for m in (prov_snap.get("results") or []) if _passes_genre_gate(mood_key, m)]
+        seen_ids = {m.get("id") for m in stable}
+        extras = [m for m in prov_items if m.get("id") not in seen_ids]
+        stable.extend(extras[: max(0, 80 - len(stable))])  # allow up to ~80 items pre-pagination
 
     # 4) Paginate (20/page) — KR 02/09/2025
     PAGE_SIZE = 20
@@ -732,6 +877,7 @@ def mood_discover(request, mood_key: str):
 
     if debug:
         payload["_mood"]           = mood_key
+        payload["_filters"]        = filters
         payload["_snapshot_sizes"] = {
             "strict": len(snap_strict.get("results", []) or []),
             "strict_wide": len(snap_strict_wide.get("results", []) or []),
@@ -752,14 +898,6 @@ def mood_discover(request, mood_key: str):
 def mood_refresh_snapshot(request):
     """
     Force refresh (or purge) the daily snapshot for a mood.
-    POST body / query:
-      - mood  (required) → one of MOOD_RULES keys
-      - region (default GB)
-      - providers (optional pipe-separated IDs)
-      - types (default flatrate,ads,free)
-      - broad (0/1) -> start widest types
-      - purge (0/1) -> if true, delete snapshots instead of building
-    Returns: {"refreshed": true, "keys": [...], "sizes": N}
     """
     mood_key = (request.data.get("mood") or request.query_params.get("mood") or "").strip()
     if mood_key not in MOOD_RULES:
@@ -771,7 +909,10 @@ def mood_refresh_snapshot(request):
     broad     = (request.data.get("broad") or request.query_params.get("broad") or "").lower() in ("1", "true", "yes")
     purge     = (request.data.get("purge") or request.query_params.get("purge") or "").lower() in ("1", "true", "yes")
 
-    base = build_discover_params(mood_key, region=region, providers=providers, types=types_in, page=1)
+    # include filters to target the exact variant - KR 17/09/2025
+    filters = _parse_filters_from_request(request)
+
+    base = build_discover_params(mood_key, region=region, providers=providers, types=types_in, page=1, filters=filters)
     attempts = []
 
     def widen_types(tstr: str, add: set[str]):
@@ -794,23 +935,30 @@ def mood_refresh_snapshot(request):
     no_providers = dict(attempts[-1]); no_providers.pop("with_watch_providers", None); attempts.append(no_providers)
     no_excludes  = dict(no_providers);  no_excludes.pop("without_genres", None);      attempts.append(no_excludes)
 
+    def _key(bucket, p):
+        f = filters
+        ftag = f"y{f.get('year_from','-')}-{f.get('year_to','-')}-rt{f.get('runtime_gte','-')}-{f.get('runtime_lte','-')}-mv{f.get('min_votes','-')}-lg{f.get('lang','-')}-sb{f.get('sort_by','-')}-va{f.get('vote_average_gte','-')}"
+        return (
+            f"snap2f:{bucket}:{mood_key}:{region}:{p.get('with_watch_providers','-')}:"
+            f"{p.get('with_watch_monetization_types','-')}:ex{bool(p.get('without_genres'))}:"
+            f"kw{bool(p.get('with_keywords'))}:{ftag}:v1"
+        )
+
     keys = []
     sizes = []
     for p in attempts:
-        snap_key = (
-            f"snap2:{'strict' if 'with_genres' in p and 'with_keywords' in p else ('genre' if 'with_genres' in p else 'kw')}"
-            f":{mood_key}:{region}:{p.get('with_watch_providers','-')}:"
-            f"{p.get('with_watch_monetization_types','-')}:ex{bool(p.get('without_genres'))}:"
-            f"kw{bool(p.get('with_keywords'))}:v1"
-        )
-        keys.append(snap_key)
-        if purge:
-            cache.delete(snap_key)
-            sizes.append(0)
-        else:
-            snap = _collect_discover_pages({**p, "page": 1}, max_pages=5)
-            cache.set(snap_key, snap, _midnight_ttl_seconds())
-            sizes.append(len(snap.get("results", [])))
+        bucket = 'strict' if ('with_genres' in p and 'with_keywords' in p) else ('genre' if 'with_genres' in p else 'kw')
+        for name, params in [(bucket, p),
+                             (bucket + "_wide", dict(p, **({"with_watch_monetization_types": "ads,buy,flatrate,free,rent"})) if p.get("with_watch_monetization_types") != "ads,buy,flatrate,free,rent" else p)]:
+            snap_key = _key(name, params)
+            keys.append(snap_key)
+            if purge:
+                cache.delete(snap_key)
+                sizes.append(0)
+            else:
+                snap = _collect_discover_pages({**params, "page": 1}, max_pages=5)
+                cache.set(snap_key, snap, _midnight_ttl_seconds())
+                sizes.append(len(snap.get("results", [])))
 
     return Response(
         {"refreshed": (not purge), "purged": purge, "keys": keys, "sizes": sizes, "mood": mood_key, "region": region},
@@ -954,17 +1102,6 @@ def mood_keywords_mutate(request):
 def mood_seed_from_movie(request):
     """
     Seed a mood's keyword overrides from a TMDB movie's keywords.
-    Body:
-      {
-        "mood": "dark_gritty",
-        "tmdb_id": 155               # OR
-        "title": "The Dark Knight"   # (we'll resolve to id via /search/movie)
-        "limit": 12                  # optional cap on keywords added (default 15)
-      }
-    Behavior:
-      - Reads /movie/{id}/keywords
-      - Takes up to N keyword IDs by 'vote_count' if present, else in listed order
-      - Adds them to the mood keyword overrides (deduped, front-loaded)
     """
     mood = (request.data.get("mood") or "").strip()
     if mood not in MOOD_RULES:
@@ -973,11 +1110,12 @@ def mood_seed_from_movie(request):
     tmdb_id = request.data.get("tmdb_id")
     title   = (request.data.get("title") or "").strip()
     limit   = int(request.data.get("limit") or 15)
+    region  = (request.data.get("region") or "GB").strip()
 
     if not tmdb_id and not title:
         return Response({"detail": "Provide tmdb_id or title"}, status=400)
 
-    # Resolve title to id if needed
+    # Resolve title to id if needed - KR 17/09/2025
     if not tmdb_id:
         srch, err = _tmdb_get("/search/movie", {"query": title})
         if err:
@@ -987,7 +1125,7 @@ def mood_seed_from_movie(request):
             return Response({"detail": f"No TMDB results for title '{title}'"}, status=404)
         tmdb_id = top[0].get("id")
 
-    # Fetch keywords for that movie
+    # Fetch keywords for that movie - KR 17/09/2025
     kw_data, err2 = _tmdb_get(f"/movie/{tmdb_id}/keywords")
     if err2:
         return err2
@@ -998,7 +1136,7 @@ def mood_seed_from_movie(request):
     if not picked_ids:
         return Response({"detail": f"No keywords found for movie id {tmdb_id}"}, status=404)
 
-    # Merge into overrides (front-load)
+    # Merge into overrides - KR 17/09/2025
     kw_ov = _get_overrides(_OVR_KEYWORDS_KEY)
     cur = [str(x) for x in kw_ov.get(mood, [])]
     for kw in picked_ids[::-1]:
@@ -1008,13 +1146,22 @@ def mood_seed_from_movie(request):
     kw_ov[mood] = cur
     _set_overrides(_OVR_KEYWORDS_KEY, kw_ov)
 
-    # Purge today's snapshots for this mood so next fetch picks them up quickly
-    def _purge_snapshots_for_mood(mood_key: str):
-        pass
+    # Purge today's snapshots for this mood so next fetch picks them up quickly - KR 10/09/2025
+    def _purge_snapshots_for_mood(mood_key: str, region_key: str):
+        deleted = []
+        buckets = ["strict", "strict_wide", "genre", "genre_wide", "kw", "kw_wide"]
+        for bucket in buckets:
+            key = f"snap2f:{bucket}:{mood_key}:{region_key}:-:flatrate,ads,free:exTrue:kwTrue:y- --rt- -mv- -lg- -sb- -va-:v1"
+            cache.delete(key)
+            deleted.append(key)
+        return deleted
+
+    deleted_keys = _purge_snapshots_for_mood(mood, region)
 
     return Response({
         "mood": mood,
         "tmdb_id": tmdb_id,
         "added_keywords": picked_ids,
         "effective_keywords": _effective_keywords_for(mood),
+        "purged_count": len(deleted_keys)
     }, status=200)
