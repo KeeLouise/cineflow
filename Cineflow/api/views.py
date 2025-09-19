@@ -1,6 +1,6 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser  # + IsAuthenticated for mood, IsAdminUser for admin endpoints - KR 01/09/2025
 from rest_framework.response import Response
 from io import BytesIO
 from PIL import Image
@@ -26,10 +26,6 @@ TMDB_KEY = os.environ.get("TMDB_API_KEY", "")
 def _tmdb_get(path, params=None):
     """
     Generic helper to call the TMDB API.
-    - Builds the full URL with `TMDB_BASE` + endpoint path.
-    - Adds the API key automatically to all requests.
-    - Handles exceptions and timeouts.
-    - Returns (data, None) on success OR (None, Response) on error.
     """
     # If API key is missing, return a 500 response - KR 21/08/2025
     if not TMDB_KEY:
@@ -47,8 +43,8 @@ def _tmdb_get(path, params=None):
 
         # Perform GET request to TMDB
         r = requests.get(url, params=p, timeout=6)
-        r.raise_for_status()   
-        return r.json(), None    
+        r.raise_for_status()
+        return r.json(), None
     except requests.RequestException as e:
         # Catch network errors, bad status codes, etc. - KR 21/08/2025
         return None, Response(
@@ -139,20 +135,15 @@ def _apply_pins(mood_key: str, items: list, *, region: str = "GB"):
             out.append(m)
     return out
 
-# Filters — KR 17/09/2025
+# --------------------------- Filters — KR 17/09/2025 ---------------------------
 
 def _parse_filters_from_request(request):
     """
-    Parse optional filters from query params.
-    Aliases supported for your frontend:
-      - with_decade -> maps to year_from/year_to (e.g., "1990s")
-      - tmdb_min    -> vote_average.gte
-    Optional:
-      - min_votes, runtime_gte/lte, lang (original language), sort_by
+    Parse optional filters from query params
     """
     q = request.query_params
 
-    # decade → years (accepts with_decade or decade)
+    # decade
     decade = (q.get("with_decade") or q.get("decade") or "").strip()
     y_from = q.get("year_from")
     y_to   = q.get("year_to")
@@ -170,14 +161,14 @@ def _parse_filters_from_request(request):
     if decade in decade_map and (year_from is None and year_to is None):
         year_from, year_to = decade_map[decade]
 
-    # TMDB rating lower bound (accept tmdb_min or vote_average_gte)
+    # TMDB rating lower bound
     vote_avg_gte = q.get("tmdb_min", q.get("vote_average_gte"))
     try:
         vote_avg_gte = float(vote_avg_gte) if vote_avg_gte not in (None, "", "null") else None
     except Exception:
         vote_avg_gte = None
 
-    # Optional helpers to keep results sane when rating is high
+    # helpers to keep results normal when rating is high
     min_votes = q.get("min_votes")
     try:
         min_votes = int(min_votes) if min_votes not in (None, "", "null") else None
@@ -214,7 +205,7 @@ def _parse_filters_from_request(request):
         "sort_by": sort_by,
     }
 
-# API Endpoints - KR 21/08/2025
+# --------------------------- Public API Endpoints ---------------------------
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -270,16 +261,14 @@ def poster_palette(request):
 def trending_movies(request):
     """
     Returns trending movies of the week from TMDB.
-    - Uses TMDB `/trending/movie/week` endpoint.
-    - Caches results in Redis/memory for 10 minutes to reduce API calls.
     """
     cache_key = "tmdb:trending:movie:week"
     data = cache.get(cache_key)
-    if not data:  # If cache empty, fetch from TMDB
+    if not data:
         data, err = _tmdb_get("/trending/movie/week")
         if err:
             return err
-        cache.set(cache_key, data, 60 * 10)  # Cache for 10 minutes
+        cache.set(cache_key, data, 60 * 10)
     return Response(data, status=200)
 
 @api_view(["GET"])
@@ -287,14 +276,9 @@ def trending_movies(request):
 def search_movies(request):
     """
     Search movies by title.
-    Example usage:
-        /api/movies/search/?q=barbie
-
-    - If no query string, returns empty list.
-    - Otherwise, calls TMDB `/search/movie`.
     """
     q = request.query_params.get("q", "").strip()
-    if not q:  # Return empty if query missing
+    if not q:
         return Response({"results": []}, status=200)
 
     data, err = _tmdb_get("/search/movie", {"query": q})
@@ -302,16 +286,11 @@ def search_movies(request):
         return err
     return Response(data, status=200)
 
-# EXTRA ENDPOINTS FOR HOME SECTIONS - KR 21/08/2025
-
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def now_playing(request):
     """
     What's on in cinemas (TMDB /movie/now_playing)
-    Optional query params:
-      - region (default: "US"), e.g., "IE"
-      - page (default: "1")
     Cached for 10 minutes to reduce TMDB calls. - KR 21/08/2025
     """
     region = request.query_params.get("region", "US")
@@ -323,7 +302,7 @@ def now_playing(request):
         data, err = _tmdb_get("/movie/now_playing", {"region": region, "page": page})
         if err:
             return err
-        cache.set(cache_key, data, 60 * 10) 
+        cache.set(cache_key, data, 60 * 10)
     return Response(data, status=200)
 
 @api_view(["GET"])
@@ -359,13 +338,11 @@ def streaming_trending(request):
         data, err = _tmdb_get("/discover/movie", params)
         if err:
             return err
-        # Attach debug echo if requested - KR 29/08/2025
         if debug:
             data = dict(data)
             data["_debug_params"] = params
         cache.set(cache_key, data, 60 * 10)
     elif debug:
-        # Ensure debug shows for cached responses too - KR 29/08/2025
         d = dict(data)
         d["_debug_params"] = params
         return Response(d, status=200)
@@ -405,7 +382,6 @@ def person_movies(request):
     if data:
         return Response(data, status=200)
 
-    # 1) find the person id
     person_data, err = _tmdb_get("/search/person", {"query": q})
     if err:
         return err
@@ -418,7 +394,6 @@ def person_movies(request):
     if not person_id:
         return Response({"results": []}, status=200)
 
-    # 2) fetch movie credits for that person
     credits, err2 = _tmdb_get(f"/person/{person_id}/movie_credits")
     if err2:
         return err2
@@ -455,7 +430,6 @@ def register(request):
             status=status.HTTP_201_CREATED
         )
 
-    # Return field-specific validation errors
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["GET"])
@@ -466,26 +440,21 @@ def movie_detail(request, tmdb_id: int):
     Cached for 30 minutes to reduce API calls. - KR 26/08/2025
     Now includes trailers and watch/providers via append_to_response. - KR 26/08/2025
     """
-
     region = request.query_params.get("region", "IE").upper()
 
-    # include region in cache key so it won't cross-contaminate provider blocks - KR 26/08/2025
     cache_key = f"tmdb:movie:{tmdb_id}:detail+credits+videos+providers:{region}"
     data = cache.get(cache_key)
     if data:
         return Response(data, status=200)
 
-    # fetch core details + credits + videos + providers in one call - KR 26/08/2025
     params = {"append_to_response": "videos,credits,watch/providers"}
     details, err = _tmdb_get(f"/movie/{tmdb_id}", params)
     if err:
         return err
 
     merged = details or {}
-
     merged["credits"] = (merged.get("credits") or {"cast": [], "crew": []})
 
-    # normalise providers to the requested region (fallback to US, else empty) - KR 26/08/2025
     wp = merged.get("watch/providers") or {}
     region_block = {}
     try:
@@ -494,14 +463,12 @@ def movie_detail(request, tmdb_id: int):
                        or {}
     except Exception:
         region_block = {}
-    # expose a simple `providers` object the frontend can read (flatrate/ads/free/rent/buy) - KR 26/08/2025
     merged["providers"] = region_block
 
-    # cache for 30 mins - KR 26/08/2025
     cache.set(cache_key, merged, 60 * 30)
     return Response(merged, status=200)
 
-# Mood mapping for logged in users - KR 01/09/2025 + expanded 02/09/2025
+# --------------------------- Mood config / rules ---------------------------
 
 # Genre constants (TMDB IDs) - (not currently used in rules, kept for future) - KR 01/09/2025
 _GENRE = {
@@ -512,8 +479,8 @@ _GENRE = {
 
 # Pinned TMDB IDs per mood  — KR 02/09/2025
 PINNED_BASE = {
-    "feelgood":     [260513, 398181, 210577, 496243],          
-    "heartwarming": [10193, 109445, 19404],                    
+    "feelgood":     [260513, 398181, 210577, 496243],
+    "heartwarming": [10193, 109445, 19404],
     "high_energy":  [497698, 353081, 324857, 299536],
     "chill":        [97630, 490132, 19404],
     "mind_bending": [62, 27205, 1124, 419430],
@@ -521,34 +488,34 @@ PINNED_BASE = {
     "family":       [862, 150540, 260513],
     "scary":        [381288, 631843, 346364],
     "tearjerker":   [598, 4922, 77338, 730154],
-    "dark_gritty":  [680, 155, 807, 500],                    
+    "dark_gritty":  [680, 155, 807, 500],
 }
 
-# Keyword groups per mood (TMDB keyword IDs) — fill with real IDs over time — KR 02/09/2025
+# Keyword groups per mood (TMDB keyword IDs) — kept for future soft scoring — KR 19/09/2025
 KEYWORDS_BASE = {
-    "feelgood":     ["180547", "3370", "211029"],       
-    "heartwarming": ["180547", "9826", "207317"],       
-    "high_energy":  ["9715", "616", "15060"],           
-    "chill":        ["158718", "179431", "195970"],     
-    "mind_bending": ["4565", "804", "11109"],           
-    "romantic":     ["9856", "1599", "210024"],         
-    "family":       ["9713", "9714", "158718"],         
-    "scary":        ["9719", "9718", "9717"],           
-    "tearjerker":   ["4344", "179430", "287501"],       
-    "dark_gritty":  ["9716", "9710", "9824"],           
+    "feelgood":     ["180547", "3370", "211029"],
+    "heartwarming": ["180547", "9826", "207317"],
+    "high_energy":  ["9715", "616", "15060"],
+    "chill":        ["158718", "179431", "195970"],
+    "mind_bending": ["4565", "804", "11109"],
+    "romantic":     ["9856", "1599", "210024"],
+    "family":       ["9713", "9714", "158718"],
+    "scary":        ["9719", "9718", "9717"],
+    "tearjerker":   ["4344", "179430", "287501"],
+    "dark_gritty":  ["9716", "9710", "9824"],
 }
 
 #  Admin-configurable overrides (cache) — KR 17/09/2025
 
 # cache keys
-_OVR_PINS_KEY     = "mood:pins:overrides"     
+_OVR_PINS_KEY     = "mood:pins:overrides"
 _OVR_KEYWORDS_KEY = "mood:keywords:overrides"
 
 def _get_overrides(cache_key: str) -> dict:
     return cache.get(cache_key) or {}
 
 def _set_overrides(cache_key: str, data: dict):
-    cache.set(cache_key, data, 60 * 60 * 24 * 30) 
+    cache.set(cache_key, data, 60 * 60 * 24 * 30)
 
 def _effective_pins_for(mood: str) -> list[int]:
     base = PINNED_BASE.get(mood, [])[:]
@@ -572,62 +539,86 @@ def _effective_keywords_for(mood: str) -> list[str]:
             out.append(kw)
     return out
 
-# Added light gating toggles to enforce mood tone while keeping volume. — KR 17/09/2025
 MOOD_RULES = {
     "feelgood": {
-        "include_genres_any": ["35", "10751", "10402", "10749", "16", "12"], 
-        "exclude_genres": ["27", "53", "80", "9648"],  # keep dark genres out
+        "include_genres_any": ["35", "10751", "10402", "10749", "16", "12"],
+        # exclude darker tones: thriller, crime, mystery, horror - KR 19/09/2025
+        "exclude_genres": ["27", "53", "80", "9648"],
         "sort_by": "popularity.desc",
         "enforce_genre_gate": True,
+        # ratings cap to keep heavy adult content out - KR 19/09/2025
+        "cert_country": "US",
+        "cert_lte": "PG-13",
+        # baseline votes for quality - KR 19/09/2025
+        "min_votes_floor": 100,
     },
     "heartwarming": {
         "include_genres_any": ["18", "10751", "10749"],
         "exclude_genres": ["27", "53"],
         "sort_by": "popularity.desc",
         "enforce_genre_gate": True,
+        "cert_country": "US",
+        "cert_lte": "PG-13",
+        "min_votes_floor": 100,
     },
     "high_energy": {
         "include_genres_any": ["28", "12", "53", "878"],
         "exclude_genres": [],
         "sort_by": "popularity.desc",
+        "min_votes_floor": 50,
     },
     "chill": {
         "include_genres_any": ["35", "18"],
         "exclude_genres": ["27", "53"],
         "sort_by": "popularity.desc",
+        "cert_country": "US",
+        "cert_lte": "PG-13",
+        "min_votes_floor": 80,
     },
     "mind_bending": {
         "include_genres_any": ["9648", "878", "53"],
         "exclude_genres": ["10751"],
         "sort_by": "popularity.desc",
+        "min_votes_floor": 50,
     },
     "romantic": {
         "include_genres_any": ["10749", "35", "18"],
         "exclude_genres": ["27", "53"],
         "sort_by": "popularity.desc",
         "enforce_genre_gate": True,
+        "cert_country": "US",
+        "cert_lte": "PG-13",
+        "min_votes_floor": 80,
     },
     "family": {
         "include_genres_any": ["10751", "16", "12"],
         "exclude_genres": ["27", "53", "80"],
         "sort_by": "popularity.desc",
         "enforce_genre_gate": True,
+        "cert_country": "US",
+        "cert_lte": "PG-13",
+        "min_votes_floor": 50,
     },
     "scary": {
         "include_genres_any": ["27", "53"],
         "exclude_genres": [],
         "sort_by": "popularity.desc",
+        "min_votes_floor": 50,
     },
     "tearjerker": {
         "include_genres_any": ["18", "10749"],
         "exclude_genres": ["27", "53"],
         "sort_by": "popularity.desc",
         "enforce_genre_gate": True,
+        "cert_country": "US",
+        "cert_lte": "PG-13",
+        "min_votes_floor": 80,
     },
     "dark_gritty": {
         "include_genres_any": ["80", "53", "18"],
-        "exclude_genres": ["10751", "16", "10402", "10749"], 
+        "exclude_genres": ["10751", "16", "10402", "10749"],
         "sort_by": "popularity.desc",
+        "min_votes_floor": 50,
     },
 }
 
@@ -648,41 +639,93 @@ def _extract_genre_id_strings(movie: dict) -> set[str]:
     return ids
 
 def _passes_genre_gate(mood_key: str, movie: dict) -> bool:
+    """
+    Strict genre gate: must include any allowed; must NOT include any excluded. - KR 19/09/2025
+    """
     rules = MOOD_RULES.get(mood_key) or {}
-    if not rules.get("enforce_genre_gate"):
-        # Always respect excludes even when gate is off
-        exc = set(rules.get("exclude_genres") or [])
-        return not (_extract_genre_id_strings(movie) & exc)
-    inc = set(rules.get("include_genres_any") or [])
     exc = set(rules.get("exclude_genres") or [])
     gids = _extract_genre_id_strings(movie)
+    # Always respect excludes
+    if exc and (gids & exc):
+        return False
+    if not rules.get("enforce_genre_gate"):
+        return True
+    inc = set(rules.get("include_genres_any") or [])
     if not gids:
         return False
     if inc and not (gids & inc):
         return False
-    if exc and (gids & exc):
-        return False
     return True
+
+# --------------------------- Provider hard-gate helper — KR 20/09/2025 ---------------------------
+
+def _filter_by_providers(results, *, region: str, providers_csv: str, limit_checks: int = 60):
+    """
+    Hard gate: keep only movies that actually have *any* of the selected providers in the given region.
+    - `providers_csv` is the pipe-joined TMDB ids string already used (e.g. "8|337|9").
+    - Only the first `limit_checks` titles are verified via /movie/{id}?append_to_response=watch/providers
+      to keep TMDB traffic reasonable; the remainder pass through.
+    """
+    if not providers_csv:
+        return results
+
+    want_ids = set()
+    for token in providers_csv.split("|"):
+        token = token.strip()
+        if token.isdigit():
+            want_ids.add(int(token))
+    if not want_ids:
+        return results
+
+    kept = []
+    checked = 0
+
+    for m in results:
+        mid = m.get("id")
+        if not mid:
+            continue
+
+        if checked < limit_checks:
+            try:
+                detail, err = _tmdb_get(f"/movie/{mid}", {"append_to_response": "watch/providers"})
+                checked += 1
+                if err or not detail:
+                    continue
+                wp = (detail.get("watch/providers") or {}).get("results", {})
+                rb = wp.get(region) or wp.get("US") or {}
+                buckets = []
+                for key in ("flatrate", "ads", "free", "rent", "buy"):
+                    arr = rb.get(key) or []
+                    if arr:
+                        buckets.extend(arr)
+                have_ids = {int(p.get("provider_id")) for p in buckets if p.get("provider_id")}
+                if have_ids & want_ids:
+                    kept.append(m)
+            except Exception:
+                continue
+        else:
+            kept.append(m)
+
+    return kept
+
+# --------------------------- Mood discover core ---------------------------
 
 def build_discover_params(
     mood_key: str, *, region="GB", providers="", types="flatrate,ads,free", page=1, filters: dict | None = None
 ):
     """
     Build TMDB /discover/movie params from MOOD_RULES.
-    - Uses OR for include sets to broaden (pipe `|`).
-    - Exclusions remain comma-joined (ANDed).
-    - Keyword IDs use admin-augmented set. - KR 03/09/2025
-    - Applies optional filters (decade/year range, rating, votes, runtime, lang, sort). - KR 10/09/2025
+    - Genre OR gate (pipe) + excludes.
+    - NO with_keywords (prevents over-constraint).
+    - Adds include_adult=false globally.
+    - Applies optional filters (decade/year range, rating, votes, runtime, lang, sort).
+    - Applies mood-level certification cap and min_votes floor where defined. — KR 19/09/2025
     """
     rules = MOOD_RULES.get(mood_key) or {}
     filters = filters or {}
 
     include_any = rules.get("include_genres_any") or []
     with_genres = "|".join(include_any) if include_any else None
-
-    k_any = _effective_keywords_for(mood_key)  # include admin overrides - KR 02/09/2025
-    with_keywords = "|".join(k_any) if k_any else None
-
     exclude = ",".join(rules.get("exclude_genres", [])) or None
 
     p = {
@@ -690,24 +733,36 @@ def build_discover_params(
         "with_watch_monetization_types": types,
         "sort_by": rules.get("sort_by", "popularity.desc"),
         "page": page,
+        "include_adult": "false",
     }
     if with_genres:
         p["with_genres"] = with_genres
-    if with_keywords:
-        p["with_keywords"] = with_keywords
     if exclude:
         p["without_genres"] = exclude
     if providers:
         p["with_watch_providers"] = providers
-    # --- Filters
+
+    # --- Mood-level certification caps (light moods)
+    cert_country = rules.get("cert_country")
+    cert_lte     = rules.get("cert_lte")
+    if cert_country and cert_lte:
+        p["certification_country"] = cert_country
+        p["certification.lte"]     = cert_lte
+
+    # --- Filters from request
     if filters.get("year_from"):
         p["primary_release_date.gte"] = f"{filters['year_from']}-01-01"
     if filters.get("year_to"):
         p["primary_release_date.lte"] = f"{filters['year_to']}-12-31"
     if filters.get("vote_average_gte") is not None:
         p["vote_average.gte"] = str(filters["vote_average_gte"])
-    if filters.get("min_votes"):
-        p["vote_count.gte"] = str(filters["min_votes"])
+
+    req_min_votes = filters.get("min_votes") or 0
+    mood_floor    = rules.get("min_votes_floor") or 0
+    min_votes     = max(req_min_votes, mood_floor)
+    if min_votes:
+        p["vote_count.gte"] = str(min_votes)
+
     if filters.get("runtime_gte"):
         p["with_runtime.gte"] = str(filters["runtime_gte"])
     if filters.get("runtime_lte"):
@@ -723,7 +778,8 @@ def build_discover_params(
 @permission_classes([IsAuthenticated])  # mood is for logged in users only - KR 01/09/2025
 def mood_discover(request, mood_key: str):
     """
-    Mood-based discover with keyword enrichment, pins, and daily snapshot stability.
+    Mood-based discover with strict genre gating, pins, and daily snapshot stability.
+    - No longer ANDs keywords at TMDB level to avoid starving results. — KR 19/09/2025
     """
     if mood_key not in MOOD_RULES:
         return Response({"detail": f"Unknown mood '{mood_key}'"}, status=400)
@@ -735,131 +791,77 @@ def mood_discover(request, mood_key: str):
     broad     = request.query_params.get("broad") in ("1", "true", "yes")
     debug     = request.query_params.get("debug") in ("1", "true", "yes")
     providers_selected = bool(providers)
+    # hard gate toggle — KR 20/09/2025
+    force_providers    = request.query_params.get("force_providers") in ("1", "true", "yes")
 
     # Parse filters (decade/rating/etc.) - KR 17/09/2025
     filters = _parse_filters_from_request(request)
 
-    # 1) Build base params
+    # 1) Build base params (genres+excludes only; keywords omitted) — KR 19/09/2025
     base = build_discover_params(
         mood_key, region=region, providers=providers, types=types_in, page=1, filters=filters
     )
 
-    # 2) Blend & score approach to keep lists on theme — KR 02/09/2025
-    def _bucket_params(base_p: dict, *, which: str):
-        p = dict(base_p)
-        if which == "strict":
-            pass
-        elif which == "genre_only":
-            p.pop("with_keywords", None)
-        elif which == "keyword_only":
-            p.pop("with_genres", None)
-        return p
+    # Allow broad monetization when requested / provider-locked
+    if broad or providers_selected:
+        base = dict(base)
+        base["with_watch_monetization_types"] = "ads,buy,flatrate,free,rent"
 
-    def _maybe_widen_types(p: dict, do_widen: bool):
-        if not do_widen:
-            return p
-        cur = {s.strip() for s in (p.get("with_watch_monetization_types") or "").split(",") if s.strip()}
-        cur |= {"rent", "buy"}
-        q = dict(p)
-        q["with_watch_monetization_types"] = ",".join(sorted(cur))
-        return q
-
-    def _snapshot_key_for(bucket_name: str, par: dict):
-        # include filters in key so cache variants don't bleed - KR 17/09/2025
+    # Snapshots (strict + a widened monetization variant) — KR 02/09/2025 + 19/09/2025
+    def _snapshot_key(bucket_name: str, par: dict):
         f = filters
         ftag = f"y{f.get('year_from','-')}-{f.get('year_to','-')}-rt{f.get('runtime_gte','-')}-{f.get('runtime_lte','-')}-mv{f.get('min_votes','-')}-lg{f.get('lang','-')}-sb{f.get('sort_by','-')}-va{f.get('vote_average_gte','-')}"
         return (
-            f"snap2f:{bucket_name}:{mood_key}:{region}:"
+            f"snap3:{bucket_name}:{mood_key}:{region}:"
             f"{par.get('with_watch_providers','-')}:"
-            f"{par.get('with_watch_monetization_types','-')}:"
-            f"ex{bool(par.get('without_genres'))}:"
-            f"kw{bool(par.get('with_keywords'))}:{ftag}:v1"
+            f"{par.get('with_watch_monetization_types','-')}:{ftag}:v1"
         )
 
     def _get_snapshot(par: dict, bucket_name: str):
-        k = _snapshot_key_for(bucket_name, par)
+        k = _snapshot_key(bucket_name, par)
         snap = cache.get(k)
         if not snap:
             snap = _collect_discover_pages({**par, "page": 1}, max_pages=5)
             cache.set(k, snap, _midnight_ttl_seconds())
         return snap
 
-    strict_p = dict(base)
+    strict      = dict(base)
+    strict_wide = dict(base)
+    strict_wide["with_watch_monetization_types"] = "ads,buy,flatrate,free,rent"
 
-    # If user selected a provider OR asked for broad, use wide monetization so catalogs are fuller - KR 17/09/2025
-    if broad or providers_selected:
-        strict_p["with_watch_monetization_types"] = "ads,buy,flatrate,free,rent"
+    snap_a = _get_snapshot(strict, "strict")
+    snap_b = _get_snapshot(strict_wide, "strict_wide")
 
-    genre_p      = _bucket_params(strict_p, which="genre_only")
-    keyword_p    = _bucket_params(strict_p, which="keyword_only")
+    merged = (snap_a.get("results") or []) + (snap_b.get("results") or [])
 
-    # Widened variants to avoid starvation
-    strict_wide  = _maybe_widen_types(strict_p,  True)
-    genre_wide   = _maybe_widen_types(genre_p,   True)
-    keyword_wide = _maybe_widen_types(keyword_p, True)
-
-    # Build snapshots — KR 02/09/2025
-    snap_strict      = _get_snapshot(strict_p,     "strict")
-    snap_strict_wide = _get_snapshot(strict_wide,  "strict_wide")
-    snap_genre       = _get_snapshot(genre_p,      "genre")
-    snap_genre_wide  = _get_snapshot(genre_wide,   "genre_wide")
-    snap_kw          = _get_snapshot(keyword_p,    "kw")
-    snap_kw_wide     = _get_snapshot(keyword_wide, "kw_wide")
-
-    merged = []
-    for snap in (snap_strict, snap_strict_wide, snap_genre, snap_genre_wide, snap_kw, snap_kw_wide):
-        merged.extend(snap.get("results", []) or [])
-
-    # Dedupe keeping earliest priority order — KR 02/09/2025
+    # Dedupe, then apply strict server-side genre gate — KR 19/09/2025
     seen = set()
     candidates = []
     for m in merged:
         mid = m.get("id")
-        if mid and mid not in seen:
-            seen.add(mid)
-            candidates.append(m)
+        if not mid or mid in seen:
+            continue
+        if not _passes_genre_gate(mood_key, m):
+            continue
+        seen.add(mid)
+        candidates.append(m)
 
-    strict_ids   = {m.get("id") for m in (snap_strict.get("results", []) or [])}
-    kw_ids       = {m.get("id") for m in (snap_kw.get("results", []) or [])} \
-                 | {m.get("id") for m in (snap_kw_wide.get("results", []) or [])}
-    genre_ids    = {m.get("id") for m in (snap_genre.get("results", []) or [])} \
-                 | {m.get("id") for m in (snap_genre_wide.get("results", []) or [])}
-
-    # Apply mood gates - KR 17/09/2025
-    candidates = [m for m in candidates if _passes_genre_gate(mood_key, m)]
-
+    # Sort: popularity + vote_count signal (stable) — KR 02/09/2025
     def _score(m):
-        mid   = m.get("id")
-        pop   = float(m.get("popularity") or 0.0)
-        vcnt  = int(m.get("vote_count") or 0)
-        s     = 0.0
-        if mid in strict_ids: s += 2.0
-        if mid in kw_ids:     s += 1.0
-        if mid in genre_ids:  s += 1.0
-        s += pop * 0.01                  
-        if vcnt < 25: s -= 0.25          
-        return (-s, -pop, mid or 0)     
+        pop  = float(m.get("popularity") or 0.0)
+        vcnt = int(m.get("vote_count") or 0)
+        s = pop * 0.01
+        if vcnt < 25: s -= 0.25
+        return (-s, -pop, int(m.get("id") or 0))
 
     candidates.sort(key=_score)
 
-    # 3) Apply pins (float anchors to the top) — KR 02/09/2025
+    # Apply pins (float anchors to the top) — KR 02/09/2025
     stable = _apply_pins(mood_key, candidates, region=region)
 
-    # Provider-only fallback to increase volume but STILL mood-gated (genres). — KR 10/09/2025
-    if providers_selected and len(stable) < 20:
-        prov_only = {
-            "watch_region": region,
-            "with_watch_providers": providers,
-            "with_watch_monetization_types": "ads,buy,flatrate,free,rent",
-            "sort_by": "popularity.desc",
-            "page": 1,
-        }
-        prov_snap = _collect_discover_pages(prov_only, max_pages=5)
-        # Keep only items that pass the mood genre gate to preserve tone
-        prov_items = [m for m in (prov_snap.get("results") or []) if _passes_genre_gate(mood_key, m)]
-        seen_ids = {m.get("id") for m in stable}
-        extras = [m for m in prov_items if m.get("id") not in seen_ids]
-        stable.extend(extras[: max(0, 80 - len(stable))])  # allow up to ~80 items pre-pagination
+    # Provider hard gate (optional) — KR 20/09/2025
+    if providers and force_providers:
+        stable = _filter_by_providers(stable, region=region, providers_csv=providers, limit_checks=60)
 
     # 4) Paginate (20/page) — KR 02/09/2025
     PAGE_SIZE = 20
@@ -876,22 +878,19 @@ def mood_discover(request, mood_key: str):
     }
 
     if debug:
-        payload["_mood"]           = mood_key
-        payload["_filters"]        = filters
-        payload["_snapshot_sizes"] = {
-            "strict": len(snap_strict.get("results", []) or []),
-            "strict_wide": len(snap_strict_wide.get("results", []) or []),
-            "genre": len(snap_genre.get("results", []) or []),
-            "genre_wide": len(snap_genre_wide.get("results", []) or []),
-            "kw": len(snap_kw.get("results", []) or []),
-            "kw_wide": len(snap_kw_wide.get("results", []) or []),
+        payload["_mood"]    = mood_key
+        payload["_filters"] = filters
+        payload["_sizes"]   = {
+            "strict": len(snap_a.get("results", []) or []),
+            "strict_wide": len(snap_b.get("results", []) or []),
         }
         payload["_picked_examples"] = [r.get("id") for r in stable[:10]]
-        payload["_keywords_any"] = _effective_keywords_for(mood_key)
+        payload["_force_providers"] = bool(force_providers)
+        payload["_providers"]       = providers
 
     return Response(payload, status=200)
 
-# Admin: refresh/purge snapshots — KR 02/09/2025
+# --------------------------- Admin: refresh/purge snapshots ---------------------------
 
 @api_view(["POST"])
 @permission_classes([IsAdminUser])  # admin-only control surface - KR 02/09/2025
@@ -909,56 +908,37 @@ def mood_refresh_snapshot(request):
     broad     = (request.data.get("broad") or request.query_params.get("broad") or "").lower() in ("1", "true", "yes")
     purge     = (request.data.get("purge") or request.query_params.get("purge") or "").lower() in ("1", "true", "yes")
 
-    # include filters to target the exact variant - KR 17/09/2025
     filters = _parse_filters_from_request(request)
 
     base = build_discover_params(mood_key, region=region, providers=providers, types=types_in, page=1, filters=filters)
-    attempts = []
+    if broad or providers:
+        base = dict(base)
+        base["with_watch_monetization_types"] = "ads,buy,flatrate,free,rent"
 
-    def widen_types(tstr: str, add: set[str]):
-        cur = {s.strip() for s in tstr.split(",") if s.strip()}
-        cur |= set(add)
-        return ",".join(sorted(cur))
-
-    if broad:
+    variants = [
+        ("strict", dict(base)),
+    ]
+    if base.get("with_watch_monetization_types") != "ads,buy,flatrate,free,rent":
         wide = dict(base)
         wide["with_watch_monetization_types"] = "ads,buy,flatrate,free,rent"
-        attempts.append(wide)
-    else:
-        attempts.append(base)
-        widened = dict(base)
-        widened["with_watch_monetization_types"] = widen_types(
-            base["with_watch_monetization_types"], {"rent", "buy"}
-        )
-        attempts.append(widened)
+        variants.append(("strict_wide", wide))
 
-    no_providers = dict(attempts[-1]); no_providers.pop("with_watch_providers", None); attempts.append(no_providers)
-    no_excludes  = dict(no_providers);  no_excludes.pop("without_genres", None);      attempts.append(no_excludes)
-
-    def _key(bucket, p):
+    def _snapkey(bucket, par):
         f = filters
         ftag = f"y{f.get('year_from','-')}-{f.get('year_to','-')}-rt{f.get('runtime_gte','-')}-{f.get('runtime_lte','-')}-mv{f.get('min_votes','-')}-lg{f.get('lang','-')}-sb{f.get('sort_by','-')}-va{f.get('vote_average_gte','-')}"
-        return (
-            f"snap2f:{bucket}:{mood_key}:{region}:{p.get('with_watch_providers','-')}:"
-            f"{p.get('with_watch_monetization_types','-')}:ex{bool(p.get('without_genres'))}:"
-            f"kw{bool(p.get('with_keywords'))}:{ftag}:v1"
-        )
+        return f"snap3:{bucket}:{mood_key}:{region}:{par.get('with_watch_providers','-')}:{par.get('with_watch_monetization_types','-')}:{ftag}:v1"
 
-    keys = []
-    sizes = []
-    for p in attempts:
-        bucket = 'strict' if ('with_genres' in p and 'with_keywords' in p) else ('genre' if 'with_genres' in p else 'kw')
-        for name, params in [(bucket, p),
-                             (bucket + "_wide", dict(p, **({"with_watch_monetization_types": "ads,buy,flatrate,free,rent"})) if p.get("with_watch_monetization_types") != "ads,buy,flatrate,free,rent" else p)]:
-            snap_key = _key(name, params)
-            keys.append(snap_key)
-            if purge:
-                cache.delete(snap_key)
-                sizes.append(0)
-            else:
-                snap = _collect_discover_pages({**params, "page": 1}, max_pages=5)
-                cache.set(snap_key, snap, _midnight_ttl_seconds())
-                sizes.append(len(snap.get("results", [])))
+    keys, sizes = [], []
+    for name, params in variants:
+        k = _snapkey(name, params)
+        keys.append(k)
+        if purge:
+            cache.delete(k)
+            sizes.append(0)
+        else:
+            snap = _collect_discover_pages({**params, "page": 1}, max_pages=5)
+            cache.set(k, snap, _midnight_ttl_seconds())
+            sizes.append(len(snap.get("results", [])))
 
     return Response(
         {"refreshed": (not purge), "purged": purge, "keys": keys, "sizes": sizes, "mood": mood_key, "region": region},
@@ -1007,7 +987,6 @@ def moods_config(request):
     for mood, ids in pins_patch.items():
         if mood not in MOOD_RULES:
             return Response({"detail": f"Unknown mood '{mood}' in pins"}, status=400)
-        # Replace override list completely
         pins_ov[mood] = [int(x) for x in (ids or [])]
 
     for mood, kws in kw_patch.items():
@@ -1027,7 +1006,6 @@ def moods_config(request):
 def mood_pins_mutate(request):
     """
     Add/remove a single pinned movie ID for a mood.
-    Body: { "mood": "feelgood", "add": 123 }  OR  { "mood": "feelgood", "remove": 123 }
     """
     mood = (request.data.get("mood") or "").strip()
     if mood not in MOOD_RULES:
@@ -1115,7 +1093,6 @@ def mood_seed_from_movie(request):
     if not tmdb_id and not title:
         return Response({"detail": "Provide tmdb_id or title"}, status=400)
 
-    # Resolve title to id if needed - KR 17/09/2025
     if not tmdb_id:
         srch, err = _tmdb_get("/search/movie", {"query": title})
         if err:
@@ -1125,7 +1102,6 @@ def mood_seed_from_movie(request):
             return Response({"detail": f"No TMDB results for title '{title}'"}, status=404)
         tmdb_id = top[0].get("id")
 
-    # Fetch keywords for that movie - KR 17/09/2025
     kw_data, err2 = _tmdb_get(f"/movie/{tmdb_id}/keywords")
     if err2:
         return err2
@@ -1136,7 +1112,6 @@ def mood_seed_from_movie(request):
     if not picked_ids:
         return Response({"detail": f"No keywords found for movie id {tmdb_id}"}, status=404)
 
-    # Merge into overrides - KR 17/09/2025
     kw_ov = _get_overrides(_OVR_KEYWORDS_KEY)
     cur = [str(x) for x in kw_ov.get(mood, [])]
     for kw in picked_ids[::-1]:
@@ -1146,12 +1121,11 @@ def mood_seed_from_movie(request):
     kw_ov[mood] = cur
     _set_overrides(_OVR_KEYWORDS_KEY, kw_ov)
 
-    # Purge today's snapshots for this mood so next fetch picks them up quickly - KR 10/09/2025
+    # Purge today's snapshots for this mood (genre-only variants) — KR 19/09/2025
     def _purge_snapshots_for_mood(mood_key: str, region_key: str):
         deleted = []
-        buckets = ["strict", "strict_wide", "genre", "genre_wide", "kw", "kw_wide"]
-        for bucket in buckets:
-            key = f"snap2f:{bucket}:{mood_key}:{region_key}:-:flatrate,ads,free:exTrue:kwTrue:y- --rt- -mv- -lg- -sb- -va-:v1"
+        for monet in ["flatrate,ads,free", "ads,buy,flatrate,free,rent"]:
+            key = f"snap3:strict:{mood_key}:{region_key}:-:{monet}:y- --rt- -mv- -lg- -sb- -va-:v1"
             cache.delete(key)
             deleted.append(key)
         return deleted
@@ -1165,3 +1139,32 @@ def mood_seed_from_movie(request):
         "effective_keywords": _effective_keywords_for(mood),
         "purged_count": len(deleted_keys)
     }, status=200)
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def clear_all_snapshots(request):
+    """
+    Remove cached mood snapshot entries.
+    """
+    prefixes = ["snap3:", "snap2f:"]
+
+    deleted = 0
+    mode = "pattern"
+
+    iter_keys = getattr(cache, "iter_keys", None)
+
+    try:
+        if callable(iter_keys):
+            for pref in prefixes:
+                for key in cache.iter_keys(f"{pref}*"):
+                    if cache.delete(key):
+                        deleted += 1
+        else:
+            cache.clear()
+            mode = "cleared_all"
+    except Exception:
+        # If anything goes wrong, ensure cache is cleared to avoid stale state - KR 19/09/2025
+        cache.clear()
+        mode = "cleared_all"
+
+    return Response({"deleted": deleted, "mode": mode}, status=200)
