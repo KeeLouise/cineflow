@@ -1,4 +1,4 @@
-.navbar .nav-link.active {
+.navbar-thin .nav-link.active {
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -14,15 +14,16 @@
 /* White → black gradient background */
 .big-navbar {
   background: linear-gradient(to right, black 20%, rgb(144, 58, 144) 80%);
-  min-height: 250px;
+  min-height: 125px;
   padding-top: 0;
   padding-bottom: 0;
 }
 
 /* Logo styling */
-.brand-logo {
-  width: 500px;
-  height: 250px;
+.navbar-thin .brand-logo,
+.navbar-thin .logo-img {
+  width: 250px;
+  height: 125px;
   object-fit: contain;
   display: block;
 }
@@ -31,7 +32,7 @@
 .navbar .nav-link {
   color: #f0f0f0;
   transition: color 0.2s ease;
-  font-size: 3em;
+  font-size: 2em;
 }
 .navbar .nav-link:hover {
   color: #ffcc00; /* example hover color */
@@ -40,7 +41,7 @@
 /* Mobile adjustments */
 @media (max-width: 992px) {
   .brand-logo {
-    width: 320px;
+    width: 125px;
     height: auto;
   }
   .big-navbar {
@@ -51,6 +52,6 @@
 
 @media (max-width: 576px) {
   .brand-logo {
-    width: 240px;
+    width: 125px;
   }
 }
