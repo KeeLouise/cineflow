@@ -4,6 +4,7 @@ import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
+import SeeAllPage from "@/pages/SeeAllPage.jsx";
 import Footer from "./components/Footer.jsx";
 import PrivateRoute from "@/components/PrivateRoute";
 import MovieDetail from "@/pages/MovieDetail.jsx";
@@ -18,12 +19,20 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Dashboard is protected - KR 01/09/2025 */}
+          {/* Protected pages */}
           <Route
             path="/dashboard"
             element={
               <PrivateRoute>
                 <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/mood/:mood/see-all"
+            element={
+              <PrivateRoute>
+                <SeeAllPage />
               </PrivateRoute>
             }
           />
