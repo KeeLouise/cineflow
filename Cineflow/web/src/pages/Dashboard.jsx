@@ -4,7 +4,9 @@ import { fetchMoodDiscover } from "@/api/movies";
 import SkeletonRow from "@/components/SkeletonRow.jsx";
 import "@/styles/home.css";
 
-// Poster card
+
+ // Poster card 
+ 
 function PosterCard({ m }) {
   return (
     <article className="poster-card">
@@ -22,7 +24,9 @@ function PosterCard({ m }) {
               No Image
             </div>
           )}
-          {m.vote_average ? <span className="badge-rating">{m.vote_average.toFixed(1)}</span> : null}
+          {typeof m.vote_average === "number" ? (
+            <span className="badge-rating">{m.vote_average.toFixed(1)}</span>
+          ) : null}
           <div className="poster-overlay" />
         </div>
         <div className="poster-meta">
@@ -100,7 +104,7 @@ export default function Dashboard() {
   const [appliedTmdbMin, setAppliedTmdbMin] = useState(0);
   const [appliedPickedProv, setAppliedPickedProv] = useState([]);
 
-  // STAGED (UI)
+  // STAGED UI
   const [stagedDecade, setStagedDecade] = useState("");
   const [stagedTmdbMin, setStagedTmdbMin] = useState(0);
   const [stagedPickedProv, setStagedPickedProv] = useState([]);
@@ -123,7 +127,7 @@ export default function Dashboard() {
     setFilterStamp((s) => s + 1);
   };
 
-  // Dropdown ui
+  // Dropdown UI
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
   useEffect(() => {
@@ -166,19 +170,21 @@ export default function Dashboard() {
     return () => { mounted = false; };
   }, [REGION]);
 
-  // Request params (ALWAYS send monetization types with COMMAS)
+  // Request params
   const commonParams = useMemo(() => {
     const base = {
       region: REGION,
       decade: appliedDecade,
-      tmdb_min: appliedTmdbMin,
-      types: "flatrate,ads,free", // <— commas (backend expects this and forwards to TMDB)
+      vote_average_gte: appliedTmdbMin || undefined,
+      types: "flatrate,ads,free",
+      broad: appliedPickedProv.length ? 1 : 0,
+      force_providers: appliedPickedProv.length ? 1 : 0,
     };
     if (providersParam) {
-      base.providers = providersParam; // pipe-joined ids
+      base.providers = providersParam;
     }
     return base;
-  }, [REGION, appliedDecade, appliedTmdbMin, providersParam]);
+  }, [REGION, appliedDecade, appliedTmdbMin, providersParam, appliedPickedProv.length]);
 
   // Fetch (first load + on apply)
   useEffect(() => {
@@ -274,9 +280,27 @@ export default function Dashboard() {
     });
   };
 
-  // Filters button label
+  // Filters label
   const selectedCount = stagedPickedProv.length + (stagedDecade ? 1 : 0) + (stagedTmdbMin ? 1 : 0);
   const filtersLabel = selectedCount ? `Filters • ${selectedCount}` : "Filters";
+
+  // See-All link
+  const seeAllHref = useMemo(() => {
+    const qs = new URLSearchParams();
+    qs.set("region", REGION);
+    if (appliedDecade) qs.set("decade", appliedDecade);
+    if (appliedTmdbMin && Number(appliedTmdbMin) > 0) {
+      // match backend parser
+      qs.set("vote_average_gte", String(appliedTmdbMin));
+    }
+    if (providersParam) {
+      qs.set("providers", providersParam);
+      qs.set("broad", "1");            // longer lists when provider-locked
+      qs.set("force_providers", "1");  // strict provider verification on See-All also
+    }
+    qs.set("types", "flatrate,ads,free");
+    return `/mood/${encodeURIComponent(mood)}/see-all?${qs.toString()}`;
+  }, [REGION, mood, appliedDecade, appliedTmdbMin, providersParam]);
 
   return (
     <div className="home-page">
@@ -286,11 +310,10 @@ export default function Dashboard() {
           <Link to="/" className="link-ghost">← Home</Link>
         </header>
 
-        <div className="section-head mb-2 d-flex align-items-center justify-content-between">
+        <div className="section-head mb-2 d-flex align-items-center gap-2 flex-wrap">
           <h2 className="m-0">🎯 Mood Picks</h2>
-        </div>
 
-        <div className="mb-3 d-flex align-items-center gap-2 flex-wrap">
+          {/* Mood chips */}
           <div className="pf-row">
             {MOODS.map((m) => (
               <button
@@ -306,8 +329,16 @@ export default function Dashboard() {
             ))}
           </div>
 
+          {/* Spacer */}
+          <div className="flex-grow-1" />
+
+          {/* See all button */}
+          <Link to={seeAllHref} className="btn btn-sm btn-outline-light">
+            See all
+          </Link>
+
           {/* Filters dropdown */}
-          <div className="ms-auto position-relative" ref={dropdownRef}>
+          <div className="position-relative ms-2" ref={dropdownRef}>
             <button
               type="button"
               className="btn btn-sm btn-outline-light"
@@ -432,12 +463,27 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
+
             {/* Infinite scroll sentinel */}
             <div ref={sentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
             {loading && <div className="text-muted mt-2">Loading more…</div>}
+
+            {/* Bottom See-All */}
+            <div className="d-flex justify-content-center mt-3">
+              <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
+                See all {MOODS.find((x) => x.key === mood)?.label || "results"}
+              </Link>
+            </div>
           </>
         ) : (
-          <div className="text-muted">No picks for this mood. Try another mood or widen filters/providers.</div>
+          <div className="text-muted">
+            No picks for this mood. Try another mood or widen filters/providers.
+            {!!seeAllHref && (
+              <div className="mt-3">
+                <Link to={seeAllHref} className="btn btn-outline-light btn-sm">Open full list</Link>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
