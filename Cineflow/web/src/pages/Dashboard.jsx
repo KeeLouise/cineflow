@@ -1,3 +1,4 @@
+// src/pages/Dashboard.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchMoodDiscover } from "@/api/movies";
@@ -78,6 +79,8 @@ const TMDB_MIN_OPTIONS = [
 ];
 
 // Whitelist (TMDB ids → label)
+// NOTE: kept for backward compatibility with your original dashboard comments.
+//       The UI below follows the See-All model (name→id mapping), but this constant remains intact.
 const PROVIDER_WHITELIST = {
   8: "Netflix",
   9: "Prime Video",
@@ -85,9 +88,18 @@ const PROVIDER_WHITELIST = {
   531: "Paramount+",
 };
 
-export default function Dashboard() {
-  const REGION = "GB";
+// See-All style provider options (mapped by provider_name -> provider_id)
+const ALLOWED_PROVIDERS = [
+  { key: "netflix",        labels: ["Netflix"] },
+  { key: "disney_plus",    labels: ["Disney+", "Disney Plus", "Disney Plus UK", "Star on Disney+"] },
+  { key: "prime_video",    labels: ["Amazon Prime Video", "Prime Video"] },
+  { key: "paramount_plus", labels: ["Paramount+", "Paramount Plus"] },
+];
 
+const API_BASE = "/api";
+const REGION = "GB";
+
+export default function Dashboard() {
   // Mood/list
   const [mood, setMood] = useState("feelgood");
   const [items, setItems] = useState([]);
@@ -96,95 +108,113 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // Providers catalog (whitelisted + normalized)
-  const [providers, setProviders] = useState([]);
+  // Providers catalog (name→id map like See-All)
+  const [providersMap, setProvidersMap] = useState({});
+  const [provLoading, setProvLoading] = useState(true);
 
   // APPLIED filters (used in requests)
   const [appliedDecade, setAppliedDecade] = useState("");
   const [appliedTmdbMin, setAppliedTmdbMin] = useState(0);
-  const [appliedPickedProv, setAppliedPickedProv] = useState([]);
+  const [appliedPickedProviders, setAppliedPickedProviders] = useState([]); // keys from ALLOWED_PROVIDERS
+  const [appliedIncludeRentBuy, setAppliedIncludeRentBuy] = useState(false);
 
-  // STAGED UI
+  // STAGED UI (edit here, apply to above on Apply)
+  const [stagedMood, setStagedMood] = useState("feelgood");
   const [stagedDecade, setStagedDecade] = useState("");
   const [stagedTmdbMin, setStagedTmdbMin] = useState(0);
-  const [stagedPickedProv, setStagedPickedProv] = useState([]);
+  const [stagedPickedProviders, setStagedPickedProviders] = useState([]); // keys
+  const [stagedIncludeRentBuy, setStagedIncludeRentBuy] = useState(false);
 
   // Apply/Reset
   const [filterStamp, setFilterStamp] = useState(0);
   const applyFilters = () => {
+    setMood(stagedMood);
     setAppliedDecade(stagedDecade);
     setAppliedTmdbMin(stagedTmdbMin);
-    setAppliedPickedProv(stagedPickedProv);
+    setAppliedPickedProviders(stagedPickedProviders);
+    setAppliedIncludeRentBuy(stagedIncludeRentBuy);
     setFilterStamp((s) => s + 1);
   };
   const resetFilters = () => {
+    setStagedMood("feelgood");
     setStagedDecade("");
     setStagedTmdbMin(0);
-    setStagedPickedProv([]);
+    setStagedPickedProviders([]);
+    setStagedIncludeRentBuy(false);
+
+    setMood("feelgood");
     setAppliedDecade("");
     setAppliedTmdbMin(0);
-    setAppliedPickedProv([]);
+    setAppliedPickedProviders([]);
+    setAppliedIncludeRentBuy(false);
     setFilterStamp((s) => s + 1);
   };
-
-  // Dropdown UI
-  const [open, setOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (!dropdownRef.current) return;
-      if (!dropdownRef.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("click", onDocClick);
-    return () => document.removeEventListener("click", onDocClick);
-  }, []);
-
-  // Provider param (pipe-joined numeric ids)
-  const providersParam = useMemo(() => {
-    if (!appliedPickedProv.length) return "";
-    const ids = Array.from(new Set(appliedPickedProv.map((x) => Number(x)).filter(Boolean)));
-    return ids.join("|");
-  }, [appliedPickedProv]);
 
   // Infinite scroll & abort
   const sentinelRef = useRef(null);
   const inFlightRef = useRef(null);
 
-  // Fetch providers (once)
+  // Providers (fetch once; map names to ids like See-All)
+  const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").replace(/[’'"]/g, "").trim();
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch(`/api/movies/providers/?region=${encodeURIComponent(REGION)}`);
+        setProvLoading(true);
+        const res = await fetch(`${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`);
         if (!res.ok) throw new Error(`Providers HTTP ${res.status}`);
         const data = await res.json();
-        const list = (data?.results || [])
-          .filter((p) => PROVIDER_WHITELIST[p.provider_id])
-          .map((p) => ({ ...p, provider_name: PROVIDER_WHITELIST[p.provider_id] }))
-          .sort((a, b) => (a.provider_name || "").localeCompare(b.provider_name || ""));
-        if (mounted) setProviders(list);
+        const list = data?.results || [];
+
+        const map = {};
+        ALLOWED_PROVIDERS.forEach((p) => {
+          const match = list.find((row) => p.labels.some((lbl) => norm(lbl) === norm(row?.provider_name)));
+          if (match?.provider_id) map[p.key] = String(match.provider_id);
+        });
+
+        if (mounted) setProvidersMap(map);
       } catch (e) {
         console.warn("Providers load failed", e);
+        if (mounted) setProvidersMap({});
+      } finally {
+        if (mounted) setProvLoading(false);
       }
     })();
-    return () => { mounted = false; };
-  }, [REGION]);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  // Request params
+  // Build providers param from applied keys -> TMDB ids
+  const providersParam = useMemo(() => {
+    const ids = (appliedPickedProviders || []).map((k) => providersMap[k]).filter(Boolean);
+    if (!ids.length) return "";
+    return Array.from(new Set(ids)).join("|");
+  }, [appliedPickedProviders, providersMap]);
+
+  // Request params (ALWAYS commas for monetization types)
   const commonParams = useMemo(() => {
     const base = {
       region: REGION,
       decade: appliedDecade,
+      // match backend parser
       vote_average_gte: appliedTmdbMin || undefined,
-      types: "flatrate,ads,free",
-      broad: appliedPickedProv.length ? 1 : 0,
-      force_providers: appliedPickedProv.length ? 1 : 0,
+      // broaden when include buy/rent toggled
+      types: appliedIncludeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free",
+      // hint to backend to widen if we’re provider-locked
+      broad: appliedPickedProviders.length ? 1 : 0,
+      // optional strictness in your backend (if supported)
+      force_providers: appliedPickedProviders.length ? 1 : 0,
     };
-    if (providersParam) {
-      base.providers = providersParam;
-    }
+    if (providersParam) base.providers = providersParam;
     return base;
-  }, [REGION, appliedDecade, appliedTmdbMin, providersParam, appliedPickedProv.length]);
+  }, [
+    appliedDecade,
+    appliedTmdbMin,
+    providersParam,
+    appliedIncludeRentBuy,
+    appliedPickedProviders.length,
+  ]);
 
   // Fetch (first load + on apply)
   useEffect(() => {
@@ -203,8 +233,8 @@ export default function Dashboard() {
           { mood, page: 1, fast: true, ...commonParams },
           { signal: controller.signal }
         );
-        if (!active) return;
 
+        if (!active) return;
         setItems(res.results || []);
         setHasMore((res.page || 1) < (res.total_pages || 1));
       } catch (e) {
@@ -271,20 +301,30 @@ export default function Dashboard() {
     return () => io.disconnect();
   }, [hasMore, page, loading, mood, items, commonParams]);
 
-  // Toggle staged provider
-  const toggleProviderStaged = (idStr) => {
-    setStagedPickedProv((prev) => {
-      const set = new Set(prev);
-      set.has(idStr) ? set.delete(idStr) : set.add(idStr);
-      return Array.from(set);
+  // Toggle staged provider (name-keyed, like See-All)
+  const toggleProviderStaged = (key) => {
+    setStagedPickedProviders((prev) => {
+      const s = new Set(prev);
+      s.has(key) ? s.delete(key) : s.add(key);
+      return Array.from(s);
     });
   };
 
   // Filters label
-  const selectedCount = stagedPickedProv.length + (stagedDecade ? 1 : 0) + (stagedTmdbMin ? 1 : 0);
+  const selectedCount =
+    (stagedPickedProviders.length ? 1 : 0) +
+    (stagedDecade ? 1 : 0) +
+    (stagedTmdbMin ? 1 : 0) +
+    (stagedIncludeRentBuy ? 1 : 0) +
+    (stagedMood !== mood ? 1 : 0);
   const filtersLabel = selectedCount ? `Filters • ${selectedCount}` : "Filters";
 
   // See-All link
+  const providersParamForSeeAll = useMemo(() => {
+    const ids = (appliedPickedProviders || []).map((k) => providersMap[k]).filter(Boolean);
+    return ids.length ? Array.from(new Set(ids)).join("|") : "";
+  }, [appliedPickedProviders, providersMap]);
+
   const seeAllHref = useMemo(() => {
     const qs = new URLSearchParams();
     qs.set("region", REGION);
@@ -293,199 +333,323 @@ export default function Dashboard() {
       // match backend parser
       qs.set("vote_average_gte", String(appliedTmdbMin));
     }
-    if (providersParam) {
-      qs.set("providers", providersParam);
-      qs.set("broad", "1");            // longer lists when provider-locked
-      qs.set("force_providers", "1");  // strict provider verification on See-All also
+    if (providersParamForSeeAll) {
+      qs.set("providers", providersParamForSeeAll);
+      qs.set("broad", appliedIncludeRentBuy ? "1" : "0"); // include rent/buy if toggled
+      qs.set("force_providers", "1");                      // strict provider verification on See-All also
     }
-    qs.set("types", "flatrate,ads,free");
+    qs.set("types", appliedIncludeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free");
     return `/mood/${encodeURIComponent(mood)}/see-all?${qs.toString()}`;
-  }, [REGION, mood, appliedDecade, appliedTmdbMin, providersParam]);
+  }, [REGION, mood, appliedDecade, appliedTmdbMin, providersParamForSeeAll, appliedIncludeRentBuy]);
 
   return (
-    <div className="home-page">
-      <div className="container-fluid py-5">
-        <header className="d-flex align-items-center justify-content-between mb-4">
-          <h1 className="m-0">Your Dashboard</h1>
-          <Link to="/" className="link-ghost">← Home</Link>
-        </header>
+    <>
+      {/* Fixed background that the glass layer will blur */}
+      <div className="page-bg" aria-hidden="true" />
 
-        <div className="section-head mb-2 d-flex align-items-center gap-2 flex-wrap">
-          <h2 className="m-0">🎯 Mood Picks</h2>
-
-          {/* Mood chips */}
-          <div className="pf-row">
-            {MOODS.map((m) => (
+      {/* Glass wrapper for the whole page */}
+      <div className="glass-dashboard">
+        <div className="container-fluid py-5">
+          <header className="d-flex align-items-center justify-content-between mb-4">
+            <h1 className="m-0">Your Dashboard</h1>
+            <div className="d-flex align-items-center gap-2">
+              <Link to="/" className="link-ghost">← Home</Link>
+              <Link to={seeAllHref} className="btn btn-sm btn-outline-light">See all</Link>
+              {/* Mobile Filters trigger */}
               <button
-                key={m.key}
+                className="btn btn-sm btn-primary d-md-none"
                 type="button"
-                className={`pf-chip ${mood === m.key ? "active" : ""}`}
-                onClick={() => setMood(m.key)}
-                aria-pressed={mood === m.key}
-                disabled={loading}
+                data-bs-toggle="offcanvas"
+                data-bs-target="#filtersOffcanvas"
+                aria-controls="filtersOffcanvas"
               >
-                {m.label}
+                {filtersLabel}
               </button>
-            ))}
-          </div>
+            </div>
+          </header>
 
-          {/* Spacer */}
-          <div className="flex-grow-1" />
-
-          {/* See all button */}
-          <Link to={seeAllHref} className="btn btn-sm btn-outline-light">
-            See all
-          </Link>
-
-          {/* Filters dropdown */}
-          <div className="position-relative ms-2" ref={dropdownRef}>
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-light"
-              onClick={() => setOpen((v) => !v)}
-              aria-expanded={open}
-              aria-haspopup="true"
-            >
-              {filtersLabel}
-            </button>
-
-            {open && (
-              <div
-                className="card shadow-sm p-3"
-                role="menu"
-                style={{
-                  position: "absolute",
-                  right: 0,
-                  top: "110%",
-                  minWidth: 320,
-                  zIndex: 1000,
-                  background: "var(--bs-body-bg)",
-                  borderRadius: "0.75rem",
-                }}
-              >
-                {/* Decade */}
-                <div className="mb-3">
-                  <label className="form-label small text-muted">Decade</label>
+          {/* Desktop filter toolbar (like See-All) */}
+          <div className="card bg-dark border-0 shadow-sm mb-4 d-none d-md-block">
+            <div className="card-body">
+              <div className="row g-3 align-items-end">
+                {/* Mood (moved inside filter container) */}
+                <div className="col-md-3">
+                  <label className="form-label text-secondary small">Mood</label>
                   <select
-                    className="form-select form-select-sm"
+                    className="form-select form-select-sm bg-dark text-light border-secondary"
+                    value={stagedMood}
+                    onChange={(e) => setStagedMood(e.target.value)}
+                    disabled={loading}
+                  >
+                    {MOODS.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Providers (chips like See-All) */}
+                <div className="col-md-5">
+                  <label className="form-label text-secondary small d-block">Providers</label>
+                  <div className="d-flex flex-wrap gap-2">
+                    {ALLOWED_PROVIDERS.map((p) => {
+                      const disabled = provLoading || !providersMap[p.key];
+                      const active = stagedPickedProviders.includes(p.key);
+                      return (
+                        <button
+                          key={p.key}
+                          type="button"
+                          className={`btn btn-sm ${active ? "btn-info text-dark" : "btn-outline-info"}`}
+                          onClick={() => toggleProviderStaged(p.key)}
+                          disabled={disabled || loading}
+                          title={disabled ? "Not available in this region" : p.labels[0]}
+                        >
+                          {p.labels[0]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Decade */}
+                <div className="col-md-2">
+                  <label className="form-label text-secondary small">Decade</label>
+                  <select
+                    className="form-select form-select-sm bg-dark text-light border-secondary"
                     value={stagedDecade}
                     onChange={(e) => setStagedDecade(e.target.value)}
                     disabled={loading}
                   >
                     {DECADES.map((d) => (
-                      <option key={d.value || "any"} value={d.value}>{d.label}</option>
+                      <option key={d.value || "any"} value={d.value}>
+                        {d.label}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 {/* TMDB rating */}
-                <div className="mb-3">
-                  <label className="form-label small text-muted">TMDB rating</label>
+                <div className="col-md-2">
+                  <label className="form-label text-secondary small">TMDB rating</label>
                   <select
-                    className="form-select form-select-sm"
-                    value={stagedTmdbMin}
+                    className="form-select form-select-sm bg-dark text-light border-secondary"
+                    value={String(stagedTmdbMin)}
                     onChange={(e) => setStagedTmdbMin(Number(e.target.value))}
                     disabled={loading}
                   >
                     {TMDB_MIN_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
+                      <option key={String(o.value)} value={String(o.value)}>
+                        {o.label}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Providers */}
-                <div className="mb-3">
-                  <label className="form-label small text-muted">Providers</label>
-                  <div className="border rounded p-2" style={{ maxHeight: 180, overflow: "auto" }}>
-                    {(providers || []).map((p) => {
-                      const idStr = String(p.provider_id);
-                      const checked = stagedPickedProv.includes(idStr);
-                      return (
-                        <label
-                          key={idStr}
-                          className="d-flex align-items-center gap-2 py-1"
-                          style={{ cursor: "pointer" }}
-                        >
-                          <input
-                            type="checkbox"
-                            className="form-check-input"
-                            checked={checked}
-                            onChange={() => toggleProviderStaged(idStr)}
-                            disabled={loading}
-                          />
-                          <span className="small">{p.provider_name}</span>
-                        </label>
-                      );
-                    })}
-                    {!providers?.length && (
-                      <div className="text-muted small">No providers loaded.</div>
-                    )}
+                {/* Include buy/rent */}
+                <div className="col-md-3">
+                  <label className="form-label text-secondary small d-block">Options</label>
+                  <div className="form-check form-switch">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="includeBuyRentSwitch"
+                      checked={stagedIncludeRentBuy}
+                      onChange={(e) => setStagedIncludeRentBuy(e.target.checked)}
+                      disabled={loading}
+                    />
+                    <label className="form-check-label small text-white" htmlFor="includeBuyRentSwitch">
+                      Include buy/rent results
+                    </label>
                   </div>
-                  {stagedPickedProv.length > 0 && (
-                    <div className="form-text">{stagedPickedProv.length} selected</div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="d-flex justify-content-end gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={resetFilters}
-                    disabled={loading}
-                  >
-                    Reset
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary"
-                    onClick={() => { applyFilters(); setOpen(false); }}
-                    disabled={loading}
-                  >
-                    Apply
-                  </button>
                 </div>
               </div>
-            )}
+
+              {/* Actions */}
+              <div className="d-flex justify-content-end gap-2 mt-3">
+                <button
+                  type="button"
+                  className="btn btn-outline-warning btn-sm"
+                  onClick={resetFilters}
+                  disabled={loading}
+                  title="Reset all filters"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={applyFilters}
+                  disabled={loading}
+                  title="Apply filters"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
           </div>
+
+          {err && <div className="alert alert-danger mb-3">{err}</div>}
+
+          {loading && items.length === 0 ? (
+            <SkeletonRow count={8} />
+          ) : items.length ? (
+            <>
+              <div className="reel-wrap">
+                <div className="h-scroll">
+                  {items.map((mv) => (
+                    <PosterCard key={`mood-${mv.id}`} m={mv} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Infinite scroll sentinel */}
+              <div ref={sentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
+              {loading && <div className="text-muted mt-2">Loading more…</div>}
+
+              {/* Bottom See-All */}
+              <div className="d-flex justify-content-center mt-3">
+                <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
+                  See all {MOODS.find((x) => x.key === mood)?.label || "results"}
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="text-muted">
+              No picks for this mood. Try another mood or widen filters/providers.
+              {!!seeAllHref && (
+                <div className="mt-3">
+                  <Link to={seeAllHref} className="btn btn-outline-light btn-sm">Open full list</Link>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {err && <div className="alert alert-danger mb-3">{err}</div>}
-
-        {loading && items.length === 0 ? (
-          <SkeletonRow count={8} />
-        ) : items.length ? (
-          <>
-            <div className="reel-wrap">
-              <div className="h-scroll">
-                {items.map((mv) => (
-                  <PosterCard key={`mood-${mv.id}`} m={mv} />
-                ))}
-              </div>
-            </div>
-
-            {/* Infinite scroll sentinel */}
-            <div ref={sentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
-            {loading && <div className="text-muted mt-2">Loading more…</div>}
-
-            {/* Bottom See-All */}
-            <div className="d-flex justify-content-center mt-3">
-              <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
-                See all {MOODS.find((x) => x.key === mood)?.label || "results"}
-              </Link>
-            </div>
-          </>
-        ) : (
-          <div className="text-muted">
-            No picks for this mood. Try another mood or widen filters/providers.
-            {!!seeAllHref && (
-              <div className="mt-3">
-                <Link to={seeAllHref} className="btn btn-outline-light btn-sm">Open full list</Link>
-              </div>
-            )}
+        {/* MOBILE FILTERS: Off-canvas sheet (with mood inside) */}
+        <div
+          className="offcanvas offcanvas-bottom bg-dark text-light d-md-none"
+          tabIndex="-1"
+          id="filtersOffcanvas"
+          aria-labelledby="filtersOffcanvasLabel"
+          style={{ height: "75vh" }}
+        >
+          <div className="offcanvas-header">
+            <h5 className="offcanvas-title" id="filtersOffcanvasLabel">
+              Filters
+            </h5>
+            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close" />
           </div>
-        )}
+          <div className="offcanvas-body">
+            {/* Mood selector (mobile) */}
+            <div className="mb-3">
+              <label className="form-label small text-secondary d-block">Mood</label>
+              <select
+                className="form-select form-select-sm bg-dark text-light border-secondary"
+                value={stagedMood}
+                onChange={(e) => setStagedMood(e.target.value)}
+                disabled={loading}
+              >
+                {MOODS.map((m) => (
+                  <option key={m.key} value={m.key}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Providers */}
+            <div className="mb-3">
+              <label className="form-label small text-secondary d-block">Providers</label>
+              <div className="d-flex flex-wrap gap-2">
+                {ALLOWED_PROVIDERS.map((p) => {
+                  const disabled = provLoading || !providersMap[p.key];
+                  const active = stagedPickedProviders.includes(p.key);
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      className={`btn btn-sm ${active ? "btn-info text-dark" : "btn-outline-info"}`}
+                      onClick={() => toggleProviderStaged(p.key)}
+                      disabled={disabled || loading}
+                      title={disabled ? "Not available in this region" : p.labels[0]}
+                    >
+                      {p.labels[0]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Decade + Rating */}
+            <div className="row g-3">
+              <div className="col-6">
+                <label className="form-label small text-secondary">Decade</label>
+                <select
+                  className="form-select form-select-sm bg-dark text-light border-secondary"
+                  value={stagedDecade}
+                  onChange={(e) => setStagedDecade(e.target.value)}
+                  disabled={loading}
+                >
+                  {DECADES.map((d) => (
+                    <option key={d.value || "any"} value={d.value}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-6">
+                <label className="form-label small text-secondary">TMDB rating</label>
+                <select
+                  className="form-select form-select-sm bg-dark text-light border-secondary"
+                  value={String(stagedTmdbMin)}
+                  onChange={(e) => setStagedTmdbMin(Number(e.target.value))}
+                  disabled={loading}
+                >
+                  {TMDB_MIN_OPTIONS.map((o) => (
+                    <option key={String(o.value)} value={String(o.value)}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Include buy/rent (mobile) */}
+            <div className="mt-3 d-flex gap-4">
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="mobileBuyRent"
+                  checked={stagedIncludeRentBuy}
+                  onChange={(e) => setStagedIncludeRentBuy(e.target.checked)}
+                  disabled={loading}
+                />
+                <label className="form-check-label" htmlFor="mobileBuyRent">
+                  Include buy/rent results
+                </label>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="d-flex justify-content-between align-items-center mt-4">
+              <button type="button" className="btn btn-outline-light" onClick={resetFilters}>
+                Reset
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                data-bs-dismiss="offcanvas"
+                onClick={applyFilters}
+                disabled={loading}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
