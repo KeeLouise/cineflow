@@ -13,7 +13,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg px-3 big-navbar">
+    <nav className="navbar navbar-expand-lg px-3 big-navbar navbar-thin">
       <div className="container-fluid">
         <Link className="navbar-brand" to="/">
           <img src={logo} alt="Cineflow Logo" className="logo-img" />
