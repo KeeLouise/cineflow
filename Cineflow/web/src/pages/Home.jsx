@@ -57,7 +57,7 @@ export default function Home() {
   const REGION = "GB";
 
   // Provider filter (chips) - KR 28/08/2025
-  const [selectedProviders, setSelectedProviders] = useState([]); // [] = all
+  const [selectedProviders, setSelectedProviders] = useState([]);
 
   // Monetization types toggle (chip) - KR 28/08/2025
   const [includeRentBuy, setIncludeRentBuy] = useState(true); // default ON for broader results
@@ -213,27 +213,27 @@ export default function Home() {
     }
   };
 
- // IntersectionObserver for Streaming inside horizontal scroller - KR 01/09/2025
-useEffect(() => {
-  if (!streamingHasMore) return;
-  const rootEl = streamingRef.current;
-  const target = streamingSentinelRef.current;
-  if (!rootEl || !target) return;
+  // IntersectionObserver for Streaming inside horizontal scroller - KR 01/09/2025
+  useEffect(() => {
+    if (!streamingHasMore) return;
+    const rootEl = streamingRef.current;
+    const target = streamingSentinelRef.current;
+    if (!rootEl || !target) return;
 
-  const io = new IntersectionObserver(
-    ([entry]) => {
-      if (entry.isIntersecting) loadMoreStreaming();
-    },
-    {
-      root: rootEl,                 
-      rootMargin: "0px 800px 0px 0px", // prefetch ~800px before right edge - KR 01/09/2025
-      threshold: 0,
-    }
-  );
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMoreStreaming();
+      },
+      {
+        root: rootEl,
+        rootMargin: "0px 800px 0px 0px", // prefetch ~800px before right edge - KR 01/09/2025
+        threshold: 0,
+      }
+    );
 
-  io.observe(target);
-  return () => io.disconnect();
-}, [streamingHasMore, loadMoreStreaming]);
+    io.observe(target);
+    return () => io.disconnect();
+  }, [streamingHasMore, loadMoreStreaming]);
 
   // IntersectionObserver for cinema sentinel - KR 29/08/2025
   useEffect(() => {
@@ -247,7 +247,7 @@ useEffect(() => {
         if (entry.isIntersecting) loadMoreCinema();
       },
       {
-        root:rootEl,
+        root: rootEl,
         rootMargin: "0px 800px 0px 0px",
         threshold: 0,
       }
@@ -372,15 +372,15 @@ useEffect(() => {
 
   return (
     <div className="home-page">
-      <div className="container-fluid py-5">
-        {/* Hero search wrapper - KR 25/08/2025 */}
-        <section className="hero-search mb-5">
-          <div className="container text-center">
-            <h1 className="display-5 mb-3">Welcome to Cineflow</h1>
+      {/* Narrow, clean hero with glass treatment */}
+      <section className="hero-search py-4">
+        <div className="container-xxl">
+          <div className="hero-glass hero-narrow p-4 p-md-5 text-center">
+            <h1 className="display-6 mb-2">Welcome to Cineflow</h1>
             <p className="lead mb-4">Search for your favourite films</p>
 
             {/* SearchBar with suggestions (type-ahead) - single source of truth (no onSearch) - KR 25/08/2025 */}
-            <div className="searchbar-wrapper mx-auto">
+            <div className="searchbar-wrapper mx-auto position-relative">
               <SearchBar
                 value={query}
                 onChange={(v) => {
@@ -400,20 +400,24 @@ useEffect(() => {
               />
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {err && <div className="alert alert-danger">{err}</div>}
+      <div className="container-xxl pb-5">
+        {err && <div className="alert alert-danger my-3">{err}</div>}
 
         {/* If user is searching, show search rail first - KR 25/08/2025 */}
         {query.trim().length >= 2 && (
-          <>
-            <div className="section-head mb-3 d-flex align-items-center justify-content-between">
-              <h2 className="mb-3">🔎 Results for “{debounced}”</h2>
+          <section className="section-card mb-5">
+            <div className="section-head compact d-flex align-items-center justify-content-between">
+              <h2 className="m-0">🔎 Results for “{debounced}”</h2>
+              <span className="text-secondary small">{results.length} found</span>
             </div>
+
             {searching ? (
-              <SkeletonRow count={8} />
+              <div className="p-3"><SkeletonRow count={8} /></div>
             ) : results.length ? (
-              <div className="reel-wrap mb-5">
+              <div className="reel-wrap">
                 <button
                   type="button"
                   className="reel-btn left"
@@ -439,136 +443,154 @@ useEffect(() => {
                 </button>
               </div>
             ) : (
-              <div className="text-muted mb-4">No results found.</div>
+              <div className="p-3 text-muted">No results found.</div>
             )}
-          </>
+          </section>
         )}
 
         {/* What's on in Cinemas - KR 21/08/2025 */}
-        <div className="section-head mb-3 d-flex align-items-center justify-content-between">
-          <h2 className="m-0">🎟️ What’s on in Cinemas</h2>
-          <a className="link-ghost" href="#" aria-label="View all now playing">View all</a>
-        </div>
-        <div className="reel-wrap mb-3">
-          <button
-            type="button"
-            className="reel-btn left"
-            aria-label="Scroll cinemas left"
-            onClick={() => scrollReel(cinemaRef, -1)}
-          >
-            ‹
-          </button>
-
-          <div ref={cinemaRef} className="h-scroll">
-            {loadingCinema && cinema.length === 0 ? (
-              <SkeletonRow count={8} />
-            ) : cinema.length ? (
-              cinema.map((m) => <PosterCard key={`c-${m.id}`} m={m} />)
-            ) : (
-              <div className="text-muted p-2">No cinema listings.</div>
-            )}
-
-          {/* Infinite scroll sentinel for cinemas - KR 29/08/2025 */}
-        <div ref={cinemaSentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
+        <section className="section-card mb-5">
+          <div className="section-head compact d-flex align-items-center justify-content-between">
+            <h2 className="m-0">🎟️ What’s on in Cinemas</h2>
+            <Link className="link-ghost" to="#" aria-label="View all now playing">
+              View all
+            </Link>
           </div>
 
-          <button
-            type="button"
-            className="reel-btn right"
-            aria-label="Scroll cinemas right"
-            onClick={() => scrollReel(cinemaRef, 1)}
-          >
-            ›
-          </button>
-        </div>
-        
-
-        {/* Trending on Streaming + provider filter - KR 28/08/2025 */}
-        <div className="section-head mb-2 d-flex align-items-center justify-content-between">
-          <h2 className="m-0">📺 Trending on Streaming</h2>
-          <a className="link-ghost" href="#" aria-label="View all streaming">View all</a>
-        </div>
-
-        {/* Provider filter chips - KR 28/08/2025 */}
-        <div className="provider-filter mb-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
-          <div className="pf-row">
-            {PROVIDER_OPTIONS.map((p) => {
-              const active = selectedProviders.includes(p.id);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`pf-chip ${active ? "active" : ""}`}
-                  onClick={() => toggleProvider(p.id)}
-                  aria-pressed={active}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
+          <div className="reel-wrap">
             <button
               type="button"
-              className={`pf-chip clear ${selectedProviders.length === 0 ? "active" : ""}`}
-              onClick={clearProviders}
-              aria-pressed={selectedProviders.length === 0}
-              title="Show all providers"
+              className="reel-btn left"
+              aria-label="Scroll cinemas left"
+              onClick={() => scrollReel(cinemaRef, -1)}
             >
-              All
+              ‹
+            </button>
+
+            <div ref={cinemaRef} className="h-scroll">
+              {loadingCinema && cinema.length === 0 ? (
+                <SkeletonRow count={8} />
+              ) : cinema.length ? (
+                cinema.map((m) => <PosterCard key={`c-${m.id}`} m={m} />)
+              ) : (
+                <div className="text-muted p-2">No cinema listings.</div>
+              )}
+
+              {/* Infinite scroll sentinel for cinemas - KR 29/08/2025 */}
+              <div
+                ref={cinemaSentinelRef}
+                className="infinite-sentinel"
+                aria-hidden="true"
+                style={{ height: 1 }}
+              />
+            </div>
+
+            <button
+              type="button"
+              className="reel-btn right"
+              aria-label="Scroll cinemas right"
+              onClick={() => scrollReel(cinemaRef, 1)}
+            >
+              ›
             </button>
           </div>
+        </section>
 
-          {/* Monetization chip to widen results - KR 28/08/2025 */}
-          <button
-            type="button"
-            className={`pf-chip ${includeRentBuy ? "active" : ""}`}
-            onClick={() => setIncludeRentBuy((v) => !v)}
-            aria-pressed={includeRentBuy}
-            title="Include rent/buy options to widen results"
-          >
-            Rent/Buy
-          </button>
-        </div>
-
-        {fallbackNote && (
-          <div className="alert alert-warning py-2 px-3 mb-3" role="status">
-            {fallbackNote}
+        {/* Trending on Streaming + provider filter - KR 28/08/2025 */}
+        <section className="section-card">
+          <div className="section-head compact d-flex align-items-center justify-content-between">
+            <h2 className="m-0">📺 Trending on Streaming</h2>
+            <Link className="link-ghost" to="#" aria-label="View all streaming">
+              View all
+            </Link>
           </div>
-        )}
 
-        <div className="reel-wrap">
-          <button
-            type="button"
-            className="reel-btn left"
-            aria-label="Scroll streaming left"
-            onClick={() => scrollReel(streamingRef, -1)}
-          >
-            ‹
-          </button>
+          {/* Provider filter chips - KR 28/08/2025 */}
+          <div className="px-3 pt-3">
+            <div className="provider-filter mb-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+              <div className="pf-row">
+                {PROVIDER_OPTIONS.map((p) => {
+                  const active = selectedProviders.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`pf-chip ${active ? "active" : ""}`}
+                      onClick={() => toggleProvider(p.id)}
+                      aria-pressed={active}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  className={`pf-chip clear ${selectedProviders.length === 0 ? "active" : ""}`}
+                  onClick={clearProviders}
+                  aria-pressed={selectedProviders.length === 0}
+                  title="Show all providers"
+                >
+                  All
+                </button>
+              </div>
 
-          <div ref={streamingRef} className="h-scroll">
-            {loadingStreaming && streaming.length === 0 ? (
-              <SkeletonRow count={8} />
-            ) : streaming.length ? (
-              streaming.map((m) => <PosterCard key={`t-${m.id}`} m={m} />)
-            ) : (
-              <div className="text-muted p-2">No streaming results.</div>
+              {/* Monetization chip to widen results - KR 28/08/2025 */}
+              <button
+                type="button"
+                className={`pf-chip ${includeRentBuy ? "active" : ""}`}
+                onClick={() => setIncludeRentBuy((v) => !v)}
+                aria-pressed={includeRentBuy}
+                title="Include rent/buy options to widen results"
+              >
+                Rent/Buy
+              </button>
+            </div>
+
+            {fallbackNote && (
+              <div className="alert alert-warning py-2 px-3 mb-3" role="status">
+                {fallbackNote}
+              </div>
             )}
-
-            {/* Infinite scroll for streaming - KR 29/08/2025 */}
-        <div ref={streamingSentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
-
           </div>
 
-          <button
-            type="button"
-            className="reel-btn right"
-            aria-label="Scroll streaming right"
-            onClick={() => scrollReel(streamingRef, 1)}
-          >
-            ›
-          </button>
-        </div>
-        
+          <div className="reel-wrap pb-3">
+            <button
+              type="button"
+              className="reel-btn left"
+              aria-label="Scroll streaming left"
+              onClick={() => scrollReel(streamingRef, -1)}
+            >
+              ‹
+            </button>
+
+            <div ref={streamingRef} className="h-scroll">
+              {loadingStreaming && streaming.length === 0 ? (
+                <SkeletonRow count={8} />
+              ) : streaming.length ? (
+                streaming.map((m) => <PosterCard key={`t-${m.id}`} m={m} />)
+              ) : (
+                <div className="text-muted p-2">No streaming results.</div>
+              )}
+
+              {/* Infinite scroll for streaming - KR 29/08/2025 */}
+              <div
+                ref={streamingSentinelRef}
+                className="infinite-sentinel"
+                aria-hidden="true"
+                style={{ height: 1 }}
+              />
+            </div>
+
+            <button
+              type="button"
+              className="reel-btn right"
+              aria-label="Scroll streaming right"
+              onClick={() => scrollReel(streamingRef, 1)}
+            >
+              ›
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   );
