@@ -30,8 +30,6 @@ class Watchlist(models.Model): # To build the user's watchlist - KR 22/09/2025
 
     name = models.CharField(max_length=120) # name of watchlist limited to 120 characters
 
-    is_public = models.BooleanField(default=False) #BooleanField = True/False, the list will be private (default=false)
-
     created_at = models.DateTimeField(auto_now_add=True) # Stores both date & time, Django will fill automatically when the row is created
 
     updated_at = models.DateTimeField(auto_now=True) #similar to created_at - updates any time changes are saved
