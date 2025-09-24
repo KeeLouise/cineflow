@@ -59,3 +59,25 @@ async function del(path) {
     });
     return handle(res);
 }
+
+// ---------- API Calls ----------
+
+export function fetchMyWatchlists(){                                // Lists the current user's watchlists
+    return get("/watchlists/");
+}
+
+export function createWatchlist(name, isPublic = false) {           // POST /api/watchlists/ {name, is_publci}
+    return post("/watchlists/", { name, is_public: isPublic});
+}
+
+export function addMovieToWatchlist(listId, movie) {                //POST /api/watchlists/:id/items/ {tmdb_id, title, poster_path}
+    return post(`/watchlists/${listId}/items/`, {
+        tmdb_id: movie.id,
+        title: movie.title,
+        poster_path: movie.poster_path ?? "",
+    });
+}
+
+export function removeMovieFromWatchlist(listId, itemId) {.         //DELETE /api/watchlists/:listId, itemId
+    return del(`/watchlists/${listId}/items/${itemId}/`);
+}
