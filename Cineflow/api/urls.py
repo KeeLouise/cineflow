@@ -1,9 +1,21 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+# Health/secure checks live in core - KR 21/08/2025
 from core.views import ping, secure_view
 
-# Public
+# Split view modules
+from api.views.mood_discover import mood_discover
+from api.views.mood_admin import (
+    moods_config,
+    mood_pins_mutate,
+    mood_keywords_mutate,
+    mood_seed_from_movie,
+    mood_refresh_snapshot,
+    clear_all_snapshots,
+)
+
+# Import public TMDB endpoints
 from api.views.tmdb_public import (
     register,
     trending_movies,
@@ -16,16 +28,8 @@ from api.views.tmdb_public import (
     poster_palette,
 )
 
-# Mood (protected + admin)
-from api.views.mood_discover import mood_discover
-from api.views.mood_admin import (
-    moods_config,
-    mood_pins_mutate,
-    mood_keywords_mutate,
-    mood_seed_from_movie,
-    mood_refresh_snapshot,
-    clear_all_snapshots,
-)
+# Import the watchlists module
+from api.views import watchlists
 
 urlpatterns = [
     # --- Auth (JWT) --- KR 01/09/2025
@@ -60,11 +64,9 @@ urlpatterns = [
     # --- Admin util: clear snapshots (protected) --- KR 19/09/2025
     path("moods/clear_snapshots/", clear_all_snapshots, name="moods-clear-snapshots"),
 
-
-# Watchlists (user-owned) - KR 24/09/2025
-
-    path("watchlists/", views.my_watchlists, name="my-watchlists"),
-    path("watchlists/<int:pk>/", views.watchlist_detail, name="watchlist-detail"),
-    path("watchlists/<int:pk>/items", views.add_item, name="watchlist-add-item"),
-    path("watchlists/<int:pk>/items/<int:item id>/", views.remove_item, name="watchlist-remove-item"),
+    # --- Watchlists (user-owned) --- KR 24/09/2025
+    path("watchlists/", watchlists.my_watchlists, name="my-watchlists"),
+    path("watchlists/<int:pk>/", watchlists.watchlist_detail, name="watchlist-detail"),
+    path("watchlists/<int:list_id>/items/", watchlists.add_item, name="watchlist-add-item"),
+    path("watchlists/<int:list_id>/items/<int:item_id>/", watchlists.remove_item, name="watchlist-remove-item"),
 ]
