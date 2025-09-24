@@ -59,4 +59,12 @@ urlpatterns = [
 
     # --- Admin util: clear snapshots (protected) --- KR 19/09/2025
     path("moods/clear_snapshots/", clear_all_snapshots, name="moods-clear-snapshots"),
+
+
+# Watchlists (user-owned) - KR 24/09/2025
+
+    path("watchlists/", views.my_watchlists, name="my-watchlists"),
+    path("watchlists/<int:pk>/", views.watchlist_detail, name="watchlist-detail"),
+    path("watchlists/<int:pk>/items", views.add_item, name="watchlist-add-item"),
+    path("watchlists/<int:pk>/items/<int:item id>/", views.remove_item, name="watchlist-remove-item"),
 ]
