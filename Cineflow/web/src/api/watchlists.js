@@ -29,7 +29,6 @@ async function handle(res) {                         // a central response handl
     }
 
     return data;   // on success, return parsed JSON
-
 }
 
 // ---------- Helpers ----------
@@ -78,6 +77,16 @@ export function addMovieToWatchlist(listId, movie) {                //POST /api/
     });
 }
 
-export function removeMovieFromWatchlist(listId, itemId) {.         //DELETE /api/watchlists/:listId, itemId
+export function removeMovieFromWatchlist(listId, itemId) {        //DELETE /api/watchlists/:listId, itemId
     return del(`/watchlists/${listId}/items/${itemId}/`);
+}
+
+
+export function fetchWatchlist(id) {                              // GET /api/watchlists/:id/  - fetch one list (with nested items)
+  return get(`/watchlists/${id}/`);
+}
+
+
+export function deleteWatchlist(id) {                             // DELETE /api/watchlists/:id/  - delete a whole list
+  return del(`/watchlists/${id}/`);
 }
