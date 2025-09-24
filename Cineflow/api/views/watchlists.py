@@ -40,6 +40,7 @@ def my_watchlists(request): # defines the function
     wl = Watchlist.objects.create(user=request.user, **ser.validated_data) # .validated_data is cleaned version of the input JSON. **ser.validated_data unpacks it into keyword arguments for the model.
     return Response(WatchlistSerializer(wl).data, status=status.HTTP_201_CREATED)
 
+# ---------- Watchlist(view/update/delete) ----------
 
 @api_view(["GET", "PUT", "DELETE"]) # Endpoint accesses 3 HTTP methods
 @permission_classes([IsAuthenticated]) # only logged-in users can use this
@@ -75,3 +76,59 @@ def watchlist_detail(request, pk): # pk = primary key of the watchlist in the UR
     if request.method == "DELETE":  # if the user did a delete
         wl.delete()                 # remove the row from the DB 
         return Response(status=204) # 204 No Content = success, nothing to return
+    
+# ---------- Add item to watchlist ----------
+
+@api_view(["POST"])                    # only POST is allowed
+@permission_classes([IsAuthenticated]) # must be logged-in
+def add_item(request, pk):             # pk = the watchlist id we're adding into
+    """
+    Add a movie into a watchlist by ID
+    """
+    try:
+        wl = Watchlist.objects.get(    # fetch the parent watchlist
+            pk=pk, 
+            user=request.user          # enforce ownership
+        )
+    except Watchlist.DoesNotExist:
+        return Response(ser.errors, status=400)
+    
+    ser = WatchlistItemSerializer(data=request.data)    # validate the incoming item data
+    if not ser.is_valid():
+        return Response(ser.errors, status=400)
+    
+    # Avoid duplicates
+    item, created = WatchlistItem.objects.get_or_create(             
+        watchlist=wl,                                               # Link to the parent list
+        tmdb_id=ser.validated_data["tmdb_id"],                      # uniqueness key with watchlist
+        defaults={                                                  # only used if a new row is created
+            "title": ser.validated_data["title"],
+            "poster_path": ser.validated_data.get("poster_path", "")
+        }
+    )
+
+    #if it already exists, we return 200; if newly created, 201 Created
+    return Response(
+        WatchlistItemSerializer(item).data,
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+    )
+
+# ---------- Remove item from a watchlist ----------
+
+@api_view (["DELETE"])
+@permission_classes([IsAuthenticated])
+def remove_item(request, pk, item_id):         # pk = watchlist id, item_id = the WtachlistItem id
+    """
+    Remove one movie from a watchlist
+    """
+    try:
+        wl = Watchlist.objects.get(            # Ensure the parent list belongs to the user
+            pk=pk,
+            user=request.user
+        )
+        item = wl.items.get(pk=item_id)        # look up the item within that list
+    except (Watchlist.DoesNotExist, WatchlistItem.DoesNotExist):
+        return Response({"detail": "Not found"}, status=404)
+    
+    item.delete()                              # remove that one row
+    return Response(status=204)                # 204 No Content(success)
