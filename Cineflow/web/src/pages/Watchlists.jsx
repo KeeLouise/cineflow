@@ -60,5 +60,20 @@ return (
                 Create
             </button>
         </form>
-    </div>
-)
+
+    {lists.length === 0 ? (                                // if there are no lists, show message -> else loop over lists with .map() and show each one
+        <p>You don't have any watchlists yet.</p>
+    ) : (
+        <ul className="list-group">
+           {lists.map((wl) => (
+            <li key={wl.id} className="list-group-item">
+                <strong>{wl.name}</strong>
+                <span className="text-muted ms-2">
+                    {wl.items?.length || 0} movies
+                </span>
+            </li>
+           ))}
+        </ul>
+      )}
+ </div>
+);
