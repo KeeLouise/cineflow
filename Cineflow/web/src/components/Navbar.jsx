@@ -1,16 +1,26 @@
+import React, { useEffect, useState } from "react";       
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import { looksLoggedIn, logout } from "@/api/auth";
 import logo from "../assets/logo.webp";
 import "../styles/navbar.css";
 
 export default function Navbar() {
-  const navigate = useNavigate();
-  const authed = looksLoggedIn();
+  const [authed, setAuthed] = useState(looksLoggedIn());
+  const navigate = useNavigate();                         
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  useEffect(() => {
+    const onAuth = () => setAuthed(looksLoggedIn());
+    window.addEventListener("auth-changed", onAuth);
+    window.addEventListener("storage", onAuth); // reacts if another tab logs in/out
+    return () => {
+      window.removeEventListener("auth-changed", onAuth);
+      window.removeEventListener("storage", onAuth);
+    };
+  }, []);
+
+  function handleLogout() {
+    logout();                 
+  }
 
   return (
     <nav className="navbar navbar-expand-lg px-3 big-navbar navbar-thin">
@@ -22,36 +32,31 @@ export default function Navbar() {
         <div className="collapse navbar-collapse">
           <ul className="navbar-nav ms-auto">
             <li className="nav-item">
-              <NavLink to="/" className="nav-link">
-                Home
-              </NavLink>
+              <NavLink to="/" className="nav-link">Home</NavLink>
             </li>
 
             {!authed ? (
               <>
                 <li className="nav-item">
-                  <NavLink to="/login" className="nav-link">
-                    Login
-                  </NavLink>
+                  <NavLink to="/login" className="nav-link">Login</NavLink>
                 </li>
                 <li className="nav-item">
-                  <NavLink to="/register" className="nav-link">
-                    Register
-                  </NavLink>
+                  <NavLink to="/register" className="nav-link">Register</NavLink>
                 </li>
               </>
             ) : (
               <>
                 <li className="nav-item">
-                  <NavLink to="/dashboard" className="nav-link">
-                    Dashboard
-                  </NavLink>
+                  <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
                 </li>
+                {/* Watchlists only for logged-in users */}
+                {authed && (
                 <li className="nav-item">
-                  <button
-                    onClick={handleLogout}
-                    className="btn btn-link nav-link"
-                  >
+                <NavLink to="/watchlists" className="nav-link">Watchlists</NavLink>
+                </li>
+                 )}
+                <li className="nav-item">
+                  <button onClick={handleLogout} className="btn btn-link nav-link">
                     Logout
                   </button>
                 </li>

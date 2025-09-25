@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { setTokens } from "@/api/auth";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -22,8 +23,7 @@ export default function Register() {
             // after signup, log user in automatically - KR 20/08/2025
             const { data } = await axios.post("/api/token/", { username, password, });
 
-            localStorage.setItem("access", data.access);
-            localStorage.setItem("refresh", data.refresh);
+            setTokens({ access: data.access, refresh: data.refresh});
 
             navigate("/dashboard");
         } catch (err) {
