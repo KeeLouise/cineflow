@@ -1,7 +1,9 @@
 // MovieDetail.jsx - Detail page with poster-derived colours - KR 26/08/2025
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchMovieDetail } from "@/api/movies";
+import { fetchMyWatchlists, addMovieToWatchlist } from "@/api/watchlists";
+import { looksLoggedIn } from "@/api/auth";
 import SkeletonRow from "@/components/SkeletonRow.jsx"; // shimmer loaders - KR 26/08/2025
 import "@/styles/movie.css";
 
@@ -30,6 +32,17 @@ export default function MovieDetail() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  // --- Watchlist UI state ---
+  const authed = looksLoggedIn();                              // true if user is logged in
+  const [lists, setLists] = useState([]);                      // user's watchlists for the <select>
+  const [listsLoading, setListsLoading] = useState(false);     // show a spinner while loading lists
+  const [listsError, setListsError] = useState(null);          // store any error text when loading lists
+
+  const [selectedListId, setSelectedListId] = useState("");    // the list id chosen in <select>
+  const [saving, setSaving] = useState(false);                 // true while we call backend to save
+  const [saveMsg, setSaveMsg] = useState("");                  // success message like “Added!”
+  const [saveError, setSaveError] = useState("");              // error message
+
   // fetch movie detail on mount/id change - KR 26/08/2025
   useEffect(() => {
     let active = true;
@@ -47,6 +60,62 @@ export default function MovieDetail() {
     })();
     return () => { active = false; };
   }, [id]);
+
+  useEffect(() => {
+  if (!authed) return;                                      // only fetch lists if authed is true
+
+  let alive = true;
+  setListsLoading(true);
+  setListsError(null);
+
+  (async () => {
+    try {
+      const data = await fetchMyWatchlists();               // GET /api/watchlists/
+      if (!alive) return;                                   // ignore late responses
+      setLists(data || []);
+      // if there is at least one list, preselect it for convenience
+      if (data && data.length > 0) {
+        setSelectedListId(String(data[0].id));
+      }
+    } catch (err) {
+      if (!alive) return;
+      setListsError(err.message || "Failed to load your watchlists.");
+    } finally {
+      if (alive) setListsLoading(false);                    // stops spinner
+    }
+  })();
+
+  return () => { alive = false; };                          // cleanup if component unmounts
+}, [authed]);
+
+async function handleAddToWatchlist() {
+  setSaveMsg("");                                            // clear previous success
+  setSaveError("");                                          // clear previous error
+
+  // must pick a list
+  if (!selectedListId) {
+    setSaveError("Please select a watchlist first.");
+    return;
+  }
+
+  // build the movie payload from the data we already fetched above
+  const moviePayload = {
+    id: Number(id),                         // TMDB movie id from the route param (string -> number)
+    title: data.title || "",                // title from the loaded movie detail
+    poster_path: data.poster_path || "",    // poster from the loaded movie detail
+  };
+
+  try {
+    setSaving(true);
+    await addMovieToWatchlist(selectedListId, moviePayload); // POST /api/watchlists/:id/items/
+    setSaveMsg("Added to your watchlist!");
+  } catch (err) {
+    // backend might return 400 if duplicate, or 404 if wrong list id
+    setSaveError(err.message || "Could not add to watchlist.");
+  } finally {
+    setSaving(false);
+  }
+}
 
   // after data loads, ask backend to extract poster palette, then set CSS vars on :root - KR 26/08/2025
   useEffect(() => {
@@ -157,6 +226,69 @@ export default function MovieDetail() {
                 </span>
               ) : null}
             </div>
+
+            {/* ---- Save to Watchlist UI ---- */}
+<div className="card bg-dark p-3 mt-4">
+  <h5 className="mb-2">Save to Watchlist</h5>
+
+  {/* If not logged in, prompt to log in */}
+  {!authed && (
+    <div className="text-muted">
+      You need to be logged in to save movies.{" "}
+      <a href="/login">Log in</a>
+    </div>
+  )}
+
+  {/* If logged in, show the selector + button */}
+  {authed && (
+    <>
+      {listsLoading && <div className="text-muted">Loading your lists…</div>}
+
+      {listsError && (
+        <div className="text-danger mb-2">Error: {listsError}</div>
+      )}
+
+      {!listsLoading && !listsError && (
+        <>
+          {lists.length === 0 ? (
+            <div className="text-muted">
+              You don’t have any watchlists yet. Create one on the{" "}
+              <a href="/watchlists">Watchlists</a> page.
+            </div>
+          ) : (
+            <div className="d-flex gap-2 align-items-center">
+              <select
+                className="form-select w-auto"
+                value={selectedListId}
+                onChange={(e) => setSelectedListId(e.target.value)}
+                disabled={saving}
+              >
+                {lists.map((wl) => (
+                  <option key={wl.id} value={wl.id}>
+                    {wl.name}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleAddToWatchlist}
+                disabled={saving || !selectedListId}
+              >
+                {saving ? "Adding…" : "Add to Watchlist"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Success / error messages */}
+      {saveMsg && <div className="text-success mt-2">{saveMsg}</div>}
+      {saveError && <div className="text-danger mt-2">{saveError}</div>}
+    </>
+  )}
+</div>
 
             {/* Overview - KR 26/08/2025 */}
             <p className="movie-overview">{overview || "No overview available."}</p>
