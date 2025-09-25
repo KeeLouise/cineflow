@@ -3,6 +3,16 @@
 const ACCESS_KEY = "access";
 const REFRESH_KEY = "refresh";
 
+//wrapper in case window/localstorage is not available - KR 25/09/2025
+export const safeLocalStorage =
+  typeof window !== "undefined" && window.localStorage
+    ? window.localStorage
+    : {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
+      };
+
 // small helper to notify the app when auth state changes - KR 24/09/2025
 function emitAuthChanged() {
   if (typeof window !== "undefined" && window?.dispatchEvent) {
@@ -34,16 +44,16 @@ function isExpired(token, skewSeconds = 20) {
 
 // public: boolean used by Navbar to toggle links - KR 02/09/2025
 export function looksLoggedIn() {
-  return !!localStorage.getItem(ACCESS_KEY) || !!localStorage.getItem(REFRESH_KEY);
+  return !!safeLocalStorage.getItem(ACCESS_KEY) || !!safeLocalStorage.getItem(REFRESH_KEY);
 }
 
 // public: authoritative check – verifies/refreshes if needed - KR 02/09/2025
 export async function isAuthenticated() {
-  const access = localStorage.getItem(ACCESS_KEY);
+  const access = safeLocalStorage.getItem(ACCESS_KEY);
   if (access && !isExpired(access)) return true;
 
   // try silent refresh using refresh token - KR 02/09/2025
-  const refresh = localStorage.getItem(REFRESH_KEY);
+  const refresh = safeLocalStorage.getItem(REFRESH_KEY);
   if (!refresh) return false;
 
   try {
@@ -55,15 +65,15 @@ export async function isAuthenticated() {
     if (!res.ok) throw new Error("refresh failed");
     const data = await res.json();
     if (data?.access) {
-      localStorage.setItem(ACCESS_KEY, data.access);
+      safeLocalStorage.setItem(ACCESS_KEY, data.access);
       emitAuthChanged(); // <— notify listeners
       return true;
     }
   } catch {
   }
   // hard sign out if refresh failed - KR 02/09/2025
-  localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+  safeLocalStorage.removeItem(ACCESS_KEY);
+  safeLocalStorage.removeItem(REFRESH_KEY);
   emitAuthChanged(); // <— notify listeners
   return false;
 }
@@ -75,8 +85,8 @@ export async function ensureSessionOrRedirect() {
 }
 
 export function logout() { // logout function to remove access tokens - KR 21/08/2025
-  localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+  safeLocalStorage.removeItem(ACCESS_KEY);
+  safeLocalStorage.removeItem(REFRESH_KEY);
   emitAuthChanged(); // <— notify listeners
   window.location.href = "/login";
 }
@@ -85,17 +95,17 @@ export function logout() { // logout function to remove access tokens - KR 21/08
 
 // helpers to read/write tokens centrally - KR 18/09/2025
 export function getAccessToken() {
-  return localStorage.getItem(ACCESS_KEY) || "";
+  return safeLocalStorage.getItem(ACCESS_KEY) || "";
 }
 export function setTokens({ access, refresh } = {}) {
-  if (typeof access === "string") localStorage.setItem(ACCESS_KEY, access);
-  if (typeof refresh === "string") localStorage.setItem(REFRESH_KEY, refresh);
+  if (typeof access === "string") safeLocalStorage.setItem(ACCESS_KEY, access);
+  if (typeof refresh === "string") safeLocalStorage.setItem(REFRESH_KEY, refresh);
   emitAuthChanged(); // <— notify listeners after setting tokens
 }
 
 // Silent refresh (returns new access or null) - KR 18/09/2025
 export async function refreshAccessToken() {
-  const refresh = localStorage.getItem(REFRESH_KEY);
+  const refresh = safeLocalStorage.getItem(REFRESH_KEY);
   if (!refresh) return null;
   try {
     const res = await fetch("/api/token/refresh/", {
@@ -106,7 +116,7 @@ export async function refreshAccessToken() {
     if (!res.ok) return null;
     const data = await res.json();
     if (data?.access) {
-      localStorage.setItem(ACCESS_KEY, data.access);
+      safeLocalStorage.setItem(ACCESS_KEY, data.access);
       emitAuthChanged(); // <— notify listeners
       return data.access;
     }
