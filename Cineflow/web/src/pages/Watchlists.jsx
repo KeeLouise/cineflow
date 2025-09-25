@@ -11,22 +11,21 @@ export default function Watchlists() {
     const [error, setError] = useState("");       // a place to show any error text
 
     // "Create new list" for fields
-    const [name, setName] = useState("");             // text input for list name
-}
+    const [newName, setNewName] = useState("");             // text input for list name
 
-useEffect(() => {                                   // useEffect runs side-effects such as fetching data after first render
-    async function load() {
-        try {
-            const data = await fetchMyWatchlists(); // ask backend for user's lists
-            setLists(data);                         // updates our lists state so react will re-render
-        }   catch (err) {                      
-            setError(err.message);                  // if something fails, store error
-        }   finally {
-            setLoading(false);                      // either way, stop loading spinner
-        }
-    }
-    load();
-}, []);                                             // empty array [] means this effect only runs once when page loads
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fetchMyWatchlists(); // GET /api/watchlists/
+        setLists(data || []);                   // set to empty array if no data
+      } catch (err) {
+        setError(err.message || "Failed to load watchlists.");
+      } finally {
+        setLoading(false);                      // loading finished whether success or error
+      }
+    })();
+  }, []);                                      // empty array [] means this effect only runs once when page loads
 
 
 async function handleCreate(e) {                    // handles submitting the new list form
@@ -41,39 +40,44 @@ async function handleCreate(e) {                    // handles submitting the ne
     }
 }
 
+
 if (loading) return <p>Loading...</p>;
-if (error) return <p classname="text-danger">Error: {error}</p>
+if (error)   return <p className="text-danger">Error: {error}</p>;
 
-return (
-    <div classNme="container py-4">
-        <h1 className="mb-3">My Watchlists</h1>
 
-        <form onSubmit={handleCreate} className="mb-4 d-flex gap-2">
-            <input
-             type="text"
-             classNmae="form-control"
-             placeholder="New watchlist name"
-             value={newName}
-             onChange={(e) => setNewName(e.target.value)}
-            />
-            <button className="btn btn-primary" type="submit">
-                Create
-            </button>
-        </form>
+  return (
+    <div className="container py-4">
+      <h1 className="mb-3">My Watchlists</h1>
 
-    {lists.length === 0 ? (                                // if there are no lists, show message -> else loop over lists with .map() and show each one
+      {/* Form for creating a new watchlist */}
+      <form onSubmit={handleCreate} className="mb-4 d-flex gap-2">
+        <input
+          type="text"
+          className="form-control"
+          placeholder="New watchlist name"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+        />
+        <button className="btn btn-primary" type="submit">
+          Create
+        </button>
+      </form>
+
+      {/* If there are no lists yet, show a message; else loop over lists */}
+      {lists.length === 0 ? (
         <p>You don't have any watchlists yet.</p>
-    ) : (
+      ) : (
         <ul className="list-group">
-           {lists.map((wl) => (
+          {lists.map((wl) => (
             <li key={wl.id} className="list-group-item">
-                <strong>{wl.name}</strong>
-                <span className="text-muted ms-2">
-                    {wl.items?.length || 0} movies
-                </span>
+              <strong>{wl.name}</strong>
+              <span className="text-muted ms-2">
+                {wl.items?.length || 0} movies
+              </span>
             </li>
-           ))}
+          ))}
         </ul>
       )}
- </div>
-);
+    </div>
+  );
+}

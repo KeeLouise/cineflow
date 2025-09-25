@@ -10,7 +10,6 @@ import Footer from "./components/Footer.jsx";
 import PrivateRoute from "@/components/PrivateRoute";
 import MovieDetail from "@/pages/MovieDetail.jsx";
 import Watchlists from "@/pages/Watchlists.jsx";
-import WatchlistDetail from "@/pages/WatchlistDetail.jsx";
 
 export default function App() {
   return (
@@ -45,15 +44,6 @@ export default function App() {
             element={
               <PrivateRoute>
                 <Watchlists />
-              </PrivateRoute>
-            }
-          />
-
-          <Route
-            path="/watchlists/:id"
-            element={
-              <PrivateRoute>
-                 <WatchlistDetail />
               </PrivateRoute>
             }
           />

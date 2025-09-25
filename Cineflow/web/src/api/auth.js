@@ -3,6 +3,13 @@
 const ACCESS_KEY = "access";
 const REFRESH_KEY = "refresh";
 
+// small helper to notify the app when auth state changes - KR 24/09/2025
+function emitAuthChanged() {
+  if (typeof window !== "undefined" && window?.dispatchEvent) {
+    window.dispatchEvent(new Event("auth-changed"));
+  }
+}
+
 function parseJwt(token) {
   try {
     const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -49,6 +56,7 @@ export async function isAuthenticated() {
     const data = await res.json();
     if (data?.access) {
       localStorage.setItem(ACCESS_KEY, data.access);
+      emitAuthChanged(); // <— notify listeners
       return true;
     }
   } catch {
@@ -56,6 +64,7 @@ export async function isAuthenticated() {
   // hard sign out if refresh failed - KR 02/09/2025
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
+  emitAuthChanged(); // <— notify listeners
   return false;
 }
 
@@ -68,6 +77,7 @@ export async function ensureSessionOrRedirect() {
 export function logout() { // logout function to remove access tokens - KR 21/08/2025
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
+  emitAuthChanged(); // <— notify listeners
   window.location.href = "/login";
 }
 
@@ -80,6 +90,7 @@ export function getAccessToken() {
 export function setTokens({ access, refresh } = {}) {
   if (typeof access === "string") localStorage.setItem(ACCESS_KEY, access);
   if (typeof refresh === "string") localStorage.setItem(REFRESH_KEY, refresh);
+  emitAuthChanged(); // <— notify listeners after setting tokens
 }
 
 // Silent refresh (returns new access or null) - KR 18/09/2025
@@ -96,6 +107,7 @@ export async function refreshAccessToken() {
     const data = await res.json();
     if (data?.access) {
       localStorage.setItem(ACCESS_KEY, data.access);
+      emitAuthChanged(); // <— notify listeners
       return data.access;
     }
   } catch (e) {
