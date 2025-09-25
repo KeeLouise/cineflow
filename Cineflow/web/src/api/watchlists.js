@@ -76,6 +76,14 @@ export function removeMovieFromWatchlist(listId, itemId) {           //DELETE /a
   return del(`/watchlists/${listId}/items/${itemId}/`);
 }
 
+export function updateWatchlist(id, payload) {
+    return fetch(`/api/watchlists/${id}/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+    }) .then(handle);
+}
+
 export function fetchWatchlist(id) {                                 // GET /api/watchlists/:id/  - fetch one list (with nested items)
   return get(`/watchlists/${id}/`);
 }
