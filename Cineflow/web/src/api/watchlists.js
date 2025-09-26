@@ -1,28 +1,27 @@
 import { authFetch } from "@/api/auth";
 
-const API_BASE = "/api"; //Base URL for backend - KR 24/09/2025
+const API_BASE = "/api"; // Base URL for backend - KR 24/09/2025
 
-function authHeaders() {                                     // a helper that builds headers for authenticated requests
-  const token = localStorage.getItem("access");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+// ---------- Shared helpers ----------
 
-async function handle(res) {                         // a central response handler to avoid repeating error parsing everywhere
-  const text = await res.text();                     // read raw text from the response(works whether or not there's a JSON body)
+// central response handler to parse JSON or throw helpful errors - KR 26/09/2025
+async function handle(res) {
+  const text = await res.text();
   let data = null;
-  
-  if (text) {                                        // if there is a body, try to parse JSON. If parsing fails, text is kept
+
+  if (text) {
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(text);   // try JSON
     } catch {
-      data = text;
+      data = text;               // fall back to plain text
     }
   }
 
-  if (!res.ok) {                                                              // when http status is not ok (e.g 400/401/500) error is created with a message. It will prefer detail, message or error fields if the server sent JSON
-    const msg = (data && (data.detail || data.message || data.error)) ||
-                (typeof data === "string" && data) ||
-                `HTTP ${res.status}`;
+  if (!res.ok) {
+    const msg =
+      (data && (data.detail || data.message || data.error)) ||
+      (typeof data === "string" && data) ||
+      `HTTP ${res.status}`;
 
     const err = new Error(msg);
     err.status = res.status;
@@ -30,33 +29,34 @@ async function handle(res) {                         // a central response handl
     throw err;
   }
 
-  return data;   // on success, return parsed JSON
+  return data; // on success, return parsed JSON (or null)
 }
 
-// ---------- Helpers ----------
-
-async function get(path) {
-  const res = await authFetch(`${API_BASE}${path}`, {method: "GET",});
-  return handle(res);
+// wrapper helpers to reduce repetition - KR 24/09/2025
+function get(path) {
+  return authFetch(`${API_BASE}${path}`, { method: "GET" }).then(handle);
 }
-
-async function post(path, bodyObj) {
-  const res = await authFetch(`${API_BASE}${path}`, {
+function post(path, body) {
+  return authFetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(bodyObj),
-  });
-  return handle(res);
+    body: JSON.stringify(body),
+  }).then(handle);
 }
-
-async function del(path) {
-  const res = await authFetch(`${API_BASE}${path}`, { method: "DELETE" });
-  return handle(res);
+function put(path, body) {
+  return authFetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then(handle);
+}
+function del(path) {
+  return authFetch(`${API_BASE}${path}`, { method: "DELETE" }).then(handle);
 }
 
 // ---------- API Calls ----------
 
-export function fetchMyWatchlists() {                                // Lists the current user's watchlists
+export function fetchMyWatchlists() {                                // GET /api/watchlists/ - list all watchlists for current user
   return get("/watchlists/");
 }
 
@@ -64,7 +64,15 @@ export function createWatchlist(name, isPublic = false) {            // POST /ap
   return post("/watchlists/", { name, is_public: isPublic });
 }
 
-export function addMovieToWatchlist(listId, movie) {                 //POST /api/watchlists/:id/items/ {tmdb_id, title, poster_path}
+export function fetchWatchlist(id) {                                 // GET /api/watchlists/:id/ - fetch one list (with nested items)
+  return get(`/watchlists/${id}/`);
+}
+
+export function deleteWatchlist(id) {                                // DELETE /api/watchlists/:id/ - delete a whole list
+  return del(`/watchlists/${id}/`);
+}
+
+export function addMovieToWatchlist(listId, movie) {                 // POST /api/watchlists/:id/items/ {tmdb_id, title, poster_path}
   return post(`/watchlists/${listId}/items/`, {
     tmdb_id: movie.id,
     title: movie.title,
@@ -72,22 +80,14 @@ export function addMovieToWatchlist(listId, movie) {                 //POST /api
   });
 }
 
-export function removeMovieFromWatchlist(listId, itemId) {           //DELETE /api/watchlists/:listId/items/:itemId
+export function removeMovieFromWatchlist(listId, itemId) {           // DELETE /api/watchlists/:listId/items/:itemId
   return del(`/watchlists/${listId}/items/${itemId}/`);
 }
 
-export function updateWatchlist(id, payload) {
-    return fetch(`/api/watchlists/${id}/`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(payload),
-    }) .then(handle);
+export function updateWatchlist(id, payload) {                       // PUT /api/watchlists/:id/ {name?, is_public?}
+  return put(`/watchlists/${id}/`, payload);
 }
 
-export function fetchWatchlist(id) {                                 // GET /api/watchlists/:id/  - fetch one list (with nested items)
-  return get(`/watchlists/${id}/`);
-}
-
-export function deleteWatchlist(id) {                                // DELETE /api/watchlists/:id/  - delete a whole list
-  return del(`/watchlists/${id}/`);
+export function updateWatchlistItem(listId, itemId, updates) {       // PUT /api/watchlists/:listId/items/:itemId/ {status?, notes?}
+  return put(`/watchlists/${listId}/items/${itemId}/`, updates);
 }
