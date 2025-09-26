@@ -1,14 +1,10 @@
+import { authFetch } from "@/api/auth";
+
 const API_BASE = "/api"; //Base URL for backend - KR 24/09/2025
 
 function authHeaders() {                                     // a helper that builds headers for authenticated requests
-  try {
-    const token = typeof window !== "undefined" && window.localStorage
-      ? window.localStorage.getItem("access")               //reads JWT access token saved at login
-      : null;
-    return token ? { Authorization: `Bearer ${token}` } : {}; //if a token exists, return the header object ({Authorization:"Bearer..."}`). If not, return an empty object
-  } catch {
-    return {};
-  }
+  const token = localStorage.getItem("access");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function handle(res) {                         // a central response handler to avoid repeating error parsing everywhere
@@ -40,28 +36,21 @@ async function handle(res) {                         // a central response handl
 // ---------- Helpers ----------
 
 async function get(path) {
-  const res = await fetch(`${API_BASE}${path}`, { //always prefixes the path with /api and sets the HTTP method
-    method: "GET",
-    headers: { ...authHeaders() }, //merges authorization headers if token exists
-  });
+  const res = await authFetch(`${API_BASE}${path}`, {method: "GET",});
   return handle(res);
 }
 
 async function post(path, bodyObj) {
-  // ✅ Fix: PATH -> path (was a typo)
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authFetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(bodyObj),                                    // body: JSON.stringify(bodyObj) converts a plain JS object to JSON text
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyObj),
   });
-  return handle(res);                                                 // all responses flow through the one parser/thrower so components do not repeat error parsing
+  return handle(res);
 }
 
 async function del(path) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "DELETE",
-    headers: { ...authHeaders() },
-  });
+  const res = await authFetch(`${API_BASE}${path}`, { method: "DELETE" });
   return handle(res);
 }
 
@@ -85,6 +74,14 @@ export function addMovieToWatchlist(listId, movie) {                 //POST /api
 
 export function removeMovieFromWatchlist(listId, itemId) {           //DELETE /api/watchlists/:listId/items/:itemId
   return del(`/watchlists/${listId}/items/${itemId}/`);
+}
+
+export function updateWatchlist(id, payload) {
+    return fetch(`/api/watchlists/${id}/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+    }) .then(handle);
 }
 
 export function fetchWatchlist(id) {                                 // GET /api/watchlists/:id/  - fetch one list (with nested items)

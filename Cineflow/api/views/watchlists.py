@@ -11,6 +11,10 @@ from ..serializers import (
     WatchlistItemCreateSerializer,  # used for input validation when adding an item
 )
 
+# Allowed statuses for item state machine (UI: Will Watch / Watched / Dropped)
+ALLOWED_ITEM_STATUSES = {"planned", "watched", "dropped"}  # keep in sync with frontend - KR 25/09/2025
+
+
 # ownership helper
 def _owned_watchlist_or_404(request, pk: int) -> Watchlist:
     """
@@ -98,7 +102,8 @@ def add_item(request, list_id):         # list_id = the watchlist id
             tmdb_id=ser.validated_data["tmdb_id"],                       # uniqueness key with watchlist
             defaults={                                                   # only used if a new row is created
                 "title": ser.validated_data["title"],
-                "poster_path": ser.validated_data.get("poster_path", "")
+                "poster_path": ser.validated_data.get("poster_path", ""),
+                "status": "planned",                                     # default state on add - KR 25/09/2025
             }
         )
     except IntegrityError:
@@ -111,6 +116,46 @@ def add_item(request, list_id):         # list_id = the watchlist id
     )
 
 
+# ---------- Update an item's status/title/poster (partial) ----------
+
+@api_view(["PATCH"])                    # PATCH == partial update
+@permission_classes([IsAuthenticated])
+def update_item(request, list_id, item_id):
+    """
+    Partially update one movie within a watchlist.
+    Currently supports: status (planned|watched|dropped), title, poster_path.
+
+    Endpoint: PATCH /api/watchlists/<list_id>/items/<item_id>/
+    Body (JSON): { "status": "watched" }
+    """
+    wl = _owned_watchlist_or_404(request, list_id)                         # 404 if not found / not owned
+    item = get_object_or_404(WatchlistItem, pk=item_id, watchlist=wl)
+
+    # Only accept a small, safe subset of fields for partial updates
+    payload = {
+        k: v for k, v in (request.data or {}).items()
+        if k in {"status", "title", "poster_path"}
+    }
+
+    # Validate status if provided
+    if "status" in payload:
+        new_status = str(payload["status"]).lower().strip()
+        if new_status not in ALLOWED_ITEM_STATUSES:
+            return Response(
+                {"status": [f"Invalid status '{payload['status']}'. Must be one of {sorted(ALLOWED_ITEM_STATUSES)}."]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        payload["status"] = new_status
+
+    # Apply updates
+    for field, value in payload.items():
+        setattr(item, field, value)
+
+    item.save(update_fields=list(payload.keys()) or None)
+
+    return Response(WatchlistItemSerializer(item).data, status=status.HTTP_200_OK)
+
+
 # ---------- Remove item from a watchlist ----------
 
 @api_view(["DELETE"])
@@ -119,7 +164,7 @@ def remove_item(request, list_id, item_id):   # list_id = watchlist id, item_id
     """
     Remove one movie from a watchlist
     """
-    wl = _owned_watchlist_or_404(request, list_id)                # 404 if not found or not owned
-    item = get_object_or_404(WatchlistItem, pk=item_id, watchlist=wl)  # Find the item within this list
-    item.delete()                                                 # remove that one row
-    return Response(status=status.HTTP_204_NO_CONTENT)            # 204 No Content(success)
+    wl = _owned_watchlist_or_404(request, list_id)                      # 404 if not found or not owned
+    item = get_object_or_404(WatchlistItem, pk=item_id, watchlist=wl)   # Find the item within this list
+    item.delete()                                                       # remove that one row
+    return Response(status=status.HTTP_204_NO_CONTENT)                  # 204 No Content(success)

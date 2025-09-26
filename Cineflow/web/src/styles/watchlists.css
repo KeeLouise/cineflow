@@ -1,0 +1,244 @@
+/* Global shell */
+html, body, #root {
+  min-height: 100%;
+  background: #0b0f1a;
+  color: #e6e6f0;
+}
+body { margin: 0; }
+main { background: transparent; }
+footer {
+  background: transparent;
+  color: #c8c8d8;
+  border-top: 1px solid rgba(255,255,255,0.12);
+}
+
+/* Watchlists page  */
+.watchlists-page {
+  --wl-grad-1: #0ea5e9;     
+  --wl-grad-2: #a855f7;     
+  --wl-grad-3: #22c55e;   
+  --wl-bg: #0b1020;
+  --wl-card: rgba(255, 255, 255, 0.06);
+  --wl-border: rgba(255, 255, 255, 0.12);
+  --wl-text: #e6e6f0;
+
+  background: linear-gradient(180deg, #0b1020 0%, #0b0f1a 100%);
+  color: var(--wl-text);
+  min-height: 100vh;
+  padding-bottom: 24px;
+  overflow-x: hidden;
+}
+
+/* Hero */
+.wl-hero {
+  background:
+    radial-gradient(1000px 400px at 20% -10%, rgba(14,165,233,.25) 0%, transparent 60%),
+    radial-gradient(900px 380px at 80% -10%, rgba(168,85,247,.25) 0%, transparent 60%),
+    linear-gradient(135deg, rgba(34,197,94,.15), rgba(14,165,233,.15));
+  border-bottom: 1px solid var(--wl-border);
+  padding: 42px 0 24px;
+}
+.wl-title { font-weight: 800; letter-spacing: .2px; }
+.wl-subtitle { color: #c8c8d8; margin: 0; }
+
+/* Glass panel + inputs */
+.glass {
+  background: var(--wl-card);
+  border: 1px solid var(--wl-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+
+/* Create bar */
+.wl-create { padding: 10px; margin-top: -18px; }
+.wl-input {
+  background: rgba(255,255,255,.06);
+  border: 1px solid var(--wl-border);
+  color: var(--wl-text);
+  border-radius: 12px;
+}
+.wl-input::placeholder { color: #9aa0b4; }
+.wl-input:focus {
+  border-color: rgba(14,165,233,.6);
+  box-shadow: 0 0 0 0.2rem rgba(14,165,233,.15);
+  background: rgba(255,255,255,.08);
+  color: var(--wl-text);
+}
+
+/* Cards */
+.wl-card {
+  padding: 12px 12px 14px;
+  border-radius: 16px;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.wl-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 34px rgba(0,0,0,.38);
+  border-color: rgba(99,102,241,.45);
+}
+.wl-name {
+  font-weight: 900;
+  font-size: 1.12rem;
+  letter-spacing: .2px;
+}
+
+/* Centered title bar */
+.wl-titlebar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.wl-titlebar .wl-name { grid-column: 2; text-align: center; }
+.wl-titlebar .wl-badge { grid-column: 2; margin-left: 8px; }
+.wl-titlebar .wl-actions { grid-column: 3; justify-self: end; }
+
+/* Badge */
+.wl-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: .75rem;
+  border: 1px solid var(--wl-border);
+  line-height: 1;
+}
+.wl-badge-success {
+  background: rgba(34, 197, 94, .18);
+  color: #b7f5c9;
+  border-color: rgba(34, 197, 94, .35);
+}
+.wl-badge-dark {
+  background: rgba(255,255,255,.08);
+  color: #e2e6f5;
+  border-color: rgba(255,255,255,.24);
+}
+
+/* Poster thumbnail strip */
+.wl-thumbs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.wl-thumb {
+  width: 38px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--wl-border);
+  background: #0d1222;
+}
+.wl-thumbs-empty {
+  font-size: 0.85rem;
+  color: #9aa0b4;
+  padding: 6px 0;
+}
+
+/* Buttons  */
+.btn-compact { padding: 6px 10px; font-size: .85rem; border-radius: 10px; }
+
+/* ghost actions: brighter text and border for contrast */
+.btn-ghost {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.28);
+  color: #f1f4ff;
+}
+.btn-ghost:hover {
+  background: rgba(255,255,255,.12);
+  border-color: rgba(99,102,241,.6);
+  color: #fff;
+}
+
+.btn-outline-ghost {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.28) !important;
+  color: #f1f4ff !important;
+  border-radius: 12px;
+  padding: 8px 14px;
+}
+.btn-outline-ghost:hover {
+  background: rgba(255,255,255,.10) !important;
+  border-color: rgba(99,102,241,.6) !important;
+  color: #fff !important;
+}
+
+/* gradient button */
+.btn-gradient {
+  background: linear-gradient(90deg, #22d3ee, #6366f1, #f43f5e);
+  background-size: 200% 100%;
+  color: #0b0f1a;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  transition: background-position .3s ease, transform .08s ease, box-shadow .2s ease, filter .2s ease;
+  box-shadow: 0 10px 22px rgba(99,102,241,.18), 0 8px 20px rgba(34,211,238,.12);
+}
+.btn-gradient:hover {
+  background-position: 100% 0;
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+.btn-gradient:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(11,15,26,1),
+    0 0 0 6px rgba(99,102,241,.55);
+}
+.btn-gradient:disabled { opacity: .75; transform: none; }
+
+/* Misc utilities */
+.wl-empty { padding: 24px; margin-top: 16px; }
+.wl-empty-emoji { font-size: 40px; }
+.spinner-lg { width: 3rem; height: 3rem; }
+.text-muted { color: #9aa0b4 !important; }
+
+/* Detail page list styles - KR 25/09/2025 */
+
+.wl-items { display: grid; gap: 10px; }
+
+.wl-item {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;   
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+}
+
+/* Poster thumb box */
+.wl-item-poster img,
+.wl-item-noimg {
+  width: 64px;
+  height: 96px;
+  border-radius: 10px;
+  border: 1px solid var(--wl-border);
+  object-fit: cover;
+  background: rgba(255,255,255,.04);
+  display: block;
+}
+.wl-item-noimg { display: grid; place-items: center; color: #9aa0b4; font-size: 12px; }
+
+.wl-item-title { font-size: 1rem; font-weight: 800; letter-spacing: .2px; }
+.wl-item-actions { display: flex; align-items: center; gap: 8px; }
+
+.wl-status-select { padding: 6px 8px; height: auto; }
+
+/* Filter pills */
+.wl-pill {
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.06);
+  color: #e6e6f0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 700;
+}
+.wl-pill:hover { background: rgba(255,255,255,.12); border-color: rgba(99,102,241,.45); }
+.wl-pill--active {
+  background: linear-gradient(90deg, #22d3ee, #6366f1);
+  color: #0b0f1a;
+  border-color: transparent;
+}
