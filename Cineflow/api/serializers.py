@@ -29,7 +29,7 @@ class MoodKeywordSerializer(serializers.ModelSerializer):
 class WatchlistItemSerializer(serializers.ModelSerializer): # ModelSerializer can auto-build fields from the model - KR 22/09/2025
     class Meta:  # This is where configuration of what the serializer does happens
         model = WatchlistItem  # tells DRF which model the serializer describes
-        fields = ["id", "tmdb_id", "title", "poster_path", "added_at"]  # lists exact fields to include JSON responses and accept in requests
+        fields = ["id", "tmdb_id", "title", "poster_path", "added_at", "status"]  # lists exact fields to include JSON responses and accept in requests
         read_only_fields = ["id", "added_at"]  # server-managed, never set by clients
 
 

@@ -29,7 +29,7 @@ from api.views.tmdb_public import (
 )
 
 # Import the watchlists module
-from api.views import watchlists
+from .views import watchlists as views
 
 urlpatterns = [
     # --- Auth (JWT) --- KR 01/09/2025
@@ -65,8 +65,10 @@ urlpatterns = [
     path("moods/clear_snapshots/", clear_all_snapshots, name="moods-clear-snapshots"),
 
     # --- Watchlists (user-owned) --- KR 24/09/2025
-    path("watchlists/", watchlists.my_watchlists, name="my-watchlists"),
-    path("watchlists/<int:pk>/", watchlists.watchlist_detail, name="watchlist-detail"),
-    path("watchlists/<int:list_id>/items/", watchlists.add_item, name="watchlist-add-item"),
-    path("watchlists/<int:list_id>/items/<int:item_id>/", watchlists.remove_item, name="watchlist-remove-item"),
+    path("watchlists/", views.my_watchlists, name="my_watchlists"),
+    path("watchlists/<int:pk>/", views.watchlist_detail, name="watchlist_detail"),
+
+    path("watchlists/<int:list_id>/items/", views.add_item, name="add_item"),
+    path("watchlists/<int:list_id>/items/<int:item_id>/", views.update_item, name="update_item"),
+    path("watchlists/<int:list_id>/items/<int:item_id>/delete/", views.remove_item, name="remove_item"),
 ]

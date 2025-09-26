@@ -195,3 +195,50 @@ footer {
 .wl-empty-emoji { font-size: 40px; }
 .spinner-lg { width: 3rem; height: 3rem; }
 .text-muted { color: #9aa0b4 !important; }
+
+/* Detail page list styles - KR 25/09/2025 */
+
+.wl-items { display: grid; gap: 10px; }
+
+.wl-item {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;   
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+}
+
+/* Poster thumb box */
+.wl-item-poster img,
+.wl-item-noimg {
+  width: 64px;
+  height: 96px;
+  border-radius: 10px;
+  border: 1px solid var(--wl-border);
+  object-fit: cover;
+  background: rgba(255,255,255,.04);
+  display: block;
+}
+.wl-item-noimg { display: grid; place-items: center; color: #9aa0b4; font-size: 12px; }
+
+.wl-item-title { font-size: 1rem; font-weight: 800; letter-spacing: .2px; }
+.wl-item-actions { display: flex; align-items: center; gap: 8px; }
+
+.wl-status-select { padding: 6px 8px; height: auto; }
+
+/* Filter pills */
+.wl-pill {
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.06);
+  color: #e6e6f0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 700;
+}
+.wl-pill:hover { background: rgba(255,255,255,.12); border-color: rgba(99,102,241,.45); }
+.wl-pill--active {
+  background: linear-gradient(90deg, #22d3ee, #6366f1);
+  color: #0b0f1a;
+  border-color: transparent;
+}
