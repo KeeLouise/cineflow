@@ -1,4 +1,3 @@
-# api/models.py
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.db.models.functions import Lower
@@ -9,7 +8,7 @@ class MoodKeyword(models.Model):
     mood = models.CharField(max_length=40, db_index=True)
     keyword_id = models.IntegerField(db_index=True)
     keyword_name = models.CharField(max_length=200)
-    weight = models.IntegerField(default=1)  # optional: ordering/priority
+    weight = models.IntegerField(default=1)  # ordering/priority
 
     class Meta:
         unique_together = ("mood", "keyword_id")
@@ -54,36 +53,35 @@ class Watchlist(models.Model): # To build the user's watchlist - KR 22/09/2025
 
 
 
-class WatchlistItem(models.Model):  # new table. - each row will represent one movie saved inside one watchlist - KR 22/09/2025
+class WatchlistItem(models.Model): # each row will represent one movie saved inside one watchlist - KR 22/09/2025
     """
     A single movie inside a user's watchlist
     """
     STATUS_CHOICES = (
-        ("planned", "Planned"),  
+        ("planned", "Planned"),
+        ("watching", "Watching"),
         ("watched", "Watched"),
         ("dropped", "Dropped"),
     )
 
-    watchlist = models.ForeignKey(
-        Watchlist,
-        on_delete=models.CASCADE,
-        related_name="items",
-    )
-    tmdb_id = models.PositiveIntegerField()
-    title = models.CharField(max_length=250)
-    poster_path = models.CharField(max_length=300, blank=True)
+    watchlist = models.ForeignKey(Watchlist, on_delete=models.CASCADE, related_name="items")  # links to Watchlist table - KR 22/09/2025
+    tmdb_id = models.PositiveIntegerField()   # To store the movies TMDB ID from the API - KR 22/09/2025
+    title = models.CharField(max_length=250)  # Saves the movie's title
+    poster_path = models.CharField(max_length=300, blank=True)  # Stores the poster image path from TMDB, doesn't have to be filled if path doesn't exist
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="planned")  # KR 26/09/2025
+    # editable fields - KR 26/09/2025
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="planned", db_index=True)  # user can change - KR 26/09/2025
+    position = models.PositiveIntegerField(default=0, db_index=True)  # manual ordering within a list - KR 26/09/2025
 
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [("watchlist", "tmdb_id")]
-        ordering = ["-added_at"]
+        unique_together = [("watchlist", "tmdb_id")]  # cannot add same movie twice to the watchlist
+        ordering = ["position", "-added_at"]          # default order: manual first, then newest - KR 26/09/2025
         indexes = [
-            models.Index(fields=["watchlist", "added_at"]),
+            models.Index(fields=["watchlist", "position"]),  # fast reorder lookups - KR 26/09/2025
             models.Index(fields=["tmdb_id"]),
-            models.Index(fields=["watchlist", "status"]),
+            models.Index(fields=["watchlist", "status", "position"]),
         ]
 
     def __str__(self):
