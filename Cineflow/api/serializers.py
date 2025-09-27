@@ -2,7 +2,11 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from .models import Watchlist, WatchlistItem, MoodKeyword
 
+
 User = get_user_model()
+
+# Allowed item statuses – keep in sync with views/models – KR 27/09/2025
+ALLOWED_ITEM_STATUSES = ("planned", "watching", "watched", "dropped")
 
 # --- AUTH/Registration --- KR 23/09/2025
 class RegisterSerializer(serializers.ModelSerializer):
@@ -27,10 +31,12 @@ class MoodKeywordSerializer(serializers.ModelSerializer):
 # --- Watchlists --- kr 23/09/2025
 
 class WatchlistItemSerializer(serializers.ModelSerializer): # ModelSerializer can auto-build fields from the model - KR 22/09/2025
+    # Enforce valid status values at the serializer layer too – KR 27/09/2025
+    status = serializers.ChoiceField(choices=ALLOWED_ITEM_STATUSES, required=False)
     class Meta:  # This is where configuration of what the serializer does happens
         model = WatchlistItem  # tells DRF which model the serializer describes
-        fields = ["id", "tmdb_id", "title", "poster_path", "added_at", "status"]  # lists exact fields to include JSON responses and accept in requests
-        read_only_fields = ["id", "added_at"]  # server-managed, never set by clients
+        fields = ["id", "tmdb_id", "title", "poster_path", "added_at", "status", "position"]  # lists exact fields to include JSON responses and accept in requests
+        read_only_fields = ["id", "added_at", "position"]  # server-managed, never set by clients
 
 
 class WatchlistSerializer(serializers.ModelSerializer): # adds a nested field called "items". Uses serializer for each related item.
@@ -48,3 +54,9 @@ class WatchlistItemCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = WatchlistItem
         fields = ["tmdb_id", "title", "poster_path"]
+
+class ReorderSerializer(serializers.Serializer):
+    order = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False
+    )

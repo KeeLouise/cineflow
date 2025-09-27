@@ -1,4 +1,6 @@
 from django.db import IntegrityError  # This is raised when a database rule such as a unique constraint is violated. Used to catch "movie already in this list". - KR 23/09/2025
+from django.db import transaction      # bulk reorder - KR 26/09/2025
+from django.db.models import Case, When, Max 
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes  # Turn functions into API endpoints(@api_view) and set access rules. - KR 23/09/2025
 from rest_framework.permissions import IsAuthenticated  # only logged in users can use this view
@@ -9,10 +11,11 @@ from ..serializers import (
     WatchlistSerializer,
     WatchlistItemSerializer,
     WatchlistItemCreateSerializer,  # used for input validation when adding an item
+    ReorderSerializer,              # bulk reorder payload validator - KR 26/09/2025
 )
 
 # Allowed statuses for item state machine (UI: Will Watch / Watched / Dropped)
-ALLOWED_ITEM_STATUSES = {"planned", "watched", "dropped"}  # keep in sync with frontend - KR 25/09/2025
+ALLOWED_ITEM_STATUSES = {"planned", "watching", "watched", "dropped"}  # keep in sync with frontend - KR 26/09/2025
 
 
 # ownership helper
@@ -90,20 +93,23 @@ def add_item(request, list_id):         # list_id = the watchlist id
     """
     wl = _owned_watchlist_or_404(request, list_id)  # 404 if not found or not owned
 
-    # Validate incoming payload (tmdb_id, title, poster_path)
+    # Determine next position (append to end) - KR 26/09/2025
+    next_pos = (WatchlistItem.objects.filter(watchlist=wl).aggregate(m=Max("position"))["m"] or 0) + 1
+
     ser = WatchlistItemCreateSerializer(data=request.data)  # validate the incoming item data
     if not ser.is_valid():
         return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        # Avoid duplicates (unique_together on (watchlist, tmdb_id))
+        # Avoid duplicates
         item, created = WatchlistItem.objects.get_or_create(
             watchlist=wl,                                                # Link to the parent list
             tmdb_id=ser.validated_data["tmdb_id"],                       # uniqueness key with watchlist
             defaults={                                                   # only used if a new row is created
                 "title": ser.validated_data["title"],
                 "poster_path": ser.validated_data.get("poster_path", ""),
-                "status": "planned",                                     # default state on add - KR 25/09/2025
+                "status": "planned",                                     # default state on add - KR 26/09/2025
+                "position": next_pos,                                    # append at end - KR 26/09/2025
             }
         )
     except IntegrityError:
@@ -116,51 +122,53 @@ def add_item(request, list_id):         # list_id = the watchlist id
     )
 
 
-# ---------- Update an item's status/title/poster (partial) ----------
+# ---------- Update an item's status / position ----------
 
-@api_view(["PATCH"])                    # PATCH == partial update
+@api_view(["PUT"])                  # only PUT is allowed - KR 26/09/2025
 @permission_classes([IsAuthenticated])
 def update_item(request, list_id, item_id):
     """
-    Partially update one movie within a watchlist.
-    Currently supports: status (planned|watched|dropped), title, poster_path.
-
-    Endpoint: PATCH /api/watchlists/<list_id>/items/<item_id>/
-    Body (JSON): { "status": "watched" }
+    Update fields of a watchlist item.
+    Supported fields: status ("planned" | "watching" | "watched" | "dropped"), position (int)
     """
-    wl = _owned_watchlist_or_404(request, list_id)                         # 404 if not found / not owned
+    wl = _owned_watchlist_or_404(request, list_id)                       
     item = get_object_or_404(WatchlistItem, pk=item_id, watchlist=wl)
 
-    # Only accept a small, safe subset of fields for partial updates
-    payload = {
-        k: v for k, v in (request.data or {}).items()
-        if k in {"status", "title", "poster_path"}
-    }
+    data = request.data.copy()
 
-    # Validate status if provided
-    if "status" in payload:
-        new_status = str(payload["status"]).lower().strip()
-        if new_status not in ALLOWED_ITEM_STATUSES:
+    # Strictly validate status if provided - KR 26/09/2025
+    if "status" in data:
+        status_val = str(data["status"]).lower().strip()
+        if status_val not in ALLOWED_ITEM_STATUSES:
             return Response(
-                {"status": [f"Invalid status '{payload['status']}'. Must be one of {sorted(ALLOWED_ITEM_STATUSES)}."]},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": f"Invalid status '{status_val}'. Allowed: {sorted(ALLOWED_ITEM_STATUSES)}"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        payload["status"] = new_status
+        data["status"] = status_val
 
-    # Apply updates
-    for field, value in payload.items():
-        setattr(item, field, value)
+    if "position" in data:
+        try:
+            data["position"] = int(data["position"])
+        except (TypeError, ValueError):
+            return Response({"detail": "position must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
 
-    item.save(update_fields=list(payload.keys()) or None)
+    ser = WatchlistItemSerializer(
+        item,
+        data=data,
+        partial=True
+    )
+    if not ser.is_valid():
+        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response(WatchlistItemSerializer(item).data, status=status.HTTP_200_OK)
+    ser.save()  # writes status/position if provided - KR 26/09/2025
+    return Response(ser.data, status=status.HTTP_200_OK)
 
 
 # ---------- Remove item from a watchlist ----------
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
-def remove_item(request, list_id, item_id):   # list_id = watchlist id, item_id
+def remove_item(request, list_id, item_id): 
     """
     Remove one movie from a watchlist
     """
@@ -168,3 +176,34 @@ def remove_item(request, list_id, item_id):   # list_id = watchlist id, item_id
     item = get_object_or_404(WatchlistItem, pk=item_id, watchlist=wl)   # Find the item within this list
     item.delete()                                                       # remove that one row
     return Response(status=status.HTTP_204_NO_CONTENT)                  # 204 No Content(success)
+
+
+# ---------- Bulk reorder items ----------
+@api_view(["POST"])                   
+@permission_classes([IsAuthenticated])
+def reorder_items(request, list_id):
+    """
+    Set a new explicit order for items in a list.
+    Body: { "order": [item_id, item_id, ...] } (must contain only items from this watchlist)
+    """
+    wl = _owned_watchlist_or_404(request, list_id)
+
+    ser = ReorderSerializer(data=request.data)
+    if not ser.is_valid():
+        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    ids = ser.validated_data["order"]
+
+    # Validate all IDs belong to this watchlist - KR 26/09/2025
+    owned_ids = set(WatchlistItem.objects.filter(watchlist=wl, id__in=ids).values_list("id", flat=True))
+    if len(owned_ids) != len(ids):
+        return Response({"detail": "Order contains invalid item IDs."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Case expression
+    when_list = [When(id=item_id, then=pos) for pos, item_id in enumerate(ids, start=1)]  # positions start at 1 - KR 27/09/2025
+    with transaction.atomic():
+        WatchlistItem.objects.filter(id__in=ids).update(position=Case(*when_list))
+
+    # Return ordered list
+    data = WatchlistSerializer(wl).data
+    return Response(data, status=status.HTTP_200_OK)
