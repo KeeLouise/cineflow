@@ -60,3 +60,14 @@ class ReorderSerializer(serializers.Serializer):
         child=serializers.IntegerField(min_value=1),
         allow_empty=False
     )
+
+    def validate_order(self, value):
+        """
+        Ensure the order array is a list of unique integers > 0.
+        Keeps client drag-and-drop reorders in place and prevents accidental duplicates – KR 28/09/2025
+        """
+        ids = list(value)
+        # Ensure uniqueness
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError("Order contains duplicate item IDs.")
+        return ids
