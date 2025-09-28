@@ -43,6 +43,8 @@ export default function MovieDetail() {
   const [saveMsg, setSaveMsg] = useState("");                  // success message like “Added!”
   const [saveError, setSaveError] = useState("");              // error message
 
+  const [pickerOpen, setPickerOpen] = useState(false);         //show/hide inline watchlist picker - KR 28/09/2025
+
   // fetch movie detail on mount/id change - KR 26/08/2025
   useEffect(() => {
     let active = true;
@@ -109,6 +111,7 @@ async function handleAddToWatchlist() {
     setSaving(true);
     await addMovieToWatchlist(selectedListId, moviePayload); // POST /api/watchlists/:id/items/
     setSaveMsg("Added to your watchlist!");
+    setPickerOpen(false);
   } catch (err) {
     // backend might return 400 if duplicate, or 404 if wrong list id
     setSaveError(err.message || "Could not add to watchlist.");
@@ -226,79 +229,100 @@ async function handleAddToWatchlist() {
                 </span>
               ) : null}
             </div>
-
-            {/* ---- Save to Watchlist UI ---- */}
-<div className="card bg-dark p-3 mt-4">
-  <h5 className="mb-2">Save to Watchlist</h5>
-
-  {/* If not logged in, prompt to log in */}
-  {!authed && (
-    <div className="text-muted">
-      You need to be logged in to save movies.{" "}
-      <a href="/login">Log in</a>
-    </div>
-  )}
-
-  {/* If logged in, show the selector + button */}
-  {authed && (
-    <>
-      {listsLoading && <div className="text-muted">Loading your lists…</div>}
-
-      {listsError && (
-        <div className="text-danger mb-2">Error: {listsError}</div>
-      )}
-
-      {!listsLoading && !listsError && (
-        <>
-          {lists.length === 0 ? (
-            <div className="text-muted">
-              You don’t have any watchlists yet. Create one on the{" "}
-              <a href="/watchlists">Watchlists</a> page.
-            </div>
-          ) : (
-            <div className="d-flex gap-2 align-items-center">
-              <select
-                className="form-select w-auto"
-                value={selectedListId}
-                onChange={(e) => setSelectedListId(e.target.value)}
-                disabled={saving}
-              >
-                {lists.map((wl) => (
-                  <option key={wl.id} value={wl.id}>
-                    {wl.name}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleAddToWatchlist}
-                disabled={saving || !selectedListId}
-              >
-                {saving ? "Adding…" : "Add to Watchlist"}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Success / error messages */}
-      {saveMsg && <div className="text-success mt-2">{saveMsg}</div>}
-      {saveError && <div className="text-danger mt-2">{saveError}</div>}
-    </>
-  )}
-</div>
-
             {/* Overview - KR 26/08/2025 */}
             <p className="movie-overview">{overview || "No overview available."}</p>
 
             {/* Primary actions - KR 26/08/2025 */}
-            <div className="actions mt-3 d-flex flex-wrap gap-2">
-              <Link to="/" className="btn btn-ghost">← Back</Link>
-              <button className="btn btn-primary">＋ Watchlist</button>
-            </div>
+<div className="actions mt-3 d-flex flex-wrap gap-2 align-items-center">
+  <Link to="/" className="btn btn-ghost">← Back</Link>
+
+  {/* Inline “Add to Watchlist” beside Back button, dropdown appears on click - KR 28/09/2025 */}
+  {authed ? (
+    <div className="position-relative d-inline-block"> {/* <-- keep the picker anchored to the button */}
+      <button
+        type="button"
+        className="btn btn-primary"
+        onClick={() => {
+          setSaveMsg("");
+          setSaveError("");
+          setPickerOpen((open) => !open);
+        }}
+        aria-expanded={pickerOpen ? "true" : "false"}
+        aria-controls="watchlist-picker"
+      >
+        Add to Watchlist
+      </button>
+
+      {pickerOpen && (
+        <div
+          id="watchlist-picker"
+          className="card p-2 position-absolute z-3 shadow"
+          // Position to the RIGHT of the button instead of below
+          style={{ minWidth: 280, top: 0, left: "100%", marginLeft: 12 }}
+        >
+          {listsLoading && <div className="text-muted">Loading your lists…</div>}
+          {listsError && <div className="text-danger mb-2">Error: {listsError}</div>}
+
+          {!listsLoading && !listsError && (
+            <>
+              {lists.length === 0 ? (
+                <div className="text-muted">
+                  You don’t have any watchlists yet. Create one on the{" "}
+                  <a href="/watchlists">Watchlists</a> page.
+                </div>
+              ) : (
+                <div className="d-flex gap-2 align-items-center">
+                  <select
+                    className="form-select w-auto"
+                    value={selectedListId}
+                    onChange={(e) => {
+                      setSaveMsg("");
+                      setSaveError("");
+                      setSelectedListId(e.target.value);
+                    }}
+                    disabled={saving}
+                  >
+                    {lists.map((wl) => (
+                      <option key={wl.id} value={wl.id}>
+                        {wl.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleAddToWatchlist}
+                    disabled={saving || !selectedListId}
+                    aria-busy={saving ? "true" : "false"}
+                  >
+                    {saving ? "Adding…" : "Add"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setPickerOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Success / error messages (inline in the popover) */}
+          {saveMsg && <div className="text-success mt-2">{saveMsg}</div>}
+          {saveError && <div className="text-danger mt-2">{saveError}</div>}
+        </div>
+      )}
+    </div>
+  ) : (
+    <a href="/login" className="btn btn-outline-secondary">Log in to save</a>
+  )}
+</div>
           </div>
+
         </div>
       </div>
 

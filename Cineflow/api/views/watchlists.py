@@ -1,6 +1,7 @@
 from django.db import IntegrityError  # This is raised when a database rule such as a unique constraint is violated. Used to catch "movie already in this list". - KR 23/09/2025
 from django.db import transaction      # bulk reorder - KR 26/09/2025
 from django.db.models import Case, When, Max 
+from django.db.models import F
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes  # Turn functions into API endpoints(@api_view) and set access rules. - KR 23/09/2025
 from rest_framework.permissions import IsAuthenticated  # only logged in users can use this view
@@ -188,22 +189,53 @@ def reorder_items(request, list_id):
     """
     wl = _owned_watchlist_or_404(request, list_id)
 
+    # Fetch full current order so partial payloads are supported (non-breaking) - KR 27/09/2025
+    current_ids = list(
+        WatchlistItem.objects
+        .filter(watchlist=wl)
+        .order_by("position", "-added_at")
+        .values_list("id", flat=True)
+    )
+
     ser = ReorderSerializer(data=request.data)
     if not ser.is_valid():
         return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
 
     ids = ser.validated_data["order"]
 
-    # Validate all IDs belong to this watchlist - KR 26/09/2025
-    owned_ids = set(WatchlistItem.objects.filter(watchlist=wl, id__in=ids).values_list("id", flat=True))
-    if len(owned_ids) != len(ids):
+    # Validate all provided IDs belong to this watchlist - KR 26/09/2025
+    provided_ids = list(ids)
+    owned_ids = set(
+        WatchlistItem.objects
+        .filter(watchlist=wl, id__in=provided_ids)
+        .values_list("id", flat=True)
+    )
+    if len(owned_ids) != len(provided_ids):
         return Response({"detail": "Order contains invalid item IDs."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Case expression
-    when_list = [When(id=item_id, then=pos) for pos, item_id in enumerate(ids, start=1)]  # positions start at 1 - KR 27/09/2025
-    with transaction.atomic():
-        WatchlistItem.objects.filter(id__in=ids).update(position=Case(*when_list))
+    # Build a normalized order that supports partial payloads by appending the rest - KR 27/09/2025
+    seen = set()
+    new_order = []
+    for i in provided_ids:
+        if i in owned_ids and i not in seen:
+            new_order.append(i)
+            seen.add(i)
+    for i in current_ids:
+        if i not in seen:
+            new_order.append(i)
+            seen.add(i)
 
-    # Return ordered list
+    # Lock affected rows and update positions in a single query - KR 27/09/2025
+    when_list = [When(id=item_id, then=pos) for pos, item_id in enumerate(new_order, start=1)]
+    with transaction.atomic():
+        (WatchlistItem.objects
+            .select_for_update()
+            .filter(watchlist=wl, id__in=new_order)
+            .update(position=Case(*when_list))
+        )
+        # touch parent to bump ordering in list view - KR 27/09/2025
+        Watchlist.objects.filter(id=wl.id).update(updated_at=F("updated_at"))
+
+    # Serializer Meta/related manager should return items ordered by position - KR 27/09/2025
     data = WatchlistSerializer(wl).data
     return Response(data, status=status.HTTP_200_OK)

@@ -79,10 +79,29 @@ class WatchlistItem(models.Model): # each row will represent one movie saved ins
         unique_together = [("watchlist", "tmdb_id")]  # cannot add same movie twice to the watchlist
         ordering = ["position", "-added_at"]          # default order: manual first, then newest - KR 26/09/2025
         indexes = [
-            models.Index(fields=["watchlist", "position"]),  # fast reorder lookups - KR 26/09/2025
+            models.Index(fields=["watchlist", "-added_at"]),   # fast reorder lookups - KR 26/09/2025
+            models.Index(fields=["watchlist", "-position"]),
             models.Index(fields=["tmdb_id"]),
             models.Index(fields=["watchlist", "status", "position"]),
         ]
+
+    def save(self, *args, **kwargs):
+        """
+        Auto-assign a position when inserting a new item if no position was provided.
+        Ensures new items append to the end of the list. - KR 27/09/2025
+        """
+        # Only generate on initial insert or when position is 0/None - KR 27/09/2025
+        if self._state.adding and (self.position is None or self.position == 0):
+            last_position = (
+                self.__class__.objects
+                .filter(watchlist=self.watchlist)
+                .order_by("-position")
+                .values_list("position", flat=True)
+                .first()
+            )
+            self.position = (last_position or 0) + 1
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.title} in {self.watchlist.name}"

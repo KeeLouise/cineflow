@@ -32,6 +32,11 @@ async function handle(res) {
   return data; // on success, return parsed JSON (or null)
 }
 
+function authHeaders() {
+  const token = localStorage.getItem("access");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // wrapper helpers to reduce repetition - KR 24/09/2025
 function get(path) {
   return authFetch(`${API_BASE}${path}`, { method: "GET" }).then(handle);
@@ -88,6 +93,14 @@ export function updateWatchlist(id, payload) {                       // PUT /api
   return put(`/watchlists/${id}/`, payload);
 }
 
-export function updateWatchlistItem(listId, itemId, updates) {       // PUT /api/watchlists/:listId/items/:itemId/ {status?, notes?}
-  return put(`/watchlists/${listId}/items/${itemId}/`, updates);
+export function updateWatchlistItem(listId, itemId, payLoad) {   
+    return fetch(`/api/watchlists/${listId}/items/${itemId}/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payLoad),
+    })  .then(handle);   
+}
+
+export function reorderWatchlistItems(listId, order) {             // POST /api/watchlists/:listId/reorder/ {order:[itemId,...]}
+  return post(`/watchlists/${listId}/reorder/`, { order });        // sends explicit item ID order to backend - KR 30/09/2025
 }
