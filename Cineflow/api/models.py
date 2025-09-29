@@ -156,6 +156,38 @@ class WatchlistCollaborator(models.Model):
 
     class Meta:
         unique_together = [("watchlist", "user")]
-        
 
 
+
+#WatchRoomVote Model - KR 29/09/2025
+
+class WatchRoomVote(models.Model):  # One user's vote on one movie in a room - KR 29/09/2025
+    UP = 1
+    DOWN = -1
+    VOTE_CHOICES = (
+        (UP, "up"),
+        (DOWN, "down"),
+    )
+
+    room_movie = models.ForeignKey(
+        "WatchRoomMovie",
+        on_delete=models.CASCADE,
+        related_name="votes",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="room_votes",
+    )
+    value = models.SmallIntegerField(choices=VOTE_CHOICES)  # 1 or -1 -KR
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("room_movie", "user")]  # prevent duplicate votes by same user - KR
+        indexes = [
+            models.Index(fields=["room_movie"]),
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self):
+        return f"Vote({self.get_value_display()}) by {self.user} on {self.room_movie_id}"
