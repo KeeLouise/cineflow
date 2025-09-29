@@ -85,5 +85,6 @@ urlpatterns = [
     path("rooms/<int:room_id>/members/", rooms.room_members, name="room_members"),
     path("rooms/<int:room_id>/movies/", rooms.room_movies, name="room_movies"),
     path("rooms/<int:room_id>/movies/reorder/", rooms.room_movies_reorder, name="room_movies_reorder"),
+    path("rooms/<int:room_id>/movies/<int:movie_id>/", rooms.room_movie_delete, name="room_movie_delete"),
     path("rooms/<int:room_id>/movies/<int:movie_id>/vote/", rooms.room_movie_vote, name="room_movie_vote"),
 ]

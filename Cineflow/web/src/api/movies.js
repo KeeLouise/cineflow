@@ -1,8 +1,7 @@
-import api from "./client"; // axios instance with baseURL: '/api'
+import api from "./client";
 
-// --- Helpers --- KR 28/08/2025
+// Helpers - KR 28/08/2025
 export function buildProvidersParam(ids) {
-  // TMDB expects pipe-separated provider IDs, e.g. "8|337"
   return Array.isArray(ids) && ids.length ? ids.join("|") : "";
 }
 
@@ -20,7 +19,15 @@ export async function searchMovies(q, { signal } = {}) {
     params: { q },
     signal,
   });
-  return data;
+
+  const raw = Array.isArray(data) ? data : (data?.results ?? []);
+  const results = raw.map((m) => ({
+    id: Number(m?.id ?? m?.tmdb_id ?? 0),
+    title: m?.title ?? m?.name ?? "",
+    poster_path: m?.poster_path ?? "",
+    release_date: m?.release_date ?? m?.first_air_date ?? "",
+  }));
+  return { results };
 }
 
 // Search by person/actor -> movie credits (via Django backend). - KR 25/08/2025
@@ -94,10 +101,9 @@ export async function fetchMoodDiscover(
     debug = false,
     broad = false,
     fast = false,
-    // NEW filters — KR 10/09/2025
-    decade = "",          // "2020s", "2010s", ...
-    tmdbMin = "",         // number/string -> vote_average.gte
-    cfMin = "",           // number/string -> cineflow score minimum
+    decade = "",          
+    tmdbMin = "",         
+    cfMin = "",           
   } = {},
   { signal } = {}
 ) {
@@ -106,19 +112,15 @@ export async function fetchMoodDiscover(
   const params = {
   region,
   page,
-  types, // e.g. "flatrate,ads,free" (MUST be commas)
+  types,
 
-  // Provider constraints
-  ...(providers ? { providers, broad: 1 } : {}), // widen monetization when provider selected
+  ...(providers ? { providers, broad: 1 } : {}), 
 
-  // Filters — use names the backend actually parses
   ...(decade ? { decade } : {}),
   ...(tmdbMin !== "" && tmdbMin != null ? { vote_average_gte: Number(tmdbMin) } : {}),
 
-  // If "cfMin" was meant to control mood strictness, map it properly:
-  ...(cfMin ? { mood_strength: cfMin } : {}), // expect 'strict' | 'balanced' | 'loose'
+  ...(cfMin ? { mood_strength: cfMin } : {}), 
 
-  // Flags
   ...(debug ? { debug: 1 } : {}),
   ...(fast ? { fast: 1 } : {}),
 };
@@ -126,3 +128,4 @@ export async function fetchMoodDiscover(
   const { data } = await api.get(`/movies/mood/${mood}/`, { params, signal });
   return data;
 }
+

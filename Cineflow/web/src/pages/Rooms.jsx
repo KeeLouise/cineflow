@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { fetchMyRooms, createRoom, joinRoom } from "@/api/rooms";
 
 export default function Rooms() {
@@ -11,6 +11,7 @@ export default function Rooms() {
   const [cName, setCName] = useState("");
   const [cDesc, setCDesc] = useState("");
 
+  const location = useLocation(); 
   const [joining, setJoining] = useState(false);
   const [code, setCode] = useState("");
 
@@ -19,7 +20,7 @@ export default function Rooms() {
     (async () => {
       try {
         setLoading(true);
-        const data = await fetchMyRooms();           // GET /api/rooms/
+        const data = await fetchMyRooms();        
         if (!alive) return;
         setRooms(data || []);
       } catch (e) {
@@ -30,6 +31,12 @@ export default function Rooms() {
     })();
     return () => { alive = false; };
   }, []);
+
+    useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const prefill = params.get("code");
+    if (prefill) setCode(prefill);                                     
+  }, [location.search]);
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -57,7 +64,7 @@ export default function Rooms() {
     setErr("");
     setJoining(true);
     try {
-      const room = await joinRoom(code.trim());      // POST /api/rooms/join/
+      const room = await joinRoom(code.trim());  
       setRooms((r) => {
         const exists = r.find((x) => x.id === room.id);
         return exists ? r.map((x) => (x.id === room.id ? room : x)) : [room, ...r];
@@ -122,7 +129,7 @@ export default function Rooms() {
         </div>
       ) : (
         <div className="row g-3">
-          {rooms.map((r) => (
+          {rooms.filter(r => r.is_active).map((r) => (
             <div key={r.id} className="col-12 col-md-6 col-xl-4">
               <div className="room-card glass h-100 d-flex flex-column">
                 <div className="d-flex align-items-center justify-content-between">

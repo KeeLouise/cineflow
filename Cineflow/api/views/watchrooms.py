@@ -130,6 +130,33 @@ def room_members(request, room_id):
     qs = RoomMembership.objects.filter(room=room).select_related("user").order_by("-is_host", "joined_at")
     return Response(RoomMembershipSerializer(qs, many=True).data, status=status.HTTP_200_OK)
 
+from django.conf import settings
+import requests
+
+def _fetch_tmdb_detail(tmdb_id: int) -> dict:
+    key = getattr(settings, "TMDB_API_KEY", None)
+    if not key:
+        return {}
+    try:
+        r = requests.get(
+            f"https://api.themoviedb.org/3/movie/{int(tmdb_id)}",
+            params={"api_key": key, "language": "en-US"},
+            timeout=5,
+        )
+        if r.ok:
+            return r.json() or {}
+    except Exception:
+        pass
+    return {}
+
+def _enrich_fields_if_missing(tmdb_id: int, title: str, poster_path: str):
+    if title and poster_path:
+        return title, poster_path
+    md = _fetch_tmdb_detail(tmdb_id)
+    t = title or md.get("title") or md.get("name") or ""
+    p = poster_path or (md.get("poster_path") or "")
+    return t, p
+
 # Room movies: add / list
 
 @api_view(["GET", "POST"])
@@ -143,6 +170,18 @@ def room_movies(request, room_id):
 
     if request.method == "GET":
         qs = RoomMovie.objects.filter(room=room).order_by("position", "-added_at")
+
+        dirty = []
+        for rm in qs:
+            if not (rm.title and rm.poster_path):
+                t, p = _enrich_fields_if_missing(rm.tmdb_id, rm.title or "", rm.poster_path or "")
+                if (t and t != rm.title) or (p and p != rm.poster_path):
+                    rm.title = t
+                    rm.poster_path = p
+                    dirty.append(rm)
+        if dirty:
+            RoomMovie.objects.bulk_update(dirty, ["title", "poster_path"])
+
         return Response(RoomMovieSerializer(qs, many=True).data, status=status.HTTP_200_OK)
 
     ser = RoomAddMovieSerializer(data=request.data)
@@ -159,18 +198,20 @@ def room_movies(request, room_id):
         or 0
     )
 
-    create_kwargs = {
-        "room": room,
-        "tmdb_id": ser.validated_data["tmdb_id"],
-        "added_by": request.user,
-        "position": last_pos + 1,
-    }
-    if "title" in ser.validated_data:
-        create_kwargs["title"] = ser.validated_data["title"]
-    if "poster_path" in ser.validated_data:
-        create_kwargs["poster_path"] = ser.validated_data["poster_path"]
+    raw_title = ser.validated_data.get("title") or ""
+    raw_poster = ser.validated_data.get("poster_path") or ""
+    final_title, final_poster = _enrich_fields_if_missing(
+        int(ser.validated_data["tmdb_id"]), raw_title, raw_poster
+    )
 
-    movie = RoomMovie.objects.create(**create_kwargs)
+    movie = RoomMovie.objects.create(
+        room=room,
+        tmdb_id=ser.validated_data["tmdb_id"],
+        title=final_title,
+        poster_path=final_poster,
+        added_by=request.user,
+        position=last_pos + 1,
+    )
     return Response(RoomMovieSerializer(movie).data, status=status.HTTP_201_CREATED)
 
 #  Reorder room movies 
@@ -217,6 +258,14 @@ def room_movie_vote(request, room_id, movie_id):
         defaults={"value": ser.validated_data["value"]},
     )
     return Response({"id": vote.id, "value": vote.value}, status=status.HTTP_200_OK)
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def room_movie_delete(request, room_id, movie_id):
+    room = _member_or_404(request.user, room_id)
+    movie = get_object_or_404(RoomMovie, id=movie_id, room=room)
+    movie.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 # Watchlist collaborators (list/add/remove)
 
