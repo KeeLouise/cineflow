@@ -31,6 +31,9 @@ from api.views.tmdb_public import (
 # Import the watchlists module
 from .views import watchlists as views
 
+# Import watch party room endpoints - KR 30/09/2025
+from .views import watchrooms as rooms
+
 urlpatterns = [
     # --- Auth (JWT) --- KR 01/09/2025
     path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
@@ -67,9 +70,20 @@ urlpatterns = [
     # --- Watchlists (user-owned) --- KR 24/09/2025
     path("watchlists/", views.my_watchlists, name="my_watchlists"),
     path("watchlists/<int:pk>/", views.watchlist_detail, name="watchlist_detail"),
-
     path("watchlists/<int:list_id>/items/", views.add_item, name="add_item"),
     path("watchlists/<int:list_id>/items/<int:item_id>/", views.update_item, name="update_item"),
     path("watchlists/<int:list_id>/items/<int:item_id>/delete/", views.remove_item, name="remove_item"),
     path("watchlists/<int:list_id>/reorder/", views.reorder_items, name="reorder_items"),
+
+    # --- Watchlist collaborators (owner admin) --- KR 29/09/2025
+    path("watchlists/<int:list_id>/collaborators/", rooms.watchlist_collaborators, name="watchlist_collaborators"),
+
+    # --- Watch party rooms --- KR 29/09/2025
+    path("rooms/", rooms.my_rooms, name="my_rooms"),
+    path("rooms/join/", rooms.room_join, name="room_join"),
+    path("rooms/<int:room_id>/", rooms.room_detail, name="room_detail"),
+    path("rooms/<int:room_id>/members/", rooms.room_members, name="room_members"),
+    path("rooms/<int:room_id>/movies/", rooms.room_movies, name="room_movies"),
+    path("rooms/<int:room_id>/movies/reorder/", rooms.room_movies_reorder, name="room_movies_reorder"),
+    path("rooms/<int:room_id>/movies/<int:movie_id>/vote/", rooms.room_movie_vote, name="room_movie_vote"),
 ]

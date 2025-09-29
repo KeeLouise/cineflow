@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.db.models.functions import Lower
+from django.utils.crypto import get_random_string  # for simple invite codes - KR 29/09/2025
 from django.conf import settings
 
 class MoodKeyword(models.Model):
@@ -50,7 +51,6 @@ class Watchlist(models.Model): # To build the user's watchlist - KR 22/09/2025
 
     def __str__(self):
         return f"{self.user} • {self.name}"  # defines how object pronts/reads in the admin or shell - KR 22/09/2025
-
 
 
 class WatchlistItem(models.Model): # each row will represent one movie saved inside one watchlist - KR 22/09/2025
@@ -105,3 +105,116 @@ class WatchlistItem(models.Model): # each row will represent one movie saved ins
 
     def __str__(self):
         return f"{self.title} in {self.watchlist.name}"
+    
+
+# Watch party room model - KR 29/09/2025
+
+# explicit helper to document length for invite codes - KR 30/09/2025
+def _room_code():
+    return get_random_string(16)
+
+class Room(models.Model):                       #new databse table called Room - KR 29/09/2025
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="owned_rooms") #owner is the user that created the room. Foreignkey means the room is linked to one user - KR
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True) #description is allowed to be empty - KR
+    is_active = models.BooleanField(default=True) #when the host ends the room, this can be set to false - KR 29/09/2025
+    starts_at = models.DateTimeField(null=True, blank=True)#optional date and time for when watch party starts
+    invite_code = models.CharField(max_length=36, unique=True, default=_room_code) #shareable code that lets others join
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["owner", "is_active", "created_at"]), #db index to make queries faster such as "rooms I own that are active, sorted by time" - kr
+            models.Index(fields=["invite_code"]),  # quick joins by code - KR 29/09/2025
+        ]
+
+    def __str__(self):
+        return f"Room({self.id}) • {self.name} by {self.owner}"
+
+
+# Room Membership model - KR 29/09/2025
+
+class RoomMembership(models.Model):                                                     #This table records which users are part of which room - KR
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="memberships")#Link back to the room. If room is deleted, membership row is deleted - KR
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="room_memberships") #link to user who is a member - KR
+    is_host=models.BooleanField(default=False)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("room", "user")] #prevents same user from being added to the same room twice - KR
+
+    def __str__(self):
+        return f"{self.user} in Room({self.room_id})"
+
+
+#RoomMovie model(suggested or queued movies in a room) - KR 29/09/2025
+
+class RoomMovie(models.Model):
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="movies")
+    tmdb_id = models.PositiveIntegerField()
+    title = models.CharField(max_length=250, blank=True)
+    poster_path = models.CharField(max_length=300, blank=True)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True) #which user suggested the movie. Keeps record even if user is deleted - KR
+    position = models.PositiveIntegerField(default=0)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("room", "tmdb_id")]
+        ordering = ["position", "-added_at"]
+        indexes = [
+            models.Index(fields=["room", "position"]),     
+            models.Index(fields=["room", "-added_at"]),    
+        ]
+
+    def __str__(self):
+        show = self.title or f"TMDB:{self.tmdb_id}"
+        return f"{show} in Room({self.room_id})"
+
+
+#WatchlistCollaborator Model - KR 29/09/2025
+
+class WatchlistCollaborator(models.Model):
+    watchlist = models.ForeignKey(Watchlist, on_delete=models.CASCADE, related_name="collaborators")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="collab_watchlists")
+    can_edit = models.BooleanField(default=True)
+    invited_at = models.DateTimeField(auto_now_add = True)
+
+    class Meta:
+        unique_together = [("watchlist", "user")]
+
+    def __str__(self):
+        return f"{self.user} ↔ {self.watchlist.name}"
+
+
+#WatchRoomVote Model - KR 29/09/2025
+
+class WatchRoomVote(models.Model):  # One user's vote on one movie in a room - KR 29/09/2025
+    UP = 1
+    DOWN = -1
+    VOTE_CHOICES = (
+        (UP, "up"),
+        (DOWN, "down"),
+    )
+
+    room_movie = models.ForeignKey(
+        "RoomMovie",
+        on_delete=models.CASCADE,
+        related_name="votes",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="room_votes",
+    )
+    value = models.SmallIntegerField(choices=VOTE_CHOICES)  # 1 or -1 -KR
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("room_movie", "user")]  # prevent duplicate votes by same user - KR
+        indexes = [
+            models.Index(fields=["room_movie"]),
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self):
+        return f"Vote({self.get_value_display()}) by {self.user} on {self.room_movie_id}"

@@ -11,6 +11,8 @@ import PrivateRoute from "@/components/PrivateRoute";
 import MovieDetail from "@/pages/MovieDetail.jsx";
 import Watchlists from "@/pages/Watchlists.jsx";
 import WatchlistDetail from "@/pages/WatchlistDetail.jsx";
+import Rooms from "./pages/Rooms";        
+import RoomDetail from "./pages/RoomDetail"; 
 
 export default function App() {
   return (
@@ -57,6 +59,23 @@ export default function App() {
               </PrivateRoute>
             }
           />
+
+          <Route
+  path="/rooms"
+  element={
+    <PrivateRoute>
+      <Rooms />
+    </PrivateRoute>
+  }
+/>
+<Route
+  path="/rooms/:id"
+  element={
+    <PrivateRoute>
+      <RoomDetail />
+    </PrivateRoute>
+  }
+/>
 
           <Route path="/movie/:id" element={<MovieDetail />} />
 
