@@ -19,7 +19,8 @@ export default function Navbar() {
   }, []);
 
   function handleLogout() {
-    logout();                 
+    logout();                  
+    navigate("/");         
   }
 
   return (
@@ -35,33 +36,36 @@ export default function Navbar() {
               <NavLink to="/" className="nav-link">Home</NavLink>
             </li>
 
-            {!authed ? (
-              <>
-                <li className="nav-item">
-                  <NavLink to="/login" className="nav-link">Login</NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink to="/register" className="nav-link">Register</NavLink>
-                </li>
-              </>
-            ) : (
-              <>
-                <li className="nav-item">
-                  <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
-                </li>
-                {/* Watchlists only for logged-in users */}
-                {authed && (
-                <li className="nav-item">
-                <NavLink to="/watchlists" className="nav-link">Watchlists</NavLink>
-                </li>
-                 )}
-                <li className="nav-item">
-                  <button onClick={handleLogout} className="btn btn-link nav-link">
-                    Logout
-                  </button>
-                </li>
-              </>
-            )}
+            {authed ? (
+  <>
+    <li className="nav-item">
+      <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
+    </li>
+
+    <li className="nav-item">
+      <NavLink to="/watchlists" className="nav-link">Watchlists</NavLink>
+    </li>
+
+    <li className="nav-item">
+      <NavLink to="/rooms" className="nav-link">Rooms</NavLink>
+    </li>
+
+    <li className="nav-item">
+      <button onClick={handleLogout} className="btn btn-link nav-link">
+        Logout
+      </button>
+    </li>
+  </>
+) : (
+  <>
+    <li className="nav-item">
+      <NavLink to="/login" className="nav-link">Login</NavLink>
+    </li>
+    <li className="nav-item">
+      <NavLink to="/register" className="nav-link">Register</NavLink>
+    </li>
+  </>
+)}
           </ul>
         </div>
       </div>

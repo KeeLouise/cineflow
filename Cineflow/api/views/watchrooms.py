@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from django.db.models import Case, When, Sum
+from django.db.models import Case, When, Sum, Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -43,24 +43,24 @@ def my_rooms(request):
     POST -> create a new room
     """
     if request.method == "GET":
-        member_room_ids = RoomMembership.objects.filter(user=request.user).values_list("room_id", flat=True)
         qs = (
             Room.objects
-            .filter(id__in=member_room_ids)
-            .union(Room.objects.filter(owner=request.user))
+            .filter(Q(owner=request.user) | Q(memberships__user=request.user))
+            .distinct()
             .order_by("-created_at")
         )
         data = RoomSerializer(qs, many=True, context={"request": request}).data
         return Response(data, status=status.HTTP_200_OK)
 
-    # POST create
     ser = RoomCreateSerializer(data=request.data, context={"request": request})
     if not ser.is_valid():
         return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
     room = ser.save(owner=request.user)
 
-    # auto-add owner as host - KR 29/09/2025
-    RoomMembership.objects.get_or_create(room=room, user=request.user, defaults={"is_host": True})
+    # auto-add owner as host
+    RoomMembership.objects.get_or_create(
+        room=room, user=request.user, defaults={"is_host": True}
+    )
 
     return Response(
         RoomSerializer(room, context={"request": request}).data,
