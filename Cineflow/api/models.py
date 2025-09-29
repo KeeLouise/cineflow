@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.db.models.functions import Lower
+from django.utils.crypto import get_random_string  # for simple invite codes - KR 29/09/2025
 from django.conf import settings
 
 class MoodKeyword(models.Model):
@@ -115,7 +116,7 @@ class Room(models.Model):                       #new databse table called Room -
     description = models.TextField(blank=True) #description is allowed to be empty - KR
     is_active = models.BooleanField(default=True) #when the host ends the room, this can be set to false - KR 29/09/2025
     starts_at = models.DateTimeField(null=True, blank=True)#optional date and time for when watch party starts
-    invite_code = models.CharField(max_length=36, unique=True) #shareable code that lets others join
+    invite_code = models.CharField(max_length=36, unique=True, default=get_random_string) #shareable code that lets others join
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -123,7 +124,7 @@ class Room(models.Model):                       #new databse table called Room -
 
 # Room Membership model - KR 29/09/2025
 
-class RoomMembership(models.model):                                                     #This table records which users are part of which room - KR
+class RoomMembership(models.Model):                                                     #This table records which users are part of which room - KR
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="memberships")#Link back to the room. If room is deleted, membership row is deleted - KR
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="room_memberships") #link to user who is a member - KR
     is_host=models.BooleanField(default=False)
@@ -137,7 +138,9 @@ class RoomMembership(models.model):                                             
 
 class RoomMovie(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="movies")
-    tmdb_id = models.CharField(max_length=300, blank=True)
+    tmdb_id = models.PositiveIntegerField()
+    title = models.CharField(max_length=250, blank=True)
+    poster_path = models.CharField(max_length=300, blank=True)
     added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True) #which user suggested the movie. Keeps record even if user is deleted - KR
     position = models.PositiveIntegerField(default=0)
     added_at = models.DateTimeField(auto_now_add=True)
@@ -145,6 +148,7 @@ class RoomMovie(models.Model):
     class Meta:
         unique_together = [("room", "tmdb_id")]
         ordering = ["position", "-added_at"]
+
 
 #WatchlistCollaborator Model - KR 29/09/2025
 
@@ -170,7 +174,7 @@ class WatchRoomVote(models.Model):  # One user's vote on one movie in a room - K
     )
 
     room_movie = models.ForeignKey(
-        "WatchRoomMovie",
+        "RoomMovie",
         on_delete=models.CASCADE,
         related_name="votes",
     )

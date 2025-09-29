@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Watchlist, WatchlistItem, MoodKeyword
+from .models import Watchlist, WatchlistItem, MoodKeyword, Room, RoomMembership, WatchRoomVote, WatchlistCollaborator
 
 
 User = get_user_model()
@@ -39,13 +39,34 @@ class WatchlistItemSerializer(serializers.ModelSerializer): # ModelSerializer ca
         read_only_fields = ["id", "added_at", "position"]  # server-managed, never set by clients
 
 
+class WatchlistCollaboratorSerializer(serializers.ModelSerializer):
+    """
+    Read-only view of collaborators on a watchlist.
+    Includes the collaborator's username for display
+    """
+    username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = WatchlistCollaborator
+        fields = ["id", "user", "username", "can_edit", "invited_at"]
+        read_only_fields = ["id", "username", "invited_at"]
+
+
+class WatchlistCollaboratorInviteSerializer(serializers.Serializer):
+    """
+    Payload to invite/add a collaborator to a watchlist by username
+    """
+    username = serializers.CharField(max_length=150)
+    can_edit = serializers.BooleanField(required=False, default=True)
+
+
 class WatchlistSerializer(serializers.ModelSerializer): # adds a nested field called "items". Uses serializer for each related item.
     
     items = WatchlistItemSerializer(many=True, read_only=True) # many = true means it's a list
+    collaborators = WatchlistCollaboratorSerializer(many=True, read_only=True)
     class Meta:
-        model = Watchlist  # serializer maps to the watchlist model
-        fields = ["id", "name", "is_public", "created_at", "updated_at", "items"]
-        # created_at / updated_at are set by the model
+        model = Watchlist 
+        fields = ["id", "name", "is_public", "created_at", "updated_at", "items", "collaborators"]
         read_only_fields = ["id", "created_at", "updated_at"]
 class WatchlistItemCreateSerializer(serializers.ModelSerializer):
     """
@@ -68,6 +89,80 @@ class ReorderSerializer(serializers.Serializer):
         """
         ids = list(value)
         # Ensure uniqueness
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError("Order contains duplicate item IDs.")
+        return ids
+    
+#  Watch Party Rooms - KR 29/09/2025
+
+class RoomMembershipSerializer(serializers.ModelSerializer):  
+    username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = RoomMembership
+        fields = ["id", "user", "username", "is_host", "joined_at"]
+        read_only_fields = ["id", "joined_at", "username"]
+
+class RoomVoteSerializer(serializers.ModelSerializer):  
+    value = serializers.ChoiceField(choices=[1, -1])
+
+    class Meta:
+        model = WatchRoomVote
+        fields = ["id", "room_movie", "user", "value", "created_at"]
+        read_only_fields = ["id", "created_at", "user", "room_movie"]
+
+class RoomMovieSerializer(serializers.ModelSerializer):  
+    score = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RoomMovie
+        fields = ["id", "tmdb_id", "title", "poster_path", "added_by", "added_at", "position", "score"]
+        read_only_fields = ["id", "added_by", "added_at", "position", "score"]
+
+    def get_score(self, obj):
+        agg = getattr(obj, "votes_sum", None)
+        if agg is not None:
+            return agg
+        return obj.votes.aggregate(s=Sum("value")).get("s") or 0
+
+class RoomSerializer(serializers.ModelSerializer):
+    members = RoomMembershipSerializer(source="memberships", many=True, read_only=True)
+    movies = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Room
+        fields = ["id", "name", "description", "owner", "is_active", "starts_at", "invite_code", "created_at", "members", "movies"]
+        read_only_fields = ["id", "owner", "invite_code", "created_at", "members", "movies"]
+
+    def get_movies(self, room: Room):
+        qs = (
+            room.movies
+            .all()
+            .annotate(votes_sum=Sum("votes__value"))
+            .order_by("position", "-votes_sum", "-added_at")
+        )
+        return RoomMovieSerializer(qs, many=True).data
+
+class RoomCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = ["name", "description", "starts_at"]  # owner/invite_code filled server-side
+
+class RoomAddMemberSerializer(serializers.Serializer):  # invite by username - KR 29/09/2025
+    username = serializers.CharField(max_length=150)
+
+class RoomAddMovieSerializer(serializers.Serializer): 
+    tmdb_id = serializers.IntegerField()
+    title = serializers.CharField(max_length=250, required=False, allow_blank=True)
+    poster_path = serializers.CharField(max_length=300, required=False, allow_blank=True)
+
+class RoomReorderSerializer(serializers.Serializer): 
+    order = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False
+    )
+    def validate_order(self, value):
+        ids = list(value)
         if len(ids) != len(set(ids)):
             raise serializers.ValidationError("Order contains duplicate item IDs.")
         return ids
