@@ -53,7 +53,6 @@ class Watchlist(models.Model): # To build the user's watchlist - KR 22/09/2025
         return f"{self.user} • {self.name}"  # defines how object pronts/reads in the admin or shell - KR 22/09/2025
 
 
-
 class WatchlistItem(models.Model): # each row will represent one movie saved inside one watchlist - KR 22/09/2025
     """
     A single movie inside a user's watchlist
@@ -110,17 +109,28 @@ class WatchlistItem(models.Model): # each row will represent one movie saved ins
 
 # Watch party room model - KR 29/09/2025
 
+# explicit helper to document length for invite codes - KR 30/09/2025
+def _room_code():
+    return get_random_string(16)
+
 class Room(models.Model):                       #new databse table called Room - KR 29/09/2025
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="owned_rooms") #owner is the user that created the room. Foreignkey means the room is linked to one user - KR
     name = models.CharField(max_length=120)
     description = models.TextField(blank=True) #description is allowed to be empty - KR
     is_active = models.BooleanField(default=True) #when the host ends the room, this can be set to false - KR 29/09/2025
     starts_at = models.DateTimeField(null=True, blank=True)#optional date and time for when watch party starts
-    invite_code = models.CharField(max_length=36, unique=True, default=get_random_string) #shareable code that lets others join
+    invite_code = models.CharField(max_length=36, unique=True, default=_room_code) #shareable code that lets others join
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        indexes = [models.Index(fields=["owner", "is_active", "created_at"])] #db index to make queries faster such as "rooms I own that are active, sorted by time" - kr
+        indexes = [
+            models.Index(fields=["owner", "is_active", "created_at"]), #db index to make queries faster such as "rooms I own that are active, sorted by time" - kr
+            models.Index(fields=["invite_code"]),  # quick joins by code - KR 29/09/2025
+        ]
+
+    def __str__(self):
+        return f"Room({self.id}) • {self.name} by {self.owner}"
+
 
 # Room Membership model - KR 29/09/2025
 
@@ -132,6 +142,9 @@ class RoomMembership(models.Model):                                             
 
     class Meta:
         unique_together = [("room", "user")] #prevents same user from being added to the same room twice - KR
+
+    def __str__(self):
+        return f"{self.user} in Room({self.room_id})"
 
 
 #RoomMovie model(suggested or queued movies in a room) - KR 29/09/2025
@@ -148,6 +161,14 @@ class RoomMovie(models.Model):
     class Meta:
         unique_together = [("room", "tmdb_id")]
         ordering = ["position", "-added_at"]
+        indexes = [
+            models.Index(fields=["room", "position"]),     
+            models.Index(fields=["room", "-added_at"]),    
+        ]
+
+    def __str__(self):
+        show = self.title or f"TMDB:{self.tmdb_id}"
+        return f"{show} in Room({self.room_id})"
 
 
 #WatchlistCollaborator Model - KR 29/09/2025
@@ -161,6 +182,8 @@ class WatchlistCollaborator(models.Model):
     class Meta:
         unique_together = [("watchlist", "user")]
 
+    def __str__(self):
+        return f"{self.user} ↔ {self.watchlist.name}"
 
 
 #WatchRoomVote Model - KR 29/09/2025

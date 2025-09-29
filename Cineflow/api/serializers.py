@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Watchlist, WatchlistItem, MoodKeyword, Room, RoomMembership, WatchRoomVote, WatchlistCollaborator
+from django.db.models import Sum
+from .models import Watchlist, WatchlistItem, MoodKeyword, Room, RoomMembership, RoomMovie, WatchRoomVote, WatchlistCollaborator
 
 
 User = get_user_model()
@@ -104,19 +105,19 @@ class RoomMembershipSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "joined_at", "username"]
 
 class RoomVoteSerializer(serializers.ModelSerializer):  
-    value = serializers.ChoiceField(choices=[1, -1])
+    value = serializers.ChoiceField(choices=WatchRoomVote.VOTE_CHOICES)
 
     class Meta:
         model = WatchRoomVote
         fields = ["id", "room_movie", "user", "value", "created_at"]
         read_only_fields = ["id", "created_at", "user", "room_movie"]
 
-class RoomMovieSerializer(serializers.ModelSerializer):  
+class RoomMovieSerializer(serializers.ModelSerializer):
     score = serializers.SerializerMethodField()
 
     class Meta:
         model = RoomMovie
-        fields = ["id", "tmdb_id", "title", "poster_path", "added_by", "added_at", "position", "score"]
+        fields = ["id", "tmdb_id", "added_by", "added_at", "position", "score"]
         read_only_fields = ["id", "added_by", "added_at", "position", "score"]
 
     def get_score(self, obj):
@@ -150,6 +151,9 @@ class RoomCreateSerializer(serializers.ModelSerializer):
 
 class RoomAddMemberSerializer(serializers.Serializer):  # invite by username - KR 29/09/2025
     username = serializers.CharField(max_length=150)
+
+class RoomJoinSerializer(serializers.Serializer):  # join by invite code - KR 29/09/2025
+    invite_code = serializers.CharField(max_length=36)
 
 class RoomAddMovieSerializer(serializers.Serializer): 
     tmdb_id = serializers.IntegerField()
