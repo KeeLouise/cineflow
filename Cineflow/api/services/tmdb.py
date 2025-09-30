@@ -7,6 +7,7 @@ from rest_framework.response import Response
 # ---- TMDB (The Movie Database) Configuration ---- KR 21/08/2025
 TMDB_BASE = "https://api.themoviedb.org/3"
 TMDB_KEY = os.environ.get("TMDB_API_KEY", "")
+TMDB_BEARER = os.environ.get("TMDB_BEARER", "")
 
 def tmdb_get(path, params=None):
     """
@@ -14,24 +15,27 @@ def tmdb_get(path, params=None):
     Returns (data, err_response). On success: (dict, None). On error: (None, Response)
     """
     # If API key is missing, return a 500 response - KR 21/08/2025
-    if not TMDB_KEY:
+    if not TMDB_KEY and not TMDB_BEARER:
         return None, Response({"detail": "TMDB_API_KEY not set on server"}, status=500)
 
     url = f"{TMDB_BASE}{path}"
-    p = {"api_key": TMDB_KEY}    # Always include API key - KR 21/08/2025
+    p = {}
+    headers = {}
+    if TMDB_BEARER:
+        headers["Authorization"] = f"Bearer {TMDB_BEARER}"
+    else:
+        p["api_key"] = TMDB_KEY
     if params:
-        p.update(params)         # Merge in additional query params - KR 21/08/2025
+        p.update(params)
 
     try:
-        # Log the final URL including query params for debugging - KR 29/08/2025
         full_url = requests.Request('GET', url, params=p).prepare().url
         print("[TMDB GET]", full_url)
 
-        r = requests.get(url, params=p, timeout=6)
+        r = requests.get(url, params=p, headers=headers, timeout=6)
         r.raise_for_status()
         return r.json(), None
     except requests.RequestException as e:
-        # Catch network errors, bad status codes, etc. - KR 21/08/2025
         return None, Response(
             {"detail": "TMDB request failed", "error": str(e)},
             status=502
