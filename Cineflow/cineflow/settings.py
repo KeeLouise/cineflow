@@ -16,6 +16,9 @@ ALLOWED_HOSTS = [
     os.getenv("APP_DOMAIN", ""), 
 ]
 
+
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 
 CSRF_TRUSTED_ORIGINS = [

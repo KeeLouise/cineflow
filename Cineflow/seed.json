@@ -1,0 +1,464 @@
+[
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$yTozww8Pk53GKemjD9F6AR$vWgzyKWMcwAWEXUmx+jWKr6WJO90Z07NtiLDMLK3lcQ=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "Kiera",
+    "last_name": "Reidy",
+    "email": "keelouise@yahoo.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2025-08-18T10:52:41.674Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.userprofile",
+  "pk": 1,
+  "fields": {
+    "user": [
+      "admin"
+    ],
+    "avatar": "avatars/IMG_2013_4wYnavI.jpeg",
+    "updated_at": "2025-09-30T12:24:58.606Z"
+  }
+},
+{
+  "model": "api.watchlist",
+  "pk": 2,
+  "fields": {
+    "user": [
+      "admin"
+    ],
+    "name": "Kiera's Movies",
+    "is_public": false,
+    "created_at": "2025-09-25T09:51:50.344Z",
+    "updated_at": "2025-09-25T13:38:28.188Z"
+  }
+},
+{
+  "model": "api.watchlistitem",
+  "pk": 2,
+  "fields": {
+    "watchlist": 2,
+    "tmdb_id": 260513,
+    "title": "Incredibles 2",
+    "poster_path": "/9lFKBtaVIhP7E2Pk0IY1CwTKTMZ.jpg",
+    "status": "planned",
+    "position": 3,
+    "added_at": "2025-09-25T11:55:42.174Z"
+  }
+},
+{
+  "model": "api.watchlistitem",
+  "pk": 3,
+  "fields": {
+    "watchlist": 2,
+    "tmdb_id": 332718,
+    "title": "Bilal: A New Breed of Hero",
+    "poster_path": "/ncWuEzxnXqssxRfHghZuUAIezCo.jpg",
+    "status": "planned",
+    "position": 2,
+    "added_at": "2025-09-25T11:55:47.034Z"
+  }
+},
+{
+  "model": "api.watchlistitem",
+  "pk": 4,
+  "fields": {
+    "watchlist": 2,
+    "tmdb_id": 496243,
+    "title": "Parasite",
+    "poster_path": "/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg",
+    "status": "planned",
+    "position": 4,
+    "added_at": "2025-09-25T11:55:50.274Z"
+  }
+},
+{
+  "model": "api.watchlistitem",
+  "pk": 5,
+  "fields": {
+    "watchlist": 2,
+    "tmdb_id": 210577,
+    "title": "Gone Girl",
+    "poster_path": "/ts996lKsxvjkO2yiYG0ht4qAicO.jpg",
+    "status": "dropped",
+    "position": 1,
+    "added_at": "2025-09-25T11:55:53.310Z"
+  }
+},
+{
+  "model": "api.room",
+  "pk": 1,
+  "fields": {
+    "owner": [
+      "admin"
+    ],
+    "name": "Test Room",
+    "description": "Test",
+    "is_active": false,
+    "starts_at": null,
+    "invite_code": "7aKHRP8gqswmjjlY",
+    "created_at": "2025-09-29T11:57:34.819Z"
+  }
+},
+{
+  "model": "api.room",
+  "pk": 2,
+  "fields": {
+    "owner": [
+      "admin"
+    ],
+    "name": "test 2",
+    "description": "",
+    "is_active": false,
+    "starts_at": null,
+    "invite_code": "HQZzBGkpSFnZN5k5",
+    "created_at": "2025-09-29T13:21:54.664Z"
+  }
+},
+{
+  "model": "api.room",
+  "pk": 3,
+  "fields": {
+    "owner": [
+      "admin"
+    ],
+    "name": "test 3",
+    "description": "",
+    "is_active": false,
+    "starts_at": null,
+    "invite_code": "H6oFqeAnGskZsDiw",
+    "created_at": "2025-09-29T13:23:14.810Z"
+  }
+},
+{
+  "model": "api.room",
+  "pk": 4,
+  "fields": {
+    "owner": [
+      "admin"
+    ],
+    "name": "test 4",
+    "description": "",
+    "is_active": false,
+    "starts_at": null,
+    "invite_code": "wrg7W0kznQROKK5w",
+    "created_at": "2025-09-29T13:46:27.878Z"
+  }
+},
+{
+  "model": "api.room",
+  "pk": 5,
+  "fields": {
+    "owner": [
+      "admin"
+    ],
+    "name": "Friday Night",
+    "description": "",
+    "is_active": false,
+    "starts_at": null,
+    "invite_code": "bhATinCQGdA0d18u",
+    "created_at": "2025-09-29T20:46:04.482Z"
+  }
+},
+{
+  "model": "api.room",
+  "pk": 6,
+  "fields": {
+    "owner": [
+      "admin"
+    ],
+    "name": "Test Room",
+    "description": "",
+    "is_active": true,
+    "starts_at": null,
+    "invite_code": "gULnWpWNOoNWmSgA",
+    "created_at": "2025-09-29T20:54:27.259Z"
+  }
+},
+{
+  "model": "api.roommembership",
+  "pk": 1,
+  "fields": {
+    "room": 1,
+    "user": [
+      "admin"
+    ],
+    "is_host": true,
+    "joined_at": "2025-09-29T11:57:34.826Z"
+  }
+},
+{
+  "model": "api.roommembership",
+  "pk": 2,
+  "fields": {
+    "room": 2,
+    "user": [
+      "admin"
+    ],
+    "is_host": true,
+    "joined_at": "2025-09-29T13:21:54.667Z"
+  }
+},
+{
+  "model": "api.roommembership",
+  "pk": 3,
+  "fields": {
+    "room": 3,
+    "user": [
+      "admin"
+    ],
+    "is_host": true,
+    "joined_at": "2025-09-29T13:23:14.814Z"
+  }
+},
+{
+  "model": "api.roommembership",
+  "pk": 4,
+  "fields": {
+    "room": 4,
+    "user": [
+      "admin"
+    ],
+    "is_host": true,
+    "joined_at": "2025-09-29T13:46:27.881Z"
+  }
+},
+{
+  "model": "api.roommembership",
+  "pk": 5,
+  "fields": {
+    "room": 5,
+    "user": [
+      "admin"
+    ],
+    "is_host": true,
+    "joined_at": "2025-09-29T20:46:04.484Z"
+  }
+},
+{
+  "model": "api.roommembership",
+  "pk": 6,
+  "fields": {
+    "room": 6,
+    "user": [
+      "admin"
+    ],
+    "is_host": true,
+    "joined_at": "2025-09-29T20:54:27.262Z"
+  }
+},
+{
+  "model": "api.roommovie",
+  "pk": 1,
+  "fields": {
+    "room": 1,
+    "tmdb_id": 9806,
+    "title": "The Incredibles",
+    "poster_path": "/2LqaLgk4Z226KkgPJuiOQ58wvrm.jpg",
+    "added_by": [
+      "admin"
+    ],
+    "position": 1,
+    "added_at": "2025-09-29T14:19:08.894Z"
+  }
+},
+{
+  "model": "api.roommovie",
+  "pk": 2,
+  "fields": {
+    "room": 1,
+    "tmdb_id": 83201,
+    "title": "Puss in Boots: The Three Diablos",
+    "poster_path": "/ptvbHUWpU8Nh6vrmSvjx4ESDgfC.jpg",
+    "added_by": [
+      "admin"
+    ],
+    "position": 2,
+    "added_at": "2025-09-29T15:04:50.355Z"
+  }
+},
+{
+  "model": "api.roommovie",
+  "pk": 3,
+  "fields": {
+    "room": 4,
+    "tmdb_id": 9806,
+    "title": "The Incredibles",
+    "poster_path": "/2LqaLgk4Z226KkgPJuiOQ58wvrm.jpg",
+    "added_by": [
+      "admin"
+    ],
+    "position": 1,
+    "added_at": "2025-09-29T15:21:30.013Z"
+  }
+},
+{
+  "model": "api.roommovie",
+  "pk": 4,
+  "fields": {
+    "room": 4,
+    "tmdb_id": 2082,
+    "title": "Halloween",
+    "poster_path": "/cD8JrfSEI4j7WVnKM1GdiYzMoUh.jpg",
+    "added_by": [
+      "admin"
+    ],
+    "position": 2,
+    "added_at": "2025-09-29T20:37:23.982Z"
+  }
+},
+{
+  "model": "api.roommovie",
+  "pk": 5,
+  "fields": {
+    "room": 5,
+    "tmdb_id": 621,
+    "title": "Grease",
+    "poster_path": "/2rM7fQKpb7cs1Iq7IBqub9LFDzJ.jpg",
+    "added_by": [
+      "admin"
+    ],
+    "position": 1,
+    "added_at": "2025-09-29T20:46:12.027Z"
+  }
+},
+{
+  "model": "api.roommovie",
+  "pk": 6,
+  "fields": {
+    "room": 5,
+    "tmdb_id": 109445,
+    "title": "Frozen",
+    "poster_path": "/itAKcobTYGpYT8Phwjd8c9hleTo.jpg",
+    "added_by": [
+      "admin"
+    ],
+    "position": 2,
+    "added_at": "2025-09-29T20:53:39.816Z"
+  }
+},
+{
+  "model": "api.roommovie",
+  "pk": 7,
+  "fields": {
+    "room": 5,
+    "tmdb_id": 1134791,
+    "title": "A Wind from the South",
+    "poster_path": "/ul1hqHhXPI1dc9kAgNDf2A5PqWn.jpg",
+    "added_by": [
+      "admin"
+    ],
+    "position": 3,
+    "added_at": "2025-09-29T20:54:16.631Z"
+  }
+},
+{
+  "model": "api.roommovie",
+  "pk": 11,
+  "fields": {
+    "room": 6,
+    "tmdb_id": 9806,
+    "title": "The Incredibles",
+    "poster_path": "/2LqaLgk4Z226KkgPJuiOQ58wvrm.jpg",
+    "added_by": [
+      "admin"
+    ],
+    "position": 1,
+    "added_at": "2025-09-29T21:07:57.227Z"
+  }
+},
+{
+  "model": "api.roommovie",
+  "pk": 12,
+  "fields": {
+    "room": 6,
+    "tmdb_id": 260513,
+    "title": "Incredibles 2",
+    "poster_path": "/9lFKBtaVIhP7E2Pk0IY1CwTKTMZ.jpg",
+    "added_by": [
+      "admin"
+    ],
+    "position": 2,
+    "added_at": "2025-09-29T21:08:11.761Z"
+  }
+},
+{
+  "model": "api.watchroomvote",
+  "pk": 1,
+  "fields": {
+    "room_movie": 1,
+    "user": [
+      "admin"
+    ],
+    "value": 1,
+    "created_at": "2025-09-29T14:19:50.352Z"
+  }
+},
+{
+  "model": "api.watchroomvote",
+  "pk": 2,
+  "fields": {
+    "room_movie": 3,
+    "user": [
+      "admin"
+    ],
+    "value": 1,
+    "created_at": "2025-09-29T15:21:34.066Z"
+  }
+},
+{
+  "model": "api.watchroomvote",
+  "pk": 3,
+  "fields": {
+    "room_movie": 4,
+    "user": [
+      "admin"
+    ],
+    "value": 1,
+    "created_at": "2025-09-29T20:37:26.125Z"
+  }
+},
+{
+  "model": "api.watchroomvote",
+  "pk": 4,
+  "fields": {
+    "room_movie": 5,
+    "user": [
+      "admin"
+    ],
+    "value": -1,
+    "created_at": "2025-09-29T20:46:16.823Z"
+  }
+},
+{
+  "model": "api.watchroomvote",
+  "pk": 7,
+  "fields": {
+    "room_movie": 11,
+    "user": [
+      "admin"
+    ],
+    "value": 1,
+    "created_at": "2025-09-29T21:07:58.934Z"
+  }
+},
+{
+  "model": "api.watchroomvote",
+  "pk": 8,
+  "fields": {
+    "room_movie": 12,
+    "user": [
+      "admin"
+    ],
+    "value": -1,
+    "created_at": "2025-09-29T21:08:13.807Z"
+  }
+}
+]
