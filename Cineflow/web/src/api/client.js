@@ -6,6 +6,8 @@ const apiBase =
     ? import.meta.env.VITE_API_URL.replace(/\/+$/, "") // strip trailing slashes
     : "/api"; // dev fallback
 
+    export const API_BASE =apiBase;
+    
 const api = axios.create({ baseURL: apiBase });
 
 // --- Public endpoints (no Authorization header required) - KR 02/09/2025
