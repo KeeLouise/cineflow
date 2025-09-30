@@ -233,3 +233,21 @@ body.rooms-screen {
 .wl-card:first-child {
   margin-top: 0;
 }
+
+/* Member avatars – */
+.member-avatar,
+.room-members img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;    
+  max-width: none;   
+}
+
+/* Member chips layout */
+.member-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
