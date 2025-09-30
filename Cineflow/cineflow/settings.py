@@ -15,15 +15,17 @@ ALLOWED_HOSTS = [
     ".onrender.com",
     os.getenv("APP_DOMAIN", ""), 
 ]
+
+FRONTEND_URL = os.getenv("FRONTEND_URL")
+
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "https://*.onrender.com",
-    os.getenv("FRONTEND_URL", ""),  
-]
+] + ([FRONTEND_URL] if FRONTEND_URL else [])
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    os.getenv("FRONTEND_URL", ""),
-]
+] + ([FRONTEND_URL] if FRONTEND_URL else [])
 
 
 INSTALLED_APPS = [
