@@ -12,22 +12,22 @@ from ..models import UserProfile
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def me_profile(request):
     user = request.user
-    profile, _ = UserProfile.objects.get_or_create(user=user)
 
     if request.method == "GET":
-        return Response(UserProfileSerializer(profile).data, status=200)
+        return Response(UserProfileSerializer(user, context={"request": request}).data, status=200)
 
     data = request.data.copy()
     remove_flag = str(data.get("remove_avatar", "")).lower() in ("1", "true", "yes", "on")
 
-    ser = UserProfileSerializer(profile, data=data, partial=True)
+    ser = UserProfileSerializer(user, data=data, partial=True, context={"request": request})
     ser.is_valid(raise_exception=True)
     instance = ser.save()
 
     if remove_flag:
-        if instance.avatar:
-            instance.avatar.delete(save=False)
-        instance.avatar = None
-        instance.save(update_fields=["avatar", "updated_at"])
+        prof, _ = UserProfile.objects.get_or_create(user=instance)
+        if prof.avatar:
+            prof.avatar.delete(save=False)
+        prof.avatar = None
+        prof.save(update_fields=["avatar", "updated_at"])
 
-    return Response(UserProfileSerializer(instance).data, status=200)
+    return Response(UserProfileSerializer(instance, context={"request": request}).data, status=200)
