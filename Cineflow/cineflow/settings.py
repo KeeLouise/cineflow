@@ -120,11 +120,11 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 # Cloudinary (media) - KR 30/09/2025
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "")
-if CLOUDINARY_URL:
-    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-else:
-    # local dev fallback so profile uploads still work without Cloudinary - KR 30/09/2025
-    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+DEFAULT_FILE_STORAGE = (
+    "cloudinary_storage.storage.MediaCloudinaryStorage"
+    if CLOUDINARY_URL else
+    "django.core.files.storage.FileSystemStorage"
+)
 
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
