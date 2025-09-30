@@ -188,40 +188,35 @@ class RoomReorderSerializer(serializers.Serializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source="user.username", required=False)
-    email = serializers.EmailField(source="user.email", required=False)
-    first_name = serializers.CharField(source="user.first_name", required=False)
-    last_name = serializers.CharField(source="user.last_name", required=False)
     full_name = serializers.SerializerMethodField(read_only=True)
-    avatar = serializers.ImageField(required=False, allow_null=True)
+    avatar = serializers.SerializerMethodField()
 
     class Meta:
-        model = UserProfile
+        model = User
         fields = ["username", "email", "first_name", "last_name", "full_name", "avatar"]
+        read_only_fields = ["full_name"]
 
     def get_full_name(self, obj):
-        fn = (obj.user.first_name or "").strip()
-        ln = (obj.user.last_name or "").strip()
-        full = f"{fn} {ln}".strip()
-        return full or obj.user.username
+        fn = (obj.first_name or "").strip()
+        ln = (obj.last_name or "").strip()
+        return f"{fn} {ln}".strip() or obj.username
+
+    def get_avatar(self, obj):
+        prof = getattr(obj, "profile", None)
+        if prof and prof.avatar:
+            try:
+                return prof.avatar.url
+            except Exception:
+                return None
+        return None
 
     def update(self, instance, validated_data):
-        user_data = validated_data.pop("user", {})
-        avatar_file = validated_data.pop("avatar", serializers.empty)
+        # Handle avatar separately
+        avatar_file = self.context["request"].data.get("avatar", None)
 
-        # Update user fields
-        for field, value in user_data.items():
-            setattr(instance.user, field, value)
-        instance.user.save()
+        if avatar_file is not None:
+            prof, _ = UserProfile.objects.get_or_create(user=instance)
+            prof.avatar = avatar_file
+            prof.save(update_fields=["avatar", "updated_at"])
 
-        # Update profile.avatar
-        if avatar_file is not serializers.empty:
-            if avatar_file is None:
-                if instance.avatar:
-                    instance.avatar.delete(save=False)
-                instance.avatar = None
-            else:
-                instance.avatar = avatar_file
-            instance.save(update_fields=["avatar", "updated_at"])
-
-        return instance
+        return super().update(instance, validated_data)
