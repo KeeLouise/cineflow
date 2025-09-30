@@ -1,6 +1,6 @@
 import { authFetch } from "@/api/auth";
 
-const API_BASE = "/api"; // Base URL for backend - KR 24/09/2025
+const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
 // ---------- Shared helpers ----------
 
