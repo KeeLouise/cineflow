@@ -58,16 +58,10 @@ export function voteRoomMovie(roomId, movieId, value) {
   return post(`/rooms/${roomId}/movies/${movieId}/vote/`, { value });
 }
 
-export function removeRoomMovie(roomId, movieId) {
+export function deleteRoomMovie(roomId, movieId) {
   return authFetch(`/api/rooms/${roomId}/movies/${movieId}/`, {
     method: "DELETE",
-  }).then(async (res) => {
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(t || `HTTP ${res.status}`);
-    }
-    return true;
-  });
+  }).then(handle);
 }
 
 export function deleteRoom(roomId) {
