@@ -3,9 +3,34 @@ from django.db.models import UniqueConstraint
 from django.db.models.functions import Lower
 from django.utils.crypto import get_random_string  # for simple invite codes - KR 29/09/2025
 from django.conf import settings
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+# user profile model - KR 30/09/2025
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile",
+    )
+    avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Profile({self.user.username})"
+
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def ensure_user_profile(sender, instance, created, **kwargs):
+    # auto-create a profile row for new users
+    if created:
+        UserProfile.objects.get_or_create(user=instance)
 
 class MoodKeyword(models.Model):
-    # mood key must match your MOOD_RULES keys - KR 02/09/2025
+    # mood key must match MOOD_RULES keys - KR 02/09/2025
     mood = models.CharField(max_length=40, db_index=True)
     keyword_id = models.IntegerField(db_index=True)
     keyword_name = models.CharField(max_length=200)
