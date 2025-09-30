@@ -188,50 +188,40 @@ class RoomReorderSerializer(serializers.Serializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", required=False)
+    email = serializers.EmailField(source="user.email", required=False)
+    first_name = serializers.CharField(source="user.first_name", required=False)
+    last_name = serializers.CharField(source="user.last_name", required=False)
     full_name = serializers.SerializerMethodField(read_only=True)
     avatar = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
-        model = User
+        model = UserProfile
         fields = ["username", "email", "first_name", "last_name", "full_name", "avatar"]
-        read_only_fields = ["full_name"]
-
-    def validate_username(self, value):
-        v = (value or "").strip()
-        if not v:
-            raise serializers.ValidationError("Username cannot be blank.")
-        qs = User._default_manager.filter(username__iexact=v)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError("This username is already taken.")
-        return v
 
     def get_full_name(self, obj):
-        fn = (obj.first_name or "").strip()
-        ln = (obj.last_name or "").strip()
+        fn = (obj.user.first_name or "").strip()
+        ln = (obj.user.last_name or "").strip()
         full = f"{fn} {ln}".strip()
-        return full or obj.username
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        prof = getattr(instance, "profile", None)
-        data["avatar"] = prof.avatar.url if (prof and prof.avatar) else None
-        return data
+        return full or obj.user.username
 
     def update(self, instance, validated_data):
+        user_data = validated_data.pop("user", {})
         avatar_file = validated_data.pop("avatar", serializers.empty)
-        username = validated_data.pop("username", None)
-        if username is not None and username != instance.username:
-            instance.username = username
-        instance = super().update(instance, validated_data)
-        prof, _ = UserProfile.objects.get_or_create(user=instance)
+
+        # Update user fields
+        for field, value in user_data.items():
+            setattr(instance.user, field, value)
+        instance.user.save()
+
+        # Update profile.avatar
         if avatar_file is not serializers.empty:
             if avatar_file is None:
-                if prof.avatar:
-                    prof.avatar.delete(save=False)
-                prof.avatar = None
+                if instance.avatar:
+                    instance.avatar.delete(save=False)
+                instance.avatar = None
             else:
-                prof.avatar = avatar_file
-            prof.save(update_fields=["avatar", "updated_at"])
+                instance.avatar = avatar_file
+            instance.save(update_fields=["avatar", "updated_at"])
+
         return instance
