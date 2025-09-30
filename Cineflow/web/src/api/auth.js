@@ -1,10 +1,7 @@
+// minimal JWT helpers with expiry awareness - KR 02/09/2025
+
 const ACCESS_KEY = "access";
 const REFRESH_KEY = "refresh";
-
-const API_BASE =
-  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL)
-    ? import.meta.env.VITE_API_URL.replace(/\/+$/, "")
-    : "/api";
 
 //wrapper in case window/localstorage is not available - KR 25/09/2025
 export const safeLocalStorage =
@@ -49,6 +46,14 @@ function isExpired(token, skewSeconds = 20) {
 export function looksLoggedIn() {
   return !!safeLocalStorage.getItem(ACCESS_KEY) || !!safeLocalStorage.getItem(REFRESH_KEY);
 }
+
+// Resolve API base once, honoring VITE_API_URL in prod and falling back locally.
+const API_BASE =
+  (typeof import.meta !== "undefined" &&
+    import.meta.env &&
+    import.meta.env.VITE_API_URL &&
+    import.meta.env.VITE_API_URL.replace(/\/+$/, "")) ||
+  "/api";
 
 // public: authoritative check – verifies/refreshes if needed - KR 02/09/2025
 export async function isAuthenticated() {
@@ -148,22 +153,4 @@ export async function authFetch(url, options = {}) {
   }
 
   return res;
-}
-
-// login helper that saves tokens and emits event - KR 30/09/2025
-export async function login(username, password) {
-  const res = await fetch(`${API_BASE}/token/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) {
-    let msg = "Login failed";
-    try { const j = await res.json(); msg = j?.detail || msg; } catch {}
-    throw new Error(msg);
-  }
-  const data = await res.json();
-  if (!data?.access || !data?.refresh) throw new Error("Token response missing access/refresh");
-  setTokens({ access: data.access, refresh: data.refresh }); // also fires auth-changed
-  return data;
 }
