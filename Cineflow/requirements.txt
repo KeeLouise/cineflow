@@ -1,16 +1,19 @@
-# Core
+# Django + DRF
 Django==5.2.3
 djangorestframework==3.16.1
 djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.7.0
-Pillow==11.3.0
 
-# Database / Deploy
-gunicorn==21.2.0
-dj-database-url==2.3.0
+# Storage / static
 whitenoise==6.7.0
-psycopg2-binary==2.9.10
 
-# Media (Cloudinary)
+# Cloudinary
 cloudinary==1.44.0
 django-cloudinary-storage==0.3.0
+
+# DB
+dj-database-url==2.2.0
+psycopg2-binary==2.9.10
+
+# Gunicorn app server
+gunicorn==21.2.0
