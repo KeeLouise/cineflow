@@ -118,13 +118,14 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Cloudinary (media) - KR 30/09/2025
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "")
-DEFAULT_FILE_STORAGE = (
-    "cloudinary_storage.storage.MediaCloudinaryStorage"
-    if CLOUDINARY_URL else
-    "django.core.files.storage.FileSystemStorage"
-)
+
+USE_CLOUDINARY = (os.getenv("RENDER") or "").strip() or (not DEBUG) or bool(CLOUDINARY_URL)
+
+if USE_CLOUDINARY:
+    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+else:
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
