@@ -84,6 +84,7 @@ export default function Profile() {
 
       const updatedRaw = await updateMyProfile(payload);
       const updated = normalizeProfile(updatedRaw);
+      const bust = updated.avatar ? (updated.avatar.includes("?") ? "&" : "?") + "v=" + Date.now() : "";
 
       setForm({
         username: updated.username || "",
@@ -91,13 +92,13 @@ export default function Profile() {
         first_name: updated.first_name || "",
         last_name: updated.last_name || "",
         full_name: updated.full_name || updated.username || "",
-        avatar: updated.avatar || null,
+        avatar: updated.avatar ? updated.avatar + bust : null,
       });
 
       if (preview) { URL.revokeObjectURL(preview); }
       setFile(null); setPreview("");
 
-      window.dispatchEvent(new CustomEvent("profile-updated", { detail: updated }));
+      window.dispatchEvent(new CustomEvent("profile-updated", { detail: { ...updated, avatar: updated.avatar ? updated.avatar + bust : null } }));
       setOk("Profile updated successfully.");
     } catch (e) {
       setErr(e.response?.data?.username?.[0] || e.message || "Failed to save profile.");
@@ -122,7 +123,7 @@ export default function Profile() {
         full_name: updated.full_name || f.full_name,
       }));
       if (preview) { URL.revokeObjectURL(preview); setPreview(""); }
-      window.dispatchEvent(new CustomEvent("profile-updated", { detail: updated }));
+      window.dispatchEvent(new CustomEvent("profile-updated", { detail: { ...updated, avatar: null } }));
       setOk("Profile picture removed.");
     } catch (e) {
       setErr(e.message || "Failed to remove avatar.");
