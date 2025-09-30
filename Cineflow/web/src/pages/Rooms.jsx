@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { fetchMyRooms, createRoom, joinRoom } from "@/api/rooms";
+import { mediaUrl } from "@/utils/media";
 
 export default function Rooms() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-
   const [creating, setCreating] = useState(false);
   const [cName, setCName] = useState("");
   const [cDesc, setCDesc] = useState("");
-
-  const location = useLocation(); 
   const [joining, setJoining] = useState(false);
   const [code, setCode] = useState("");
 
@@ -20,9 +18,9 @@ export default function Rooms() {
     (async () => {
       try {
         setLoading(true);
-        const data = await fetchMyRooms();        
+        const data = await fetchMyRooms();
         if (!alive) return;
-        setRooms(data || []);
+        setRooms((data || []).filter(r => r?.is_active !== false));
       } catch (e) {
         if (alive) setErr(e.message || "Failed to load rooms.");
       } finally {
@@ -32,25 +30,15 @@ export default function Rooms() {
     return () => { alive = false; };
   }, []);
 
-    useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const prefill = params.get("code");
-    if (prefill) setCode(prefill);                                     
-  }, [location.search]);
-
   async function handleCreate(e) {
     e.preventDefault();
     if (!cName.trim() || creating) return;
     setErr("");
     setCreating(true);
     try {
-      const room = await createRoom({
-        name: cName.trim(),
-        description: cDesc.trim(),
-      });
+      const room = await createRoom({ name: cName.trim(), description: cDesc.trim() });
       setRooms((r) => [room, ...r]);
-      setCName("");
-      setCDesc("");
+      setCName(""); setCDesc("");
     } catch (e) {
       setErr(e.message || "Could not create room.");
     } finally {
@@ -64,10 +52,11 @@ export default function Rooms() {
     setErr("");
     setJoining(true);
     try {
-      const room = await joinRoom(code.trim());  
+      const room = await joinRoom(code.trim());
       setRooms((r) => {
         const exists = r.find((x) => x.id === room.id);
-        return exists ? r.map((x) => (x.id === room.id ? room : x)) : [room, ...r];
+        const list = exists ? r.map((x) => (x.id === room.id ? room : x)) : [room, ...r];
+        return list.filter(x => x?.is_active !== false);
       });
       setCode("");
     } catch (e) {
@@ -85,7 +74,6 @@ export default function Rooms() {
 
       {err && <div className="alert alert-danger glass">{err}</div>}
 
-      {/* Create / Join bar */}
       <div className="glass p-3 mb-3 d-flex flex-wrap gap-2">
         <form className="d-flex gap-2 align-items-center flex-wrap" onSubmit={handleCreate}>
           <input
@@ -96,7 +84,7 @@ export default function Rooms() {
             maxLength={120}
           />
           <input
-            className="form-control wl-input minw-220"
+            className="form-control wl-input"
             placeholder="Description (optional)"
             value={cDesc}
             onChange={(e) => setCDesc(e.target.value)}
@@ -109,7 +97,7 @@ export default function Rooms() {
 
         <form className="ms-auto d-flex gap-2 align-items-center" onSubmit={handleJoin}>
           <input
-            className="form-control wl-input w-180"
+            className="form-control wl-input"
             placeholder="Invite code"
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -120,7 +108,6 @@ export default function Rooms() {
         </form>
       </div>
 
-      {/* Rooms list */}
       {loading ? (
         <div className="glass p-4 text-center">Loading…</div>
       ) : rooms.length === 0 ? (
@@ -129,30 +116,48 @@ export default function Rooms() {
         </div>
       ) : (
         <div className="row g-3">
-          {rooms.filter(r => r.is_active).map((r) => (
-            <div key={r.id} className="col-12 col-md-6 col-xl-4">
-              <div className="room-card glass h-100 d-flex flex-column">
-                <div className="d-flex align-items-center justify-content-between">
-                  <h3 className="mb-0">{r.name}</h3>
-                  <span className="badge text-bg-dark">
-                    {(r.members?.length ?? 0)} members
-                  </span>
-                </div>
+          {rooms.map((r) => {
+            const rid = Number(r.id);
+            return (
+              <div key={rid} className="col-12 col-md-6 col-xl-4">
+                <div className="room-card glass h-100 d-flex flex-column">
+                  <div className="d-flex align-items-center justify-content-between">
+                    <h3 className="mb-0">{r.name}</h3>
+                    <div className="d-flex align-items-center" style={{ gap: 6 }}>
+                      <div className="d-flex" style={{ position: "relative", height: 28 }}>
+                        {(r.members || []).slice(0, 5).map((m, idx) => (
+                          <img
+                            key={m.id}
+                            src={m.avatar ? mediaUrl(m.avatar) : undefined}
+                            alt={m.username}
+                            title={m.username}
+                            style={{
+                              width: 28, height: 28, borderRadius: "50%", objectFit: "cover",
+                              border: "1px solid rgba(255,255,255,.3)",
+                              position: "relative", left: idx ? -idx * 10 : 0,
+                              background: "rgba(255,255,255,.08)"
+                            }}
+                            onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+                          />
+                        ))}
+                      </div>
+                      <span className="badge text-bg-dark">{(r.members?.length ?? 0)} members</span>
+                    </div>
+                  </div>
 
-                {r.description ? (
-                  <p className="text-muted mt-2 mb-3">{r.description}</p>
-                ) : (
-                  <div className="mb-3" />
-                )}
+                  {r.description ? (
+                    <p className="text-muted mt-2 mb-3">{r.description}</p>
+                  ) : <div className="mb-3" />}
 
-                <div className="mt-auto d-flex justify-content-end gap-2">
-                  <Link to={`/rooms/${r.id}`} className="btn btn-outline-ghost">
-                    Open
-                  </Link>
+                  <div className="mt-auto d-flex justify-content-end gap-2">
+                    <Link to={`/rooms/${rid}`} className="btn btn-outline-ghost">
+                      Open
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

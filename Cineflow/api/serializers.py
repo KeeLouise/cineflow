@@ -1,12 +1,15 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.db.models import Sum
-from .models import Watchlist, WatchlistItem, MoodKeyword, Room, RoomMembership, RoomMovie, WatchRoomVote, WatchlistCollaborator
-
+from .models import (
+    Watchlist, WatchlistItem, MoodKeyword,
+    Room, RoomMembership, RoomMovie, WatchRoomVote, WatchlistCollaborator,
+    UserProfile
+)
 
 User = get_user_model()
 
-# Allowed item statuses – keep in sync with views/models – KR 27/09/2025
+# Allowed item statuses – KR 27/09/2025
 ALLOWED_ITEM_STATUSES = ("planned", "watching", "watched", "dropped")
 
 # --- AUTH/Registration --- KR 23/09/2025
@@ -96,13 +99,23 @@ class ReorderSerializer(serializers.Serializer):
     
 #  Watch Party Rooms - KR 29/09/2025
 
-class RoomMembershipSerializer(serializers.ModelSerializer):  
+class RoomMembershipSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
+    avatar = serializers.SerializerMethodField(read_only=True)  # add
 
     class Meta:
         model = RoomMembership
-        fields = ["id", "user", "username", "is_host", "joined_at"]
-        read_only_fields = ["id", "joined_at", "username"]
+        fields = ["id", "user", "username", "avatar", "is_host", "joined_at"]
+        read_only_fields = ["id", "joined_at", "username", "avatar"]
+
+    def get_avatar(self, obj):
+        prof = getattr(obj.user, "profile", None)
+        if prof and prof.avatar:
+            try:
+                return prof.avatar.url
+            except Exception:
+                return None
+        return None
 
 class RoomVoteSerializer(serializers.ModelSerializer):  
     value = serializers.ChoiceField(choices=WatchRoomVote.VOTE_CHOICES)
@@ -117,7 +130,7 @@ class RoomMovieSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RoomMovie
-        fields = ["id", "tmdb_id", "added_by", "added_at", "position", "score"]
+        fields = ["id", "tmdb_id", "title", "poster_path", "added_by", "added_at", "position", "score"]
         read_only_fields = ["id", "added_by", "added_at", "position", "score"]
 
     def get_score(self, obj):
@@ -170,3 +183,55 @@ class RoomReorderSerializer(serializers.Serializer):
         if len(ids) != len(set(ids)):
             raise serializers.ValidationError("Order contains duplicate item IDs.")
         return ids
+
+# --- User Profile --- KR 30/09/2025
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField(read_only=True)
+    avatar = serializers.ImageField(required=False, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = ["username", "email", "first_name", "last_name", "full_name", "avatar"]
+        read_only_fields = ["full_name"]
+
+    def validate_username(self, value):
+        v = (value or "").strip()
+        if not v:
+            raise serializers.ValidationError("Username cannot be blank.")
+        qs = User._default_manager.filter(username__iexact=v)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("This username is already taken.")
+        return v
+
+    def get_full_name(self, obj):
+        fn = (obj.first_name or "").strip()
+        ln = (obj.last_name or "").strip()
+        full = f"{fn} {ln}".strip()
+        return full or obj.username
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        prof = getattr(instance, "profile", None)
+        data["avatar"] = prof.avatar.url if (prof and prof.avatar) else None
+        return data
+
+    def update(self, instance, validated_data):
+        avatar_file = validated_data.pop("avatar", serializers.empty)
+        username = validated_data.pop("username", None)
+        if username is not None and username != instance.username:
+            instance.username = username
+        instance = super().update(instance, validated_data)
+        prof, _ = UserProfile.objects.get_or_create(user=instance)
+        if avatar_file is not serializers.empty:
+            if avatar_file is None:
+                if prof.avatar:
+                    prof.avatar.delete(save=False)
+                prof.avatar = None
+            else:
+                prof.avatar = avatar_file
+            prof.save(update_fields=["avatar", "updated_at"])
+        return instance

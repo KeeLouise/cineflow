@@ -2,9 +2,10 @@ import React, { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   fetchRoom, fetchRoomMembers, fetchRoomMovies,
-  addRoomMovie, voteRoomMovie, removeRoomMovie,
+  addRoomMovie, voteRoomMovie, deleteRoomMovie,
 } from "@/api/rooms";
-import { searchMovies } from "@/api/movies";   
+import { searchMovies } from "@/api/movies";
+import { mediaUrl } from "@/utils/media";
 import "../styles/room.css";
 
 export default function RoomDetail() {
@@ -17,17 +18,13 @@ export default function RoomDetail() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // Winning movie - KR 29/09/2025
-  const winningMovie = movies.length
-  ? movies.reduce((top, mv) => (mv.score ?? 0) > (top.score ?? 0) ? mv : top, movies[0])
-  : null;
-
   // Live search state - KR 29/09/2025
-  const [q, setQ] = useState("");                // search query - KR
-  const [results, setResults] = useState([]);    // search results list - KR
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const debounceRef = useRef(null);
+  const searchBoxRef = useRef(null);
 
   // if the URL param isn't a number, show an error immediately - KR
   if (!Number.isFinite(roomId)) {
@@ -54,16 +51,7 @@ export default function RoomDetail() {
         if (!alive) return;
         setRoom(r);
         setMembers(mbs || []);
-        // merge: keep any known title/poster locally if API omits them - KR 29/09/2025
-        setMovies((prev) => {
-          const cache = new Map(prev.map(x => [x.tmdb_id, { title: x.title, poster_path: x.poster_path }]));
-          const merged = (mv || []).map(x => ({
-            ...x,
-            title: x.title || cache.get(x.tmdb_id)?.title || "",
-            poster_path: x.poster_path || cache.get(x.tmdb_id)?.poster_path || "",
-          }));
-          return merged;
-        });
+        setMovies(Array.isArray(mv) ? mv : []);
       } catch (e) {
         if (alive) setErr(e.message || "Failed to load room.");
       } finally {
@@ -73,24 +61,25 @@ export default function RoomDetail() {
     return () => { alive = false; };
   }, [roomId]);
 
- 
-  // Voting
+  // Voting - KR
   async function handleVote(mid, value) {
     try {
       await voteRoomMovie(roomId, mid, value);
       const mv = await fetchRoomMovies(roomId);
-      // --- merge after refetch so title/poster never disappear
-      setMovies((prev) => {
-        const cache = new Map(prev.map(x => [x.tmdb_id, { title: x.title, poster_path: x.poster_path }]));
-        const merged = (mv || []).map(x => ({
-          ...x,
-          title: x.title || cache.get(x.tmdb_id)?.title || "",
-          poster_path: x.poster_path || cache.get(x.tmdb_id)?.poster_path || "",
-        }));
-        return merged;
-      });
+      setMovies(Array.isArray(mv) ? mv : []);
     } catch (e) {
       alert(e.message || "Vote failed.");
+    }
+  }
+
+  // Remove movie - KR
+  async function handleRemove(mid) {
+    if (!confirm("Remove this movie from the room?")) return;
+    try {
+      await deleteRoomMovie(roomId, mid);
+      setMovies((lst) => lst.filter((m) => m.id !== mid));
+    } catch (e) {
+      alert(e.message || "Could not remove movie.");
     }
   }
 
@@ -125,43 +114,25 @@ export default function RoomDetail() {
     };
   }, [q]);
 
-  // Add from search result - KR 29/09/2025
+  // Add from search result - KR
   async function handleAddFromSearch(movie) {
-  try {
-    const payload = {
-      tmdb_id: Number(movie.id),
-      title: movie.title || movie.name || "",
-      poster_path: movie.poster_path || "",
-    };
-    const added = await addRoomMovie(roomId, payload);
-    setMovies((lst) => [
-      ...lst,
-      {
-        ...added,
-        title: added.title || payload.title,
-        poster_path: added.poster_path || payload.poster_path,
-      },
-    ]);
-    setQ("");
-    setResults([]);
-    setShowResults(false);
-  } catch (e) {
-    alert(e.message || "Could not add movie.");
+    try {
+      const payload = {
+        tmdb_id: Number(movie.id),
+        title: movie.title || movie.name || "",
+        poster_path: movie.poster_path || "",
+      };
+      const added = await addRoomMovie(roomId, payload);
+      setMovies((lst) => [...lst, added]);
+      setQ("");
+      setResults([]);
+      setShowResults(false);
+    } catch (e) {
+      alert(e.message || "Could not add movie.");
+    }
   }
-}
 
-async function handleRemove(mid) {
-  if (!window.confirm("Remove this movie from the room?")) return;
-  try {
-    await removeRoomMovie(roomId, mid);
-    setMovies((lst) => lst.filter((m) => m.id !== mid));
-  } catch (e) {
-    alert(e.message || "Could not remove movie.");
-  }
-}
-
-  // Close dropdown when clicking outside - KR
-  const searchBoxRef = useRef(null);
+  // Close dropdown when clicking outside - KR 29/09/2025
   useEffect(() => {
     function onDocClick(e) {
       if (!searchBoxRef.current) return;
@@ -189,12 +160,18 @@ async function handleRemove(mid) {
     );
   }
 
+  // derive top 3 by score) - KR 29/09/2025
+  const top3 = [...movies]
+    .map(m => ({ ...m, score: Number.isFinite(m.score) ? m.score : 0 }))
+    .sort((a, b) => (b.score - a.score) || (a.position - b.position) || (new Date(b.added_at) - new Date(a.added_at)))
+    .slice(0, 3);
+
   return (
     <div className="container py-4">
       {/* Header */}
-      <div className="wl-card glass mb-3">
-        <div className="d-flex align-items-center justify-content-between">
-          <div className="d-flex align-items-center gap-2">
+      <div className="wl-card glass mb-3 room-header">
+        <div className="room-header-row">
+          <div className="room-header-left">
             <h1 className="h4 m-0">{room.name}</h1>
             <span className={`wl-badge ${room.is_active ? "wl-badge-success" : "wl-badge-dark"}`}>
               {room.is_active ? "Active" : "Ended"}
@@ -205,47 +182,40 @@ async function handleRemove(mid) {
         {room.description ? <p className="mt-2 mb-0 text-muted">{room.description}</p> : null}
       </div>
 
-      {/* Members */}
-      <div className="wl-card glass mb-3">
-        <h2 className="h6 mb-2">Members</h2>
-        <div className="d-flex flex-wrap gap-2">
-          {members.map((m) => (
-            <span key={m.id} className="wl-badge">
-              {m.username}{m.is_host ? " ⭐" : ""}
-            </span>
-          ))}
-        </div>
-      </div>
+      {/* Grid layout: members • search • queue */}
+      <div className="room-grid">
+        {/* Members */}
+        <section className="glass room-panel">
+          <div className="room-panel-head">
+            <h2 className="h6 m-0">Members</h2>
+          </div>
+          <div className="room-members">
+            {members.map((m) => (
+              <div key={m.id} className="member-chip">
+                {m.avatar ? (
+                  <img
+                    className="member-avatar"
+                    src={mediaUrl(m.avatar)}
+                    alt={m.username}
+                  />
+                ) : (
+                  <div className="member-avatar member-initial">
+                    {m.username?.[0]?.toUpperCase() || "?"}
+                  </div>
+                )}
+                <span className="wl-badge">{m.is_host ? "Host" : "Member"}</span>
+              </div>
+            ))}
+            {members.length === 0 && <div className="text-muted small">No members</div>}
+          </div>
+        </section>
 
-      {/* Winning Movie */}
-{winningMovie && (
-  <div className="wl-card glass mb-3">
-    <h2 className="h6 mb-2">Winning Movie</h2>
-    <div className="d-flex align-items-center gap-3">
-      {winningMovie.poster_path ? (
-        <img
-          src={`https://image.tmdb.org/t/p/w154${winningMovie.poster_path}`}
-          alt={winningMovie.title || `#${winningMovie.tmdb_id}`}
-          className="room-poster-lg"
-          loading="lazy"
-        />
-      ) : (
-        <div className="room-poster-placeholder-lg">—</div>
-      )}
-      <div>
-        <div className="fw-bold">{winningMovie.title || `#${winningMovie.tmdb_id}`}</div>
-        <div className="text-muted small">Score: {winningMovie.score ?? 0}</div>
-      </div>
-    </div>
-  </div>
-)}
+        {/* Search-to-add */}
+        <section className="glass room-panel">
+          <div className="room-panel-head">
+            <h2 className="h6 m-0">Add to queue</h2>
+          </div>
 
-      {/* Queue + LIVE SEARCH */}
-      <div className="wl-card glass">
-        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <h2 className="h6 m-0">Queue</h2>
-
-          {/* Live Search box */}
           <div className="room-search" ref={searchBoxRef}>
             <input
               className="form-control wl-input room-search-input"
@@ -292,13 +262,50 @@ async function handleRemove(mid) {
               </div>
             )}
           </div>
-        </div>
+        </section>
 
-        {/* Movies grid */}
-        <div className="row g-2 mt-2">
-          {movies.map((m) => (
-            <div key={m.id} className="col-12 col-sm-6 col-lg-4">
-              <div className="glass p-2 h-100 d-flex align-items-center gap-2">
+        {/* Queue + Top 3 */}
+        <section className="glass room-panel">
+          <div className="room-panel-head">
+            <h2 className="h6 m-0">Queue</h2>
+          </div>
+
+          {/* Top 3 */}
+          <div className="glass top3-card mb-2">
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span className="fw-semibold">Top 3</span>
+              <span className="text-muted small">by votes</span>
+            </div>
+            <ul className="top3-list">
+              {top3.map((m, i) => (
+                <li key={m.id} className="top3-item">
+                  <div className="top3-rank">{i + 1}</div>
+                  {m.poster_path ? (
+                    <img
+                      className="top3-thumb"
+                      src={`https://image.tmdb.org/t/p/w92${m.poster_path}`}
+                      alt={m.title || `#${m.tmdb_id}`}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="top3-thumb placeholder">—</div>
+                  )}
+                  <div className="top3-meta">
+                    <div className="top3-title">{m.title || `#${m.tmdb_id}`}</div>
+                    <div className="top3-sub">Score: {m.score ?? 0}</div>
+                  </div>
+                </li>
+              ))}
+              {top3.length === 0 && (
+                <li className="text-muted small">No votes yet.</li>
+              )}
+            </ul>
+          </div>
+
+          {/* Movies list */}
+          <div className="room-list">
+            {movies.map((m) => (
+              <div key={m.id} className="room-item glass">
                 {m.poster_path ? (
                   <img
                     src={`https://image.tmdb.org/t/p/w92${m.poster_path}`}
@@ -310,23 +317,41 @@ async function handleRemove(mid) {
                   <div className="room-poster-placeholder">—</div>
                 )}
 
-                <div className="flex-grow-1">
-                  <div className="fw-bold small">{m.title || `#${m.tmdb_id}`}</div>
-                  <div className="text-muted small">Score: {m.score ?? 0}</div>
+                <div className="room-item-main">
+                  <div className="room-item-title">{m.title || `#${m.tmdb_id}`}</div>
+                  <div className="room-item-sub">Score: {m.score ?? 0}</div>
                 </div>
 
-                <div className="d-flex gap-1">
-                  <button className="btn btn-ghost btn-compact" title="Upvote" onClick={() => handleVote(m.id, 1)}>▲</button>
-                  <button className="btn btn-ghost btn-compact" title="Downvote" onClick={() => handleVote(m.id, -1)}>▼</button>
-                  <button className="btn btn-outline-ghost btn-compact" title="Remove" onClick={() => handleRemove(m.id)}>Delete</button>
+                <div className="room-item-actions">
+                  <button
+                    className="btn btn-ghost btn-compact"
+                    title="Upvote"
+                    onClick={() => handleVote(m.id, 1)}
+                  >
+                    ▲
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-compact"
+                    title="Downvote"
+                    onClick={() => handleVote(m.id, -1)}
+                  >
+                    ▼
+                  </button>
+                  <button
+                    className="btn btn-outline-ghost btn-compact link-danger"
+                    title="Remove"
+                    onClick={() => handleRemove(m.id)}
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
-            </div>
-          ))}
-          {movies.length === 0 && (
-            <div className="text-muted p-3">No movies yet. Use the search box above to add one.</div>
-          )}
-        </div>
+            ))}
+            {movies.length === 0 && (
+              <div className="text-muted p-3">No movies yet. Use the search box above to add one.</div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
