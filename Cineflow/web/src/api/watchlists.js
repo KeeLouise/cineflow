@@ -61,8 +61,9 @@ function del(path) {
 
 // ---------- API Calls ----------
 
-export function fetchMyWatchlists() {                                // GET /api/watchlists/ - list all watchlists for current user
-  return get("/watchlists/");
+export async function fetchMyWatchlists() {
+  const data = await get("/watchlists/");
+  return Array.isArray(data) ? data : []; // guarantee array
 }
 
 export function createWatchlist(name, isPublic = false) {            // POST /api/watchlists/ {name, is_public}

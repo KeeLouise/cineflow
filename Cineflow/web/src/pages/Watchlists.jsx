@@ -23,17 +23,17 @@ export default function Watchlists() {
   const [editingName, setEditingName] = useState("");
 
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await fetchMyWatchlists(); // GET /api/watchlists/
-        setLists(data || []);                   // set to empty array if no data
-      } catch (err) {
-        setError(err.message || "Failed to load watchlists.");
-      } finally {
-        setLoading(false);                      // loading finished whether success or error
-      }
-    })();
-  }, []);                                       // empty array [] means this effect only runs once when page loads
+  (async () => {
+    try {
+      const data = await fetchMyWatchlists();
+      setLists(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message || "Failed to load watchlists.");
+    } finally {
+      setLoading(false);
+    }
+  })();
+}, []);                                    
 
   async function handleCreate(e) {              // handles submitting the new list form
     e.preventDefault();
