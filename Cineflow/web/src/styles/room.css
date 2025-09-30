@@ -1,127 +1,235 @@
-.room-input {
-  width: 140px;
+/* Design tokens — KR 29/09/2025 */
+:root {
+  --room-bg: linear-gradient(180deg, #0f1220 0%, #0a0d18 100%);
+  --room-card: rgba(255,255,255,0.06);
+  --room-card-hover: rgba(255,255,255,0.10);
+  --room-border: rgba(255,255,255,0.12);
+  --room-text: #e9ecf3;
+  --room-muted: #9aa3b2;
+  --room-accent: #7aa2ff;
+  --room-success: #38d39f;
+  --room-danger: #ff6b6b;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --shadow-soft: 0 10px 24px rgba(0,0,0,0.25);
+  --blur: saturate(180%) blur(10px);
 }
 
-.room-poster {
-  width: 46px;
-  height: 69px;
-  object-fit: cover;
-  border-radius: 8px;
+/* Page background — KR 29/09/2025 */
+body.rooms-screen {
+  background: var(--room-bg) fixed;
+  color: var(--room-text);
 }
 
-.room-poster-placeholder {
-  width: 46px;
-  height: 69px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.2);
+/* Glass cards — KR 29/09/2025 */
+.glass {
+  background: var(--room-card);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--room-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Header bar — KR 29/09/2025 */
+.room-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #aaa;
-  font-size: 0.9rem;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: 1rem 1.25rem;
 }
 
-.room-search {
-  position: relative;
-  max-width: 420px;
-  width: 100%;
+/* Badges — KR 29/09/2025 */
+.wl-badge {
+  padding: .35rem .6rem;
+  border-radius: 999px;
+  border: 1px solid var(--room-border);
+  background: rgba(255,255,255,.04);
+  color: var(--room-text);
+  font-weight: 600;
+  font-size: .8rem;
 }
+.wl-badge-success { border-color: rgba(56,211,159,.4); color: var(--room-success); }
+.wl-badge-dark { color: var(--room-muted); }
 
-.room-search-input {
-  width: 100%;
-}
-
-.room-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-
-  z-index: 30;
-  background: rgba(20, 20, 22, 0.98);
-  border: 1px solid rgba(255,255,255,0.08);
+/* Inputs — KR 29/09/2025 */
+.wl-input {
+  background: rgba(255,255,255,.06);
+  border: 1px solid var(--room-border);
+  color: var(--room-text);
   border-radius: 12px;
+  height: 40px;
+}
+.wl-input::placeholder { color: var(--room-muted); }
+.wl-input:focus { box-shadow: none; border-color: var(--room-accent); }
 
-  margin-top: 6px;
-  padding: 6px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+/* Buttons — KR 29/09/2025 */
+.btn-gradient {
+  background: linear-gradient(135deg, #7aa2ff 0%, #5f86ff 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  transition: transform .05s ease, filter .2s ease;
+}
+.btn-gradient:active { transform: translateY(1px); }
+
+.btn-outline-ghost,
+.btn-ghost {
+  border: 1px solid var(--room-border);
+  color: var(--room-text);
+  background: rgba(255,255,255,.02);
+  border-radius: 12px;
+}
+.btn-ghost:hover,
+.btn-outline-ghost:hover { background: var(--room-card-hover); }
+
+/* Compact icon buttons — KR 29/09/2025 */
+.btn-compact { padding: .35rem .5rem; border-radius: 10px; }
+
+/* Room list card — KR 29/09/2025 */
+.room-card {
+  padding: 1rem;
+  transition: transform .12s ease, background .2s ease;
+}
+.room-card:hover { transform: translateY(-2px); }
+
+/* Winning poster — KR 29/09/2025 */
+.room-poster-lg { width: 100px; border-radius: 12px; }
+.room-poster-placeholder-lg {
+  width: 100px; height: 150px; border-radius: 12px;
+  border: 1px dashed var(--room-border); color: var(--room-muted);
+  display: grid; place-items: center;
 }
 
+/* Queue item — KR 29/09/2025 */
+.room-poster { width: 46px; height: 69px; border-radius: 10px; object-fit: cover; }
+.room-poster-placeholder {
+  width: 46px; height: 69px; border-radius: 10px;
+  border: 1px dashed var(--room-border); color: var(--room-muted);
+  display: grid; place-items: center;
+}
+
+/* grid layout */
+.wl-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+@media (min-width: 992px) {
+  .wl-grid { grid-template-columns: 1fr 320px; }
+}
+.wl-grid-main { display: grid; gap: 1.5rem; }
+.wl-grid-side { display: grid; gap: 1.5rem; }
+
+/* top 3 card */
+.top3-card { padding: 1rem; }
+.top3-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: .9rem;
+}
+.top3-item { display: flex; align-items: center; gap: 12px; }
+.top3-rank {
+  width: 26px; height:26px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background: rgba(255,255,255,.08); font-weight:700;
+}
+.top3-thumb { width: 32px; height: 48px; border-radius: 6px; object-fit: cover; }
+.top3-thumb.placeholder {
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.2);
+}
+.top3-meta { display:flex; flex-direction:column; }
+.top3-title { font-weight:600; font-size:14px; }
+.top3-sub { color:#9aa; font-size:12px; }
+
+/* search */
+.room-search { position: relative; width: 100%; max-width: 420px; }
+.room-search-input { width: 100%; }
+.room-results {
+  position:absolute; top: calc(100% + 6px); left:0; right:0;
+  background: rgba(20,20,20,.9);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  padding: 6px;
+  z-index: 20;
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-soft);
+}
 .room-results-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  width: 100%;
-  padding: 8px;
-  border-radius: 10px;
-
+  width:100%;
+  display:flex; align-items:center; gap:10px;
+  padding:8px; border-radius:10px;
   background: transparent;
   border: none;
+  text-align:left;
+  color: inherit;
   cursor: pointer;
-  text-align: left;
-  color: #fff;
 }
-
-.room-results-item:hover {
-  background: rgba(255,255,255,0.06);
-}
-
-.room-results-thumb {
-  width: 36px;
-  height: 54px;
-  border-radius: 6px;
-  object-fit: cover;
-}
-
+.room-results-item:hover { background: rgba(255,255,255,.06); }
+.room-results-thumb { width: 32px; height: 48px; border-radius: 6px; object-fit: cover; }
 .room-results-thumb.placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #aaa;
-  border: 1px solid rgba(255,255,255,0.18);
-  font-size: 12px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.4);
+}
+.room-results-meta { flex:1; min-width:0; display: grid; }
+.room-results-title { font-weight:600; font-size: 14px; line-height:1.1; }
+.room-results-sub { color:#aaa; font-size: 12px; }
+.room-results-add { font-size: 13px; opacity:.9; }
+
+/* posters in main list */
+.room-list { display:flex; flex-direction:column; gap:14px; margin-top:10px; }
+.room-item {
+  display:flex; align-items:center; gap:14px;
+  border-radius:12px; padding:12px;
+}
+.room-item-main { flex:1; min-width:0; }
+.room-item-title { font-weight:600; font-size:14px; }
+.room-item-sub { color:#9aa; font-size:12px; }
+.room-item-actions { display:flex; align-items:center; gap:6px; }
+
+.room-app { gap: 12px; }
+
+.room-header { border-radius: 16px; padding: 16px 18px; }
+.room-header-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.room-header-left { display:flex; align-items:center; gap:10px; }
+
+.room-grid {
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: 20px; 
+}
+@media (min-width: 992px) {
+  .room-grid { grid-template-columns: 1fr 2fr 1fr; }
 }
 
-.room-results-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
+.room-panel { border-radius: 16px; padding: 18px; }
+.room-panel-head {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; flex-wrap:wrap;
 }
 
-.room-results-title {
-  font-weight: 600;
-  font-size: 0.95rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.room-members { display:flex; flex-wrap:wrap; gap:8px; }
+
+/* Danger/action links — KR 30/09/2025 */
+.link-danger { color: var(--room-danger); }
+.link-muted { color: var(--room-muted); }
+
+/* Space between all cards*/
+.glass,
+.room-card,
+.room-panel,
+.top3-card,
+.wl-card {
+  margin: 1.5rem 0;
 }
 
-.room-results-sub {
-  font-size: 0.8rem;
-  color: #bbb;
-}
-
-.room-results-add {
-  margin-left: auto;
-  font-size: 0.85rem;
-  opacity: 0.9;
-}
-
-.room-poster-lg {
-  width: 100px;
-  border-radius: 8px;
-}
-
-.room-poster-placeholder-lg {
-  width: 100px;
-  height: 150px;
-  background: #ddd;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  color: #666;
+/* Prevent unnecessary gap on the very first card in a section */
+.glass:first-child,
+.room-card:first-child,
+.room-panel:first-child,
+.top3-card:first-child,
+.wl-card:first-child {
+  margin-top: 0;
 }
