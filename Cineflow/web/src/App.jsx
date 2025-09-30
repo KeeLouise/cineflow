@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import SeeAllPage from "@/pages/SeeAllPage.jsx";
 import Footer from "./components/Footer.jsx";
 import PrivateRoute from "@/components/PrivateRoute";
+import Profile from "@/pages/Profile.jsx";
 import MovieDetail from "@/pages/MovieDetail.jsx";
 import Watchlists from "@/pages/Watchlists.jsx";
 import WatchlistDetail from "@/pages/WatchlistDetail.jsx";
@@ -73,6 +74,15 @@ export default function App() {
   element={
     <PrivateRoute>
       <RoomDetail />
+    </PrivateRoute>
+  }
+/>
+
+<Route
+  path="/profile"
+  element={
+    <PrivateRoute>
+      <Profile />
     </PrivateRoute>
   }
 />

@@ -1,5 +1,6 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from .views.profile import me_profile
 
 # Health/secure checks live in core - KR 21/08/2025
 from core.views import ping, secure_view
@@ -31,13 +32,14 @@ from api.views.tmdb_public import (
 # Import the watchlists module
 from .views import watchlists as views
 
-# Import watch party room endpoints - KR 30/09/2025
+# Import watch party room endpoints - KR 29/09/2025
 from .views import watchrooms as rooms
 
 urlpatterns = [
     # --- Auth (JWT) --- KR 01/09/2025
     path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("me/profile/", me_profile, name="me_profile"),
 
     # --- Health/secure checks --- KR 21/08/2025
     path("ping/", ping, name="api_ping"),
