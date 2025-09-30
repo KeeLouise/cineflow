@@ -2,7 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { setTokens } from "@/api/auth";
-import { API_BASE } from "@/api/client"; 
+import API_ROOT from "@/utils/apiRoot";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -14,11 +14,7 @@ export default function Login() {
     e.preventDefault();
     setError("");
     try {
-      const { data } = await axios.post(`${API_BASE}/token/`, { 
-        username,
-        password,
-      });
-
+      const { data } = await axios.post(`${API_ROOT}/token/`, { username, password });
       setTokens({ access: data.access, refresh: data.refresh });
       navigate("/dashboard");
     } catch (err) {
