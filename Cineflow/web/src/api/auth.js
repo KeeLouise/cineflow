@@ -1,5 +1,4 @@
 // minimal JWT helpers with expiry awareness - KR 02/09/2025
-import { API_BASE } from "@/api/client";
 
 const ACCESS_KEY = "access";
 const REFRESH_KEY = "refresh";
@@ -8,9 +7,13 @@ const REFRESH_KEY = "refresh";
 export const safeLocalStorage =
   typeof window !== "undefined" && window.localStorage
     ? window.localStorage
-    : { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+    : {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
+      };
 
-// helper to notify the app when auth state changes - KR 24/09/2025
+// small helper to notify the app when auth state changes - KR 24/09/2025
 function emitAuthChanged() {
   if (typeof window !== "undefined" && window?.dispatchEvent) {
     window.dispatchEvent(new Event("auth-changed"));
@@ -21,7 +24,10 @@ function parseJwt(token) {
   try {
     const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     const json = decodeURIComponent(
-      atob(base64).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+      atob(base64)
+        .split("")
+        .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
     );
     return JSON.parse(json);
   } catch {
@@ -42,15 +48,17 @@ export function looksLoggedIn() {
 }
 
 // public: authoritative check – verifies/refreshes if needed - KR 02/09/2025
+import API_ROOT from "@/utils/apiRoot";
 export async function isAuthenticated() {
   const access = safeLocalStorage.getItem(ACCESS_KEY);
   if (access && !isExpired(access)) return true;
 
+  // try silent refresh using refresh token - KR 02/09/2025
   const refresh = safeLocalStorage.getItem(REFRESH_KEY);
   if (!refresh) return false;
 
   try {
-    const res = await fetch(`${API_BASE}/token/refresh/`, {  
+    const res = await fetch(`${API_ROOT}/token/refresh/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh }),
@@ -62,7 +70,9 @@ export async function isAuthenticated() {
       emitAuthChanged();
       return true;
     }
-  } catch {}
+  } catch {
+  }
+  // hard sign out if refresh failed - KR 02/09/2025
   safeLocalStorage.removeItem(ACCESS_KEY);
   safeLocalStorage.removeItem(REFRESH_KEY);
   emitAuthChanged();
@@ -84,13 +94,14 @@ export function logout() { // logout function to remove access tokens - KR 21/08
 
 /* token utilities + authFetch wrapper - KR 18/09/2025 */
 
+// helpers to read/write tokens centrally - KR 18/09/2025
 export function getAccessToken() {
   return safeLocalStorage.getItem(ACCESS_KEY) || "";
 }
 export function setTokens({ access, refresh } = {}) {
   if (typeof access === "string") safeLocalStorage.setItem(ACCESS_KEY, access);
   if (typeof refresh === "string") safeLocalStorage.setItem(REFRESH_KEY, refresh);
-  emitAuthChanged();
+  emitAuthChanged(); // <— notify listeners after setting tokens
 }
 
 // Silent refresh (returns new access or null) - KR 18/09/2025
@@ -98,7 +109,7 @@ export async function refreshAccessToken() {
   const refresh = safeLocalStorage.getItem(REFRESH_KEY);
   if (!refresh) return null;
   try {
-    const res = await fetch(`${API_BASE}/token/refresh/`, {
+    const res = await fetch(`${API_ROOT}/token/refresh/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh }),
@@ -121,14 +132,22 @@ export async function authFetch(url, options = {}) {
   const access = getAccessToken();
   if (access) initialHeaders.set("Authorization", `Bearer ${access}`);
 
-  let res = await fetch(url, { ...options, headers: initialHeaders });
+  let full = url;
+  if (url.startsWith("/api/")) {
+    full = `${API_ROOT}${url.replace(/^\/api/, "")}`;
+  }
 
+  let res = await fetch(full, { ...options, headers: initialHeaders });
+
+  // If unauthorised, try once to refresh and retry the same request - KR 18/09/2025
   if (res.status === 401) {
     const newAccess = await refreshAccessToken();
-    if (!newAccess) return res;
+    if (!newAccess) {
+      return res;
+    }
     const retryHeaders = new Headers(options.headers || {});
     retryHeaders.set("Authorization", `Bearer ${newAccess}`);
-    res = await fetch(url, { ...options, headers: retryHeaders });
+    res = await fetch(full, { ...options, headers: retryHeaders });
   }
 
   return res;
