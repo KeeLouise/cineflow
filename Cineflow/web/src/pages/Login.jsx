@@ -2,6 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { setTokens } from "@/api/auth";
+import { API_BASE } from "@/api/client"; 
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -13,11 +14,12 @@ export default function Login() {
     e.preventDefault();
     setError("");
     try {
-      // relative path so Vite proxy forwards to Django - KR 19/08/2025
-      const { data } = await axios.post("/api/token/", { username, password });
+      const { data } = await axios.post(`${API_BASE}/token/`, { 
+        username,
+        password,
+      });
 
       setTokens({ access: data.access, refresh: data.refresh });
-
       navigate("/dashboard");
     } catch (err) {
       setError("Invalid credentials or server unreachable");
