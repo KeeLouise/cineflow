@@ -1,7 +1,9 @@
 import axios from "axios";
 
 // Create a base Axios instance pointing to Django backend via Vite proxy - KR 18/08/2025
-const api = axios.create({ baseURL: "/api" });
+const RAW = import.meta.env?.VITE_API_URL || "/api";
+const BASE = (typeof RAW === "string" ? RAW : "/api").replace(/\/+$/, "");
+const api = axios.create({ baseURL: BASE });
 
 // --- Public endpoints (no Authorization header required) - KR 02/09/2025
 const PUBLIC_PREFIXES = [
@@ -16,6 +18,8 @@ const PUBLIC_PREFIXES = [
 
 function stripApiPrefix(u = "") {
   // normalize leading "/api" once, whether full or not
+  if (!u) return u;
+  if (u.startsWith(BASE)) return u.slice(BASE.length) || "/";
   return u.startsWith("/api") ? u.slice(4) || "/" : u;
 }
 
@@ -39,8 +43,8 @@ const isHmrOrStatic = (url = "") =>
   url.endsWith(".map") ||
   url.endsWith(".ico");
 
-// --- Request interceptor ---
-// Attach access token to every request IF it's protected - KR 02/09/2025
+// Request interceptor
+// Attach access token to every request if it's protected - KR 02/09/2025
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("access");
   const url = config?.url || "";
@@ -72,7 +76,7 @@ const processQueue = (error, token = null) => {
   pendingQueue = [];
 };
 
-// --- Response interceptor ---
+// Response interceptor
 // Handles refresh token flow safely - KR 21/08/2025
 api.interceptors.response.use(
   (res) => res,
@@ -121,7 +125,7 @@ api.interceptors.response.use(
       isRefreshing = true;
       try {
         // request a new access token from Django using the refresh token - KR 19/08/2025
-        const { data } = await axios.post("/api/token/refresh/", { refresh });
+        const { data } = await api.post("/token/refresh/", { refresh });
 
         // save and use the new access token - KR 20/08/2025
         localStorage.setItem("access", data.access);
