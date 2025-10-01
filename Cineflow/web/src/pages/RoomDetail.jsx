@@ -1,3 +1,4 @@
+// src/pages/RoomDetail.jsx
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
@@ -6,6 +7,7 @@ import {
 } from "@/api/rooms";
 import { searchMovies } from "@/api/movies";
 import { mediaUrl } from "@/utils/media";
+import { getMyProfile } from "@/api/profile"; // to know who the current user is (for host-only invite chip)
 import "../styles/room.css";
 
 export default function RoomDetail() {
@@ -18,7 +20,9 @@ export default function RoomDetail() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // Live search state - KR 29/09/2025
+  const [me, setMe] = useState(null); // current user (profile)
+
+  // Live search state
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -26,7 +30,7 @@ export default function RoomDetail() {
   const debounceRef = useRef(null);
   const searchBoxRef = useRef(null);
 
-  // if the URL param isn't a number, show an error immediately - KR
+  // Guard invalid :id
   if (!Number.isFinite(roomId)) {
     return (
       <div className="container py-4">
@@ -36,22 +40,24 @@ export default function RoomDetail() {
     );
   }
 
-  // Load room details/members/movies - KR 29/09/2025
+  // Load room + members + movies + my profile
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
         setErr("");
-        const [r, mbs, mv] = await Promise.all([
+        const [r, mbs, mv, meProfile] = await Promise.all([
           fetchRoom(roomId),
           fetchRoomMembers(roomId),
           fetchRoomMovies(roomId),
+          getMyProfile().catch(() => null), // not fatal if it fails
         ]);
         if (!alive) return;
         setRoom(r);
         setMembers(mbs || []);
         setMovies(Array.isArray(mv) ? mv : []);
+        setMe(meProfile);
       } catch (e) {
         if (alive) setErr(e.message || "Failed to load room.");
       } finally {
@@ -61,7 +67,7 @@ export default function RoomDetail() {
     return () => { alive = false; };
   }, [roomId]);
 
-  // Voting - KR
+  // Voting
   async function handleVote(mid, value) {
     try {
       await voteRoomMovie(roomId, mid, value);
@@ -72,7 +78,7 @@ export default function RoomDetail() {
     }
   }
 
-  // Remove movie - KR
+  // Remove movie
   async function handleRemove(mid) {
     if (!confirm("Remove this movie from the room?")) return;
     try {
@@ -83,17 +89,15 @@ export default function RoomDetail() {
     }
   }
 
-  // Live Search: debounce input then call backend - KR 29/09/2025
+  // Debounced live search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-
     const query = q.trim();
     if (query.length < 2) {
       setResults([]);
       setShowResults(false);
       return;
     }
-
     debounceRef.current = setTimeout(async () => {
       try {
         setSearching(true);
@@ -108,13 +112,12 @@ export default function RoomDetail() {
         setSearching(false);
       }
     }, 300);
-
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [q]);
 
-  // Add from search result - KR
+  // Add from search
   async function handleAddFromSearch(movie) {
     try {
       const payload = {
@@ -132,13 +135,11 @@ export default function RoomDetail() {
     }
   }
 
-  // Close dropdown when clicking outside - KR 29/09/2025
+  // Close dropdown on outside click
   useEffect(() => {
     function onDocClick(e) {
       if (!searchBoxRef.current) return;
-      if (!searchBoxRef.current.contains(e.target)) {
-        setShowResults(false);
-      }
+      if (!searchBoxRef.current.contains(e.target)) setShowResults(false);
     }
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
@@ -160,11 +161,28 @@ export default function RoomDetail() {
     );
   }
 
-  // derive top 3 by score) - KR 29/09/2025
+  // top 3 by score
   const top3 = [...movies]
     .map(m => ({ ...m, score: Number.isFinite(m.score) ? m.score : 0 }))
     .sort((a, b) => (b.score - a.score) || (a.position - b.position) || (new Date(b.added_at) - new Date(a.added_at)))
     .slice(0, 3);
+
+  // Is the current user the host in this room?
+  const isCurrentUserHost = !!(me && members.some(m => m.is_host && m.username === me.username));
+
+  async function copyInvite() {
+    try {
+      await navigator.clipboard.writeText(room.invite_code);
+      // quick, unobtrusive feedback:
+      const el = document.getElementById("invite-copy-chip");
+      if (el) {
+        el.dataset.copied = "1";
+        setTimeout(() => { el.dataset.copied = "0"; }, 1200);
+      }
+    } catch {
+      alert("Could not copy invite code.");
+    }
+  }
 
   return (
     <div className="container py-4">
@@ -176,47 +194,132 @@ export default function RoomDetail() {
             <span className={`wl-badge ${room.is_active ? "wl-badge-success" : "wl-badge-dark"}`}>
               {room.is_active ? "Active" : "Ended"}
             </span>
+
+            {/* Host-only invite chip */}
+            {isCurrentUserHost && room.invite_code ? (
+              <button
+                id="invite-copy-chip"
+                type="button"
+                className="wl-badge"
+                onClick={copyInvite}
+                title="Copy invite code"
+                style={{ cursor: "pointer" }}
+              >
+                Invite: <span style={{ fontFamily: "monospace", marginLeft: 6 }}>{room.invite_code}</span>
+                <span
+                  style={{
+                    marginLeft: 8,
+                    opacity: 0.8,
+                    fontWeight: 700,
+                    letterSpacing: 0.3,
+                  }}
+                >
+                  ⧉
+                </span>
+              </button>
+            ) : null}
           </div>
           <Link to="/rooms" className="btn btn-outline-ghost">← Back</Link>
         </div>
         {room.description ? <p className="mt-2 mb-0 text-muted">{room.description}</p> : null}
       </div>
 
-      {/* Grid layout: members • search • queue */}
-      <div className="room-grid">
-        {/* Members */}
+      {/* 2-column grid: Left (Members + Top 3) • Right (Queue + Search) */}
+      <div className="room-grid" style={{ gridTemplateColumns: "1fr 2fr" }}>
+        {/* LEFT: Members */}
         <section className="glass room-panel">
           <div className="room-panel-head">
             <h2 className="h6 m-0">Members</h2>
           </div>
           <div className="room-members">
             {members.map((m) => (
-              <div key={m.id} className="member-chip">
+              <div
+                key={m.id}
+                className="member-chip"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 10px",
+                  border: "1px solid var(--room-border)",
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,.04)"
+                }}
+              >
                 {m.avatar ? (
                   <img
                     className="member-avatar"
                     src={mediaUrl(m.avatar)}
                     alt={m.username}
+                    style={{
+                      width: 28, height: 28, borderRadius: "50%",
+                      objectFit: "cover", background: "rgba(255,255,255,.08)"
+                    }}
                   />
                 ) : (
-                  <div className="member-avatar member-initial">
+                  <div
+                    className="member-avatar member-initial"
+                    style={{
+                      width: 28, height: 28, borderRadius: "50%",
+                      display: "grid", placeItems: "center",
+                      background: "rgba(255,255,255,.08)", fontWeight: 700
+                    }}
+                  >
                     {m.username?.[0]?.toUpperCase() || "?"}
                   </div>
                 )}
-                <span className="wl-badge">{m.is_host ? "Host" : "Member"}</span>
+                <span className="text-muted" style={{ fontSize: 13 }}>
+                  {m.username}
+                </span>
+                <span className="wl-badge" style={{ fontSize: 11 }}>
+                  {m.is_host ? "Host" : "Member"}
+                </span>
               </div>
             ))}
             {members.length === 0 && <div className="text-muted small">No members</div>}
           </div>
+
+          {/* TOP 3 */}
+          <div className="glass top3-card mb-2" style={{ marginTop: 16 }}>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span className="fw-semibold">Top 3</span>
+              <span className="text-muted small">by votes</span>
+            </div>
+            <ul className="top3-list">
+              {top3.map((m, i) => (
+                <li key={m.id} className="top3-item">
+                  <div className="top3-rank">{i + 1}</div>
+                  {m.poster_path ? (
+                    <img
+                      className="top3-thumb"
+                      src={`https://image.tmdb.org/t/p/w92${m.poster_path}`}
+                      alt={m.title || `#${m.tmdb_id}`}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="top3-thumb placeholder">—</div>
+                  )}
+                  <div className="top3-meta">
+                    <div className="top3-title">{m.title || `#${m.tmdb_id}`}</div>
+                    <div className="top3-sub">Score: {m.score ?? 0}</div>
+                  </div>
+                </li>
+              ))}
+              {top3.length === 0 && (
+                <li className="text-muted small">No votes yet.</li>
+              )}
+            </ul>
+          </div>
         </section>
 
-        {/* Search-to-add */}
+        {/* RIGHT: Queue + Search in the same card */}
         <section className="glass room-panel">
           <div className="room-panel-head">
-            <h2 className="h6 m-0">Add to queue</h2>
+            <h2 className="h6 m-0">Queue</h2>
           </div>
 
-          <div className="room-search" ref={searchBoxRef}>
+          {/* Search box lives at the top of the Queue card */}
+          <div className="room-search mb-3" ref={searchBoxRef}>
             <input
               className="form-control wl-input room-search-input"
               placeholder="Search movies…"
@@ -261,45 +364,6 @@ export default function RoomDetail() {
                 )}
               </div>
             )}
-          </div>
-        </section>
-
-        {/* Queue + Top 3 */}
-        <section className="glass room-panel">
-          <div className="room-panel-head">
-            <h2 className="h6 m-0">Queue</h2>
-          </div>
-
-          {/* Top 3 */}
-          <div className="glass top3-card mb-2">
-            <div className="d-flex align-items-center justify-content-between mb-2">
-              <span className="fw-semibold">Top 3</span>
-              <span className="text-muted small">by votes</span>
-            </div>
-            <ul className="top3-list">
-              {top3.map((m, i) => (
-                <li key={m.id} className="top3-item">
-                  <div className="top3-rank">{i + 1}</div>
-                  {m.poster_path ? (
-                    <img
-                      className="top3-thumb"
-                      src={`https://image.tmdb.org/t/p/w92${m.poster_path}`}
-                      alt={m.title || `#${m.tmdb_id}`}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="top3-thumb placeholder">—</div>
-                  )}
-                  <div className="top3-meta">
-                    <div className="top3-title">{m.title || `#${m.tmdb_id}`}</div>
-                    <div className="top3-sub">Score: {m.score ?? 0}</div>
-                  </div>
-                </li>
-              ))}
-              {top3.length === 0 && (
-                <li className="text-muted small">No votes yet.</li>
-              )}
-            </ul>
           </div>
 
           {/* Movies list */}
