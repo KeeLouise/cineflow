@@ -2,12 +2,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchMoodDiscover } from "@/api/movies";
+import { getMyProfile } from "@/api/profile";
+import { resendVerificationEmail } from "@/api/account";
 import SkeletonRow from "@/components/SkeletonRow.jsx";
 import "@/styles/home.css";
 
-
- // Poster card 
- 
+/* Poster card */
 function PosterCard({ m }) {
   return (
     <article className="poster-card">
@@ -78,16 +78,6 @@ const TMDB_MIN_OPTIONS = [
   { value: 8.0, label: "≥ 8.0" },
 ];
 
-// Whitelist (TMDB ids → label)
-// NOTE: kept for backward compatibility with your original dashboard comments.
-//       The UI below follows the See-All model (name→id mapping), but this constant remains intact.
-const PROVIDER_WHITELIST = {
-  8: "Netflix",
-  9: "Prime Video",
-  337: "Disney+",
-  531: "Paramount+",
-};
-
 // See-All style provider options (mapped by provider_name -> provider_id)
 const ALLOWED_PROVIDERS = [
   { key: "netflix",        labels: ["Netflix"] },
@@ -100,6 +90,9 @@ const API_BASE = "/api";
 const REGION = "GB";
 
 export default function Dashboard() {
+  // Signed-in user (for email verification banner)
+  const [me, setMe] = useState(null);
+
   // Mood/list
   const [mood, setMood] = useState("feelgood");
   const [items, setItems] = useState([]);
@@ -154,6 +147,20 @@ export default function Dashboard() {
   const sentinelRef = useRef(null);
   const inFlightRef = useRef(null);
 
+  // Load profile for banner
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const p = await getMyProfile();
+        if (alive) setMe(p);
+      } catch {
+        if (alive) setMe(null);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
   // Providers (fetch once; map names to ids like See-All)
   const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").replace(/[’'"]/g, "").trim();
   useEffect(() => {
@@ -197,13 +204,9 @@ export default function Dashboard() {
     const base = {
       region: REGION,
       decade: appliedDecade,
-      // match backend parser
       vote_average_gte: appliedTmdbMin || undefined,
-      // broaden when include buy/rent toggled
       types: appliedIncludeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free",
-      // hint to backend to widen if we’re provider-locked
       broad: appliedPickedProviders.length ? 1 : 0,
-      // optional strictness in your backend (if supported)
       force_providers: appliedPickedProviders.length ? 1 : 0,
     };
     if (providersParam) base.providers = providersParam;
@@ -330,13 +333,12 @@ export default function Dashboard() {
     qs.set("region", REGION);
     if (appliedDecade) qs.set("decade", appliedDecade);
     if (appliedTmdbMin && Number(appliedTmdbMin) > 0) {
-      // match backend parser
       qs.set("vote_average_gte", String(appliedTmdbMin));
     }
     if (providersParamForSeeAll) {
       qs.set("providers", providersParamForSeeAll);
-      qs.set("broad", appliedIncludeRentBuy ? "1" : "0"); // include rent/buy if toggled
-      qs.set("force_providers", "1");                      // strict provider verification on See-All also
+      qs.set("broad", appliedIncludeRentBuy ? "1" : "0");
+      qs.set("force_providers", "1");
     }
     qs.set("types", appliedIncludeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free");
     return `/mood/${encodeURIComponent(mood)}/see-all?${qs.toString()}`;
@@ -350,6 +352,29 @@ export default function Dashboard() {
       {/* Glass wrapper for the whole page */}
       <div className="glass-dashboard">
         <div className="container-fluid py-5">
+
+          {/* EMAIL VERIFICATION BANNER */}
+          {me && me.email_verified === false && (
+            <div className="alert alert-warning d-flex align-items-center justify-content-between">
+              <div>
+                <strong>Verify your email.</strong> We’ve sent a link to {me.email}. You’ll need to verify before enabling 2FA.
+              </div>
+              <button
+                className="btn btn-outline-ghost"
+                onClick={async () => {
+                  try {
+                    await resendVerificationEmail();
+                    alert("Verification email sent.");
+                  } catch (e) {
+                    alert(e?.response?.data?.detail || "Could not send verification email.");
+                  }
+                }}
+              >
+                Resend
+              </button>
+            </div>
+          )}
+
           <header className="d-flex align-items-center justify-content-between mb-4">
             <h1 className="m-0">Your Dashboard</h1>
             <div className="d-flex align-items-center gap-2">
@@ -368,11 +393,11 @@ export default function Dashboard() {
             </div>
           </header>
 
-          {/* Desktop filter toolbar (like See-All) */}
+          {/* Desktop filter toolbar */}
           <div className="card bg-dark border-0 shadow-sm mb-4 d-none d-md-block">
             <div className="card-body">
               <div className="row g-3 align-items-end">
-                {/* Mood (moved inside filter container) */}
+                {/* Mood */}
                 <div className="col-md-3">
                   <label className="form-label text-secondary small">Mood</label>
                   <select
@@ -389,7 +414,7 @@ export default function Dashboard() {
                   </select>
                 </div>
 
-                {/* Providers (chips like See-All) */}
+                {/* Providers */}
                 <div className="col-md-5">
                   <label className="form-label text-secondary small d-block">Providers</label>
                   <div className="d-flex flex-wrap gap-2">
@@ -503,11 +528,9 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Infinite scroll sentinel */}
               <div ref={sentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
               {loading && <div className="text-muted mt-2">Loading more…</div>}
 
-              {/* Bottom See-All */}
               <div className="d-flex justify-content-center mt-3">
                 <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
                   See all {MOODS.find((x) => x.key === mood)?.label || "results"}
@@ -526,7 +549,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* MOBILE FILTERS: Off-canvas sheet (with mood inside) */}
+        {/* MOBILE FILTERS */}
         <div
           className="offcanvas offcanvas-bottom bg-dark text-light d-md-none"
           tabIndex="-1"
