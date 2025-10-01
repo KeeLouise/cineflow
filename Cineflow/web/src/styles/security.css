@@ -1,0 +1,57 @@
+.security-page .security-card {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 1.5rem;
+}
+
+.verify-form .form-label {
+  font-weight: 600;
+}
+
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+}
+
+.profile-avatar-fallback {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  font-weight: 700;
+}
+
+.security-section + .security-section {
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding-top: 1rem;
+}
+
+.btn-gradient {
+  background: linear-gradient(135deg, #ff6ad5 0%, #f50057 100%);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.btn-outline-ghost {
+  border: 1px solid rgba(255,255,255,.18);
+  color: #e9ecf3;
+  background: rgba(255,255,255,.03);
+  border-radius: 12px;
+}
+
+.bg-success-subtle {
+  background: rgba(56,211,159,.15) !important;
+}
+
+.bg-warning-subtle {
+  background: rgba(255,193,7,.2) !important;
+}
+
+.bg-info-subtle {
+  background: rgba(13,202,240,.2) !important;
+}
