@@ -139,16 +139,34 @@ class RoomMovieSerializer(serializers.ModelSerializer):
             return agg
         return obj.votes.aggregate(s=Sum("value")).get("s") or 0
 
+
 class RoomSerializer(serializers.ModelSerializer):
     members = RoomMembershipSerializer(source="memberships", many=True, read_only=True)
     movies = serializers.SerializerMethodField()
+    invite_code = serializers.SerializerMethodField(read_only=True)   # gate it
+    is_host_current = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Room
-        fields = ["id", "name", "description", "owner", "is_active", "starts_at", "invite_code", "created_at", "members", "movies"]
-        read_only_fields = ["id", "owner", "invite_code", "created_at", "members", "movies"]
+        fields = [
+            "id", "name", "description", "owner", "is_active", "starts_at",
+            "invite_code", "created_at", "members", "movies", "is_host_current"
+        ]
+        read_only_fields = [
+            "id", "owner", "invite_code", "created_at", "members", "movies", "is_host_current"
+        ]
 
-    def get_movies(self, room: Room):
+    def get_invite_code(self, room):
+        request = self.context.get("request")
+        if request and request.user and request.user.id == room.owner_id:
+            return room.invite_code
+        return None  # hidden for non-hosts
+
+    def get_is_host_current(self, room):
+        request = self.context.get("request")
+        return bool(request and request.user and request.user.id == room.owner_id)
+
+    def get_movies(self, room):
         qs = (
             room.movies
             .all()
