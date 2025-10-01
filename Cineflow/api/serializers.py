@@ -150,7 +150,7 @@ class RoomReorderSerializer(serializers.Serializer):
 # --- User Profile ---
 class UserProfileSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField(read_only=True)
-    avatar = serializers.ImageField(required=False, allow_null=True)
+    avatar = serializers.ImageField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = User
@@ -175,30 +175,39 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return full or obj.username
 
     def to_representation(self, instance):
-        """
-        Avoid 500s if storage is misconfigured or file missing —
-        return avatar=None instead of crashing.
-        """
+        # Start with the User fields
         data = super().to_representation(instance)
+        # Safely add profile + avatar URL
         prof = getattr(instance, "profile", None)
         url = None
-        if prof and prof.avatar:
+        if prof and getattr(prof, "avatar", None):
+            # Guard against storage/Cloudinary issues locally
             try:
-                url = prof.avatar.url
+                if prof.avatar and getattr(prof.avatar, "url", None):
+                    url = prof.avatar.url
             except Exception:
                 url = None
         data["avatar"] = url
+        if prof:
+            data["email_verified"] = bool(getattr(prof, "email_verified", False))
+            data["two_factor_enabled"] = bool(getattr(prof, "two_factor_enabled", False))
+        else:
+            data["email_verified"] = False
+            data["two_factor_enabled"] = False
         return data
 
     def update(self, instance, validated_data):
+        # Handle username/first/last/email on the User model
         avatar_file = validated_data.pop("avatar", serializers.empty)
         username = validated_data.pop("username", None)
         if username is not None and username != instance.username:
             instance.username = username
-
         instance = super().update(instance, validated_data)
 
+        # Ensure profile row exists
         prof, _ = UserProfile.objects.get_or_create(user=instance)
+
+        # If avatar posted (file or null), update profile storage
         if avatar_file is not serializers.empty:
             if avatar_file is None:
                 try:
