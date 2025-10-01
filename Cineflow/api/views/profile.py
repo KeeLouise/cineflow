@@ -13,6 +13,8 @@ from ..models import UserProfile
 def me_profile(request):
     user = request.user
 
+    UserProfile.objects.get_or_create(user=user)
+
     if request.method == "GET":
         UserProfile.objects.get_or_create(user=user)
         data = UserProfileSerializer(user, context={"request": request}).data
