@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import api from "@/api/client";
 import { confirm2FAEmailLogin } from "@/api/account";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/auth/AuthContext";
 import "@/styles/security.css";
 
 export default function Login() {

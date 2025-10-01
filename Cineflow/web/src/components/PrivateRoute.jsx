@@ -1,33 +1,33 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import api from "@/api/client";
 import { safeLocalStorage } from "@/api/auth";
 
-export default function PrivateRoute({ children }) {
-  let token = "";
-  try { token = safeLocalStorage.getItem("access") || ""; } catch { token = ""; }
 
-  if (!token) return <Navigate to="/login" replace />;
-  return children;
+let useAuth;
+try {
+  ({ useAuth } = require("@/context/AuthContext"));
+} catch {
+  useAuth = null;
 }
 
-  // check: verify token actually works with the backend
-  const [status, setStatus] = useState<"checking" | "ok" | "fail">("checking");
+export default function PrivateRoute({ children }) {
+  const location = useLocation();
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        await api.get("/me/profile/");
-        if (alive) setStatus("ok");
-      } catch {
-        if (alive) setStatus("fail");
+  let ready = true;
+  let authed = !!safeLocalStorage.getItem("access");
+
+  if (typeof useAuth === "function") {
+    try {
+      const ctx = useAuth();
+      if (ctx) {
+        ready = ctx.ready ?? true;
+        authed = ctx.authed ?? authed;
       }
-    })();
-    return () => { alive = false; };
-  }, []);
+    } catch {
+    }
+  }
 
-  if (status === "checking") {
+  if (!ready) {
     return (
       <div className="container py-5 text-center">
         <div className="glass p-4">Checking your session…</div>
@@ -35,9 +35,10 @@ export default function PrivateRoute({ children }) {
     );
   }
 
-  if (status === "fail") {
-    // Bad/expired token or MFA not completed -> back to login
-    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  if (!authed) {
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${next}`} replace />;
   }
 
   return children;
+}
