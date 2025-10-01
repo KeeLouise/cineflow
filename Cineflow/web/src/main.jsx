@@ -12,7 +12,9 @@ import WatchlistDetail from "@/pages/WatchlistDetail";
 import Rooms from "@/pages/Rooms";
 import RoomDetail from "@/pages/RoomDetail";
 import Profile from "@/pages/Profile";
-
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap/dist/js/bootstrap.bundle.min.js";
+import "@/styles/base.css";
 import PrivateRoute from "@/components/PrivateRoute";
 import AuthProvider from "@/auth/AuthContext"; 
 

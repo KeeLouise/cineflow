@@ -14,7 +14,9 @@ import Watchlists from "@/pages/Watchlists.jsx";
 import WatchlistDetail from "@/pages/WatchlistDetail.jsx";
 import Rooms from "@/pages/Rooms";        
 import RoomDetail from "@/pages/RoomDetail"; 
-
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap/dist/js/bootstrap.bundle.min.js";
+import "@/styles/base.css";
 export default function App() {
   return (
     <div className="d-flex flex-column min-vh-100">
