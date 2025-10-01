@@ -21,42 +21,33 @@ export default function Navbar() {
     };
   }, []);
 
-  // helper to normalize avatar to absolute URL + cache-buster
-  function normalizeProfile(p) {
-    if (!p) return p;
+  const normalizeProfile = (p) => {
+    if (!p || typeof p !== "object") return null;
     const url = p.avatar ? `${mediaUrl(p.avatar)}?v=${Date.now()}` : null;
     return { ...p, avatar: url };
-  }
+  };
 
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!authed) {
-        setMe(null);
+        if (alive) setMe(null);
         return;
       }
       try {
         const data = await getMyProfile();
-        if (alive) setMe(normalizeProfile(data));
+        if (!alive) return;
+        if (data && typeof data === "object") {
+          setMe(normalizeProfile(data));
+        } else {
+          setMe(null);
+        }
       } catch {
         if (alive) setMe(null);
       }
     })();
     return () => { alive = false; };
   }, [authed]);
-
-  useEffect(() => {
-    function onProfileUpdated(e) {
-      const data = e.detail;
-      if (data) {
-        setMe(prev => normalizeProfile({ ...(prev || {}), ...data }));
-      } else {
-        getMyProfile().then(d => setMe(normalizeProfile(d))).catch(() => {});
-      }
-    }
-    window.addEventListener("profile-updated", onProfileUpdated);
-    return () => window.removeEventListener("profile-updated", onProfileUpdated);
-  }, []);
 
   function handleLogout() {
     logout();
@@ -95,12 +86,14 @@ export default function Navbar() {
                         src={me.avatar}
                         alt={me?.username || "Profile"}
                         className="rounded-circle"
+                        style={{ width: 28, height: 28, objectFit: "cover" }}
                       />
                     ) : (
                       <div
                         className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center"
+                        style={{ width: 28, height: 28 }}
                       >
-                        {me?.username?.[0]?.toUpperCase() || "?"}
+                        {(me?.username?.[0] || "?").toUpperCase()}
                       </div>
                     )}
                     <span>{me?.username || "Profile"}</span>

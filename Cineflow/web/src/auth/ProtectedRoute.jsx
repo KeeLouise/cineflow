@@ -1,13 +1,15 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "@/context/AuthContext";
 
-//Protected route - KR 18/08/2025
+const ACCESS_KEY = "access";
+
 export default function ProtectedRoute() {
-    const { user, ready } = useAuth();
+  const { ready } = useAuth();
 
-    //Avoid flicker: wait until AuthContext finishes checking localStorage/token. KR 18/08/2025
-    if (!ready) return null; 
+  if (!ready) return null;
 
-    //If logged in, render nested route via 'Outlet'; otherwise go to 'login'. KR 18/08/2025
-    return user ? <Outlet /> : <Navigate to="/login" replace />;
+  let hasAccess = false;
+  try { hasAccess = !!localStorage.getItem(ACCESS_KEY); } catch { hasAccess = false; }
+
+  return hasAccess ? <Outlet /> : <Navigate to="/login" replace />;
 }

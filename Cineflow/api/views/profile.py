@@ -6,10 +6,16 @@ from rest_framework.response import Response
 from ..serializers import UserProfileSerializer
 from ..models import UserProfile
 
+
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def me_profile(request):
+    """
+    GET    -> return current user's profile (ensures row exists)
+    PATCH  -> update first_name/last_name (on User) and avatar (on profile)
+              send remove_avatar=true to clear image
+    """
     user = request.user
     profile, _ = UserProfile.objects.get_or_create(user=user)
 
@@ -17,7 +23,6 @@ def me_profile(request):
         data = UserProfileSerializer(profile, context={"request": request}).data
         return Response(data, status=200)
 
-    # PATCH
     data = request.data.copy()
     remove_flag = str(data.get("remove_avatar", "")).lower() in ("1", "true", "yes", "on")
 
@@ -27,7 +32,10 @@ def me_profile(request):
 
     if remove_flag:
         if instance.avatar:
-            instance.avatar.delete(save=False)
+            try:
+                instance.avatar.delete(save=False)
+            except Exception:
+                pass
         instance.avatar = None
         instance.save(update_fields=["avatar", "updated_at"])
 
