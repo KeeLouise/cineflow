@@ -1,14 +1,18 @@
-// src/pages/RoomDetail.jsx
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  fetchRoom, fetchRoomMembers, fetchRoomMovies,
-  addRoomMovie, voteRoomMovie, deleteRoomMovie,
+  fetchRoom,
+  fetchRoomMembers,
+  fetchRoomMovies,
+  addRoomMovie,
+  voteRoomMovie,
+  deleteRoomMovie,
 } from "@/api/rooms";
 import { searchMovies } from "@/api/movies";
 import { mediaUrl } from "@/utils/media";
-import { getMyProfile } from "@/api/profile"; // to know who the current user is (for host-only invite chip)
+import { getMyProfile } from "@/api/profile"; 
 import "../styles/room.css";
+import "../styles/index.css";
 
 export default function RoomDetail() {
   const { id } = useParams();
@@ -19,10 +23,9 @@ export default function RoomDetail() {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [me, setMe] = useState(null);
 
-  const [me, setMe] = useState(null); // current user (profile)
-
-  // Live search state
+  // Live search
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -30,7 +33,7 @@ export default function RoomDetail() {
   const debounceRef = useRef(null);
   const searchBoxRef = useRef(null);
 
-  // Guard invalid :id
+  // Guard invalid id
   if (!Number.isFinite(roomId)) {
     return (
       <div className="container py-4">
@@ -40,18 +43,17 @@ export default function RoomDetail() {
     );
   }
 
-  // Load room + members + movies + my profile
+  // Load room
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
-        setErr("");
         const [r, mbs, mv, meProfile] = await Promise.all([
           fetchRoom(roomId),
           fetchRoomMembers(roomId),
           fetchRoomMovies(roomId),
-          getMyProfile().catch(() => null), // not fatal if it fails
+          getMyProfile().catch(() => null),
         ]);
         if (!alive) return;
         setRoom(r);
@@ -67,7 +69,7 @@ export default function RoomDetail() {
     return () => { alive = false; };
   }, [roomId]);
 
-  // Voting
+  // Vote
   async function handleVote(mid, value) {
     try {
       await voteRoomMovie(roomId, mid, value);
@@ -78,7 +80,7 @@ export default function RoomDetail() {
     }
   }
 
-  // Remove movie
+  // Remove
   async function handleRemove(mid) {
     if (!confirm("Remove this movie from the room?")) return;
     try {
@@ -89,7 +91,7 @@ export default function RoomDetail() {
     }
   }
 
-  // Debounced live search
+  // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const query = q.trim();
@@ -112,12 +114,10 @@ export default function RoomDetail() {
         setSearching(false);
       }
     }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => clearTimeout(debounceRef.current);
   }, [q]);
 
-  // Add from search
+  // Add movie
   async function handleAddFromSearch(movie) {
     try {
       const payload = {
@@ -135,7 +135,7 @@ export default function RoomDetail() {
     }
   }
 
-  // Close dropdown on outside click
+  // Close dropdown
   useEffect(() => {
     function onDocClick(e) {
       if (!searchBoxRef.current) return;
@@ -161,19 +161,16 @@ export default function RoomDetail() {
     );
   }
 
-  // top 3 by score
   const top3 = [...movies]
     .map(m => ({ ...m, score: Number.isFinite(m.score) ? m.score : 0 }))
-    .sort((a, b) => (b.score - a.score) || (a.position - b.position) || (new Date(b.added_at) - new Date(a.added_at)))
+    .sort((a, b) => (b.score - a.score) || (a.position - b.position))
     .slice(0, 3);
 
-  // Is the current user the host in this room?
   const isCurrentUserHost = !!(me && members.some(m => m.is_host && m.username === me.username));
 
   async function copyInvite() {
     try {
       await navigator.clipboard.writeText(room.invite_code);
-      // quick, unobtrusive feedback:
       const el = document.getElementById("invite-copy-chip");
       if (el) {
         el.dataset.copied = "1";
@@ -190,135 +187,76 @@ export default function RoomDetail() {
       <div className="wl-card glass mb-3 room-header">
         <div className="room-header-row">
           <div className="room-header-left">
-            <h1 className="h4 m-0">{room.name}</h1>
+            <h1 className="h1">{room.name}</h1>
             <span className={`wl-badge ${room.is_active ? "wl-badge-success" : "wl-badge-dark"}`}>
               {room.is_active ? "Active" : "Ended"}
             </span>
 
-            {/* Host-only invite chip */}
-            {isCurrentUserHost && room.invite_code ? (
+            {/* Host invite chip */}
+            {isCurrentUserHost && room.invite_code && (
               <button
                 id="invite-copy-chip"
                 type="button"
-                className="wl-badge"
+                className="wl-badge invite-chip"
                 onClick={copyInvite}
                 title="Copy invite code"
-                style={{ cursor: "pointer" }}
               >
-                Invite: <span style={{ fontFamily: "monospace", marginLeft: 6 }}>{room.invite_code}</span>
-                <span
-                  style={{
-                    marginLeft: 8,
-                    opacity: 0.8,
-                    fontWeight: 700,
-                    letterSpacing: 0.3,
-                  }}
-                >
-                  ⧉
-                </span>
+                Invite: <span className="invite-code">{room.invite_code}</span>
+                <span className="invite-icon">⧉</span>
               </button>
-            ) : null}
+            )}
           </div>
           <Link to="/rooms" className="btn btn-outline-ghost">← Back</Link>
         </div>
-        {room.description ? <p className="mt-2 mb-0 text-muted">{room.description}</p> : null}
+        {room.description && <p className="subtitle mt-2">{room.description}</p>}
       </div>
 
-      {/* 2-column grid: Left (Members + Top 3) • Right (Queue + Search) */}
-      <div className="room-grid" style={{ gridTemplateColumns: "1fr 2fr" }}>
-        {/* LEFT: Members */}
+      <div className="room-grid two-col">
+        {/* Members + Top3 */}
         <section className="glass room-panel">
-          <div className="room-panel-head">
-            <h2 className="h6 m-0">Members</h2>
-          </div>
+          <h2 className="h2 mb-3">Members</h2>
           <div className="room-members">
             {members.map((m) => (
-              <div
-                key={m.id}
-                className="member-chip"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "6px 10px",
-                  border: "1px solid var(--room-border)",
-                  borderRadius: 999,
-                  background: "rgba(255,255,255,.04)"
-                }}
-              >
+              <div key={m.id} className="member-chip">
                 {m.avatar ? (
-                  <img
-                    className="member-avatar"
-                    src={mediaUrl(m.avatar)}
-                    alt={m.username}
-                    style={{
-                      width: 28, height: 28, borderRadius: "50%",
-                      objectFit: "cover", background: "rgba(255,255,255,.08)"
-                    }}
-                  />
+                  <img className="member-avatar" src={mediaUrl(m.avatar)} alt={m.username} />
                 ) : (
-                  <div
-                    className="member-avatar member-initial"
-                    style={{
-                      width: 28, height: 28, borderRadius: "50%",
-                      display: "grid", placeItems: "center",
-                      background: "rgba(255,255,255,.08)", fontWeight: 700
-                    }}
-                  >
+                  <div className="member-avatar member-initial">
                     {m.username?.[0]?.toUpperCase() || "?"}
                   </div>
                 )}
-                <span className="text-muted" style={{ fontSize: 13 }}>
-                  {m.username}
-                </span>
-                <span className="wl-badge" style={{ fontSize: 11 }}>
-                  {m.is_host ? "Host" : "Member"}
-                </span>
+                <span className="small">{m.username}</span>
+                <span className="wl-badge small">{m.is_host ? "Host" : "Member"}</span>
               </div>
             ))}
-            {members.length === 0 && <div className="text-muted small">No members</div>}
+            {members.length === 0 && <div className="small">No members</div>}
           </div>
 
-          {/* TOP 3 */}
-          <div className="glass top3-card mb-2" style={{ marginTop: 16 }}>
+          <div className="glass top3-card mt-3">
             <div className="d-flex align-items-center justify-content-between mb-2">
               <span className="fw-semibold">Top 3</span>
-              <span className="text-muted small">by votes</span>
+              <span className="small">by votes</span>
             </div>
             <ul className="top3-list">
-              {top3.map((m, i) => (
+              {top3.length > 0 ? top3.map((m, i) => (
                 <li key={m.id} className="top3-item">
                   <div className="top3-rank">{i + 1}</div>
                   {m.poster_path ? (
-                    <img
-                      className="top3-thumb"
-                      src={`https://image.tmdb.org/t/p/w92${m.poster_path}`}
-                      alt={m.title || `#${m.tmdb_id}`}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="top3-thumb placeholder">—</div>
-                  )}
+                    <img className="top3-thumb" src={`https://image.tmdb.org/t/p/w92${m.poster_path}`} alt={m.title} />
+                  ) : <div className="top3-thumb placeholder">—</div>}
                   <div className="top3-meta">
-                    <div className="top3-title">{m.title || `#${m.tmdb_id}`}</div>
+                    <div className="top3-title">{m.title}</div>
                     <div className="top3-sub">Score: {m.score ?? 0}</div>
                   </div>
                 </li>
-              ))}
-              {top3.length === 0 && (
-                <li className="text-muted small">No votes yet.</li>
-              )}
+              )) : <li className="small">No votes yet.</li>}
             </ul>
           </div>
         </section>
 
-        {/* RIGHT: Queue + Search in the same card */}
+        {/* Queue + Search */}
         <section className="glass room-panel">
-          <div className="room-panel-head">
-            <h2 className="h6 m-0">Queue</h2>
-          </div>
-
-          {/* Search box lives at the top of the Queue card */}
+          <h2 className="h2 mb-3">Queue</h2>
           <div className="room-search mb-3" ref={searchBoxRef}>
             <input
               className="form-control wl-input room-search-input"
@@ -326,14 +264,13 @@ export default function RoomDetail() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onFocus={() => { if (results.length) setShowResults(true); }}
-              aria-label="Search movies to add to this room"
             />
             {showResults && (
               <div className="room-results">
                 {searching ? (
-                  <div className="room-results-item text-muted">Searching…</div>
+                  <div className="room-results-item small">Searching…</div>
                 ) : results.length === 0 ? (
-                  <div className="room-results-item text-muted">No results</div>
+                  <div className="room-results-item small">No results</div>
                 ) : (
                   results.map((mv) => (
                     <button
@@ -343,20 +280,11 @@ export default function RoomDetail() {
                       onClick={() => handleAddFromSearch(mv)}
                     >
                       {mv.poster_path ? (
-                        <img
-                          className="room-results-thumb"
-                          src={`https://image.tmdb.org/t/p/w92${mv.poster_path}`}
-                          alt={mv.title || mv.name || ""}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="room-results-thumb placeholder">—</div>
-                      )}
+                        <img className="room-results-thumb" src={`https://image.tmdb.org/t/p/w92${mv.poster_path}`} alt={mv.title} />
+                      ) : <div className="room-results-thumb placeholder">—</div>}
                       <div className="room-results-meta">
-                        <div className="room-results-title">{mv.title || mv.name || ""}</div>
-                        <div className="room-results-sub">
-                          {mv.release_date ? mv.release_date.slice(0, 4) : "—"}
-                        </div>
+                        <div className="room-results-title">{mv.title}</div>
+                        <div className="room-results-sub">{mv.release_date?.slice(0, 4) || "—"}</div>
                       </div>
                       <span className="room-results-add">Add</span>
                     </button>
@@ -366,54 +294,24 @@ export default function RoomDetail() {
             )}
           </div>
 
-          {/* Movies list */}
           <div className="room-list">
             {movies.map((m) => (
               <div key={m.id} className="room-item glass">
                 {m.poster_path ? (
-                  <img
-                    src={`https://image.tmdb.org/t/p/w92${m.poster_path}`}
-                    alt={m.title || m.tmdb_id}
-                    className="room-poster"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="room-poster-placeholder">—</div>
-                )}
-
+                  <img src={`https://image.tmdb.org/t/p/w92${m.poster_path}`} alt={m.title} className="room-poster" />
+                ) : <div className="room-poster-placeholder">—</div>}
                 <div className="room-item-main">
-                  <div className="room-item-title">{m.title || `#${m.tmdb_id}`}</div>
+                  <div className="room-item-title">{m.title}</div>
                   <div className="room-item-sub">Score: {m.score ?? 0}</div>
                 </div>
-
                 <div className="room-item-actions">
-                  <button
-                    className="btn btn-ghost btn-compact"
-                    title="Upvote"
-                    onClick={() => handleVote(m.id, 1)}
-                  >
-                    ▲
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-compact"
-                    title="Downvote"
-                    onClick={() => handleVote(m.id, -1)}
-                  >
-                    ▼
-                  </button>
-                  <button
-                    className="btn btn-outline-ghost btn-compact link-danger"
-                    title="Remove"
-                    onClick={() => handleRemove(m.id)}
-                  >
-                    Remove
-                  </button>
+                  <button className="btn btn-ghost btn-compact" onClick={() => handleVote(m.id, 1)}>▲</button>
+                  <button className="btn btn-ghost btn-compact" onClick={() => handleVote(m.id, -1)}>▼</button>
+                  <button className="btn btn-outline-ghost btn-compact link-danger" onClick={() => handleRemove(m.id)}>Remove</button>
                 </div>
               </div>
             ))}
-            {movies.length === 0 && (
-              <div className="text-muted p-3">No movies yet. Use the search box above to add one.</div>
-            )}
+            {movies.length === 0 && <div className="small p-3">No movies yet. Use search to add one.</div>}
           </div>
         </section>
       </div>
