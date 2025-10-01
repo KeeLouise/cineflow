@@ -155,52 +155,69 @@ from .models import UserProfile
 User = get_user_model()
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    
+    username = serializers.CharField(source="user.username", required=False)
+    email = serializers.EmailField(source="user.email", required=False)
+    first_name = serializers.CharField(source="user.first_name", required=False, allow_blank=True)
+    last_name  = serializers.CharField(source="user.last_name",  required=False, allow_blank=True)
+
     full_name = serializers.SerializerMethodField(read_only=True)
-    avatar = serializers.ImageField(required=False, allow_null=True)
+    avatar    = serializers.ImageField(required=False, allow_null=True)
+    avatar_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
-        model = User
-        fields = ["username", "email", "first_name", "last_name", "full_name", "avatar"]
-        read_only_fields = ["full_name"]
+        model = UserProfile
+        fields = [
+            "username", "email", "first_name", "last_name", "full_name",
+            "avatar", "avatar_url",
+            "two_factor_enabled", "email_verified",
+            "updated_at",
+        ]
+        read_only_fields = ["full_name", "avatar_url", "updated_at", "email_verified"]
 
-    def get_full_name(self, obj):
-        fn = (obj.first_name or "").strip()
-        ln = (obj.last_name or "").strip()
+    def get_full_name(self, obj: UserProfile):
+        fn = (obj.user.first_name or "").strip()
+        ln = (obj.user.last_name or "").strip()
         full = f"{fn} {ln}".strip()
-        return full or obj.username
+        return full or obj.user.username
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        url = None
-        prof = getattr(instance, "profile", None)
-        if prof and getattr(prof, "avatar", None):
-            try:
-                if hasattr(prof.avatar, "url"):
-                    url = prof.avatar.url
-                else:
-                    url = str(prof.avatar)
-            except Exception:
-                url = None
-        data["avatar"] = url
-        return data
+    def get_avatar_url(self, obj: UserProfile):
+        try:
+            if obj.avatar:
+                return obj.avatar.url
+        except Exception:
+            pass
+        return None
 
-    def update(self, instance, validated_data):
+    def update(self, instance: UserProfile, validated_data):
+        # split nested user fields
+        user_data = validated_data.pop("user", {})
         avatar_file = validated_data.pop("avatar", serializers.empty)
-        username = validated_data.pop("username", None)
-        if username is not None and username != instance.username:
-            instance.username = username
-        instance = super().update(instance, validated_data)
 
-        prof, _ = UserProfile.objects.get_or_create(user=instance)
+        # update user core fields
+        updated_user = False
+        for field in ("username", "email", "first_name", "last_name"):
+            if field in user_data:
+                setattr(instance.user, field, user_data[field])
+                updated_user = True
+        if updated_user:
+            instance.user.save(update_fields=[f for f in ("username","email","first_name","last_name") if f in user_data])
+
+        # avatar handling
         if avatar_file is not serializers.empty:
             if avatar_file is None:
-                try:
-                    if prof.avatar:
-                        prof.avatar.delete(save=False)
-                except Exception:
-                    pass
-                prof.avatar = None
+                if instance.avatar:
+                    try:
+                        instance.avatar.delete(save=False)
+                    except Exception:
+                        pass
+                instance.avatar = None
             else:
-                prof.avatar = avatar_file
-            prof.save(update_fields=["avatar", "updated_at"])
+                instance.avatar = avatar_file
+
+        # update any remaining profile fields (rare)
+        for k, v in validated_data.items():
+            setattr(instance, k, v)
+
+        instance.save()
         return instance
