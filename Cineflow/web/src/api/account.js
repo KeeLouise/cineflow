@@ -2,8 +2,9 @@ import api from "@/api/client";
 
 // Email verification (account activation)
 export async function resendVerificationEmail() {
-  const { data } = await api.post("/auth/email/resend/");
-  return data; // { sent: true }
+  const res = await authFetch("/api/auth/email/resend/", { method: "POST" });
+  if (!res.ok) throw new Error("Failed to resend verification email");
+  return res.json();
 }
 
 // Email-based 2FA

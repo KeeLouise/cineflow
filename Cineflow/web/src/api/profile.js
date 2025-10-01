@@ -10,18 +10,30 @@ export async function updateMyProfile(patch) {
     patch &&
     (patch.avatar instanceof File || (typeof Blob !== "undefined" && patch.avatar instanceof Blob));
 
-  if (hasFile) {
+  if (hasFile || patch.remove_avatar) {
     const fd = new FormData();
+
     if (patch.username != null)    fd.append("username", patch.username);
     if (patch.email != null)       fd.append("email", patch.email);
     if (patch.first_name != null)  fd.append("first_name", patch.first_name);
     if (patch.last_name != null)   fd.append("last_name", patch.last_name);
-    fd.append("avatar", patch.avatar);
 
-    const { data } = await api.patch("/me/profile/", fd);
+    if (hasFile) {
+      fd.append("avatar", patch.avatar);
+    }
+    if (patch.remove_avatar) {
+      fd.append("remove_avatar", "true");
+    }
+
+    const { data } = await api.patch("/me/profile/", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return data;
   }
 
-  const { data } = await api.patch("/me/profile/", patch);
+  // fallback: normal JSON PATCH
+  const { data } = await api.patch("/me/profile/", patch, {
+    headers: { "Content-Type": "application/json" },
+  });
   return data;
 }
