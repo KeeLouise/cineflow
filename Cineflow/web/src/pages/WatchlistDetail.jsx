@@ -1,14 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";                                 // react hooks
-import { useParams, Link } from "react-router-dom";                                          // read :id from the URL and link back
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, Link } from "react-router-dom";
 import {
-  fetchWatchlist,                                                                           
-  updateWatchlistItem,                                                                      
-  removeMovieFromWatchlist,                                                                  
-  updateWatchlist,                                                                           
+  fetchWatchlist,
+  updateWatchlistItem,
+  removeMovieFromWatchlist,
+  updateWatchlist,
 } from "@/api/watchlists";
-import "@/styles/watchlists.css";                                                            
+import "@/styles/watchlists.css";
 
-const TMDB_IMG = "https://image.tmdb.org/t/p/w154";                                         
+const TMDB_IMG = "https://image.tmdb.org/t/p/w154";
 
 const STATUS = {
   PLANNED: "planned",
@@ -24,13 +24,13 @@ const STATUS_LABEL = {
   dropped: "Dropped",
 };
 
-// Lightweight auth header builder for local POST from this page (avoids importing another module) - KR 28/09/2025
+// Build auth header for local fetches on this page
 function authHeaders() {
   const token = localStorage.getItem("access");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// Persist a new item order to the backend if the endpoint exists (best-effort) - KR 27/09/2025
+// Persist a new item order
 async function persistOrder(listId, orderedIds) {
   try {
     const res = await fetch(`/api/watchlists/${listId}/reorder/`, {
@@ -38,26 +38,21 @@ async function persistOrder(listId, orderedIds) {
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ order: orderedIds }),
     });
-    // We still attempt to parse JSON if OK to refresh local data.
     if (res.ok) {
       const data = await res.json().catch(() => null);
       return data || null;
     }
-  } catch {
-  }
+  } catch {}
   return null;
 }
 
-// Build a safe TMDB poster URL even if the path is already absolute or missing a leading slash - KR 27/09/2025
 function posterUrl(path) {
   if (!path) return "";
-  if (/^https?:\/\//i.test(path)) return path; // already absolute
-  // ensure leading slash once
+  if (/^https?:\/\//i.test(path)) return path;
   const clean = path.startsWith("/") ? path : `/${path}`;
   return `${TMDB_IMG}${clean}`;
 }
 
-// Format a date string consistently - KR 27/09/2025
 function formatDate(iso) {
   try {
     return new Intl.DateTimeFormat(undefined, {
@@ -71,22 +66,23 @@ function formatDate(iso) {
 }
 
 export default function WatchlistDetail() {
-  const { id } = useParams();                                                                // read watchlist id from /watchlists/:id - KR 25/09/2025
-  const [wl, setWl] = useState(null);                                                        // current watchlist data - KR 25/09/2025
-  const [loading, setLoading] = useState(true);                                              // spinner while loading - KR 25/09/2025
-  const [error, setError] = useState("");                                                    // error banner - KR 25/09/2025
-  const [filter, setFilter] = useState("all");                                               // UI filter (all/planned/watched/dropped) - KR 25/09/2025
-  const [renaming, setRenaming] = useState(false);                                           // inline rename bar - KR 25/09/2025
-  const [newName, setNewName] = useState("");                                                
-  
-  // Drag state for manual ordering (enabled on "All" view). Non-breaking: persists only if backend endpoint exists. - KR 28/09/2025
-  const [draggingId, setDraggingId] = useState(null);
+  const { id } = useParams();
+  const listId = Number(id);
+  const [wl, setWl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState("");
 
-  // Reorder items locally by moving srcId before targetId - KR 28/09/2025
+  // drag handling
+  const [draggingId, setDraggingId] = useState(null);
+  const lastOverRef = useRef(null);
+
   function reorderLocal(srcId, targetId) {
     setWl((prev) => {
       if (!prev) return prev;
-      const items = [...(prev.items || [])];
+      const items = Array.isArray(prev.items) ? [...prev.items] : [];
       const fromIdx = items.findIndex((i) => i.id === srcId);
       const toIdx = items.findIndex((i) => i.id === targetId);
       if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
@@ -96,112 +92,124 @@ export default function WatchlistDetail() {
     });
   }
 
-  // Commit current order to backend (best-effort) - KR 28/09/2025
   async function commitOrder() {
     if (!wl) return;
-    const ids = (wl.items || []).map((i) => i.id);
+    const ids = (Array.isArray(wl.items) ? wl.items : []).map((i) => i.id);
+    if (!ids.length) return;
     const data = await persistOrder(wl.id, ids);
-    if (data && data.items) {
-      setWl(data);
-    }
+    if (data && data.items) setWl(data);
   }
 
-  // HTML drag handlers - KR 28/09/2025
   function onDragStart(itemId) {
     setDraggingId(itemId);
+    lastOverRef.current = null;
   }
   function onDragOver(e, overId) {
-    // allow drop
     e.preventDefault();
-    // only reorder when hovering a different item
-    if (draggingId && draggingId !== overId) {
-      reorderLocal(draggingId, overId);
-    }
+    if (!draggingId || draggingId === overId) return;
+    if (lastOverRef.current === overId) return;
+    lastOverRef.current = overId;
+    reorderLocal(draggingId, overId);
   }
   async function onDrop() {
     setDraggingId(null);
+    lastOverRef.current = null;
     await commitOrder();
   }
 
-  // Load the watchlist
   useEffect(() => {
+    let alive = true;
+
+    if (!Number.isFinite(listId)) {
+      setLoading(false);
+      setError("Invalid watchlist id.");
+      setWl(null);
+      return () => {};
+    }
+
     (async () => {
       setLoading(true);
       setError("");
       try {
-        const data = await fetchWatchlist(id);                                               
-        setWl(data);
+        const data = await fetchWatchlist(listId);
+        if (!alive) return;
+        setWl(data || null);
         setNewName(data?.name || "");
       } catch (err) {
-        setError(err.message || "Failed to load watchlist.");
+        if (!alive) return;
+        setError(err?.message || "Failed to load watchlist.");
+        setWl(null);
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
-  }, [id]);
 
-  // Quick counters for header chips
+    return () => {
+      alive = false;
+    };
+  }, [listId]);
+
   const counts = useMemo(() => {
-    const items = wl?.items || [];
+    const items = Array.isArray(wl?.items) ? wl.items : [];
     const by = { all: items.length, planned: 0, watching: 0, watched: 0, dropped: 0 };
     for (const it of items) {
-      const s = it.status || STATUS.PLANNED;
+      const s = it?.status || STATUS.PLANNED;
       if (by[s] !== undefined) by[s] += 1;
     }
     return by;
   }, [wl]);
 
-  // Optimistic status change per item
   async function changeStatus(item, next) {
     if (!wl) return;
-    const current = item.status || STATUS.PLANNED;
-    if (current === next) return; // no-op if unchanged
+    const current = item?.status || STATUS.PLANNED;
+    if (current === next) return;
     const prev = wl;
     setWl((p) => ({
       ...p,
-      items: p.items.map((it) => (it.id === item.id ? { ...it, status: next } : it)),
+      items: (Array.isArray(p.items) ? p.items : []).map((it) =>
+        it.id === item.id ? { ...it, status: next } : it
+      ),
     }));
     try {
-      await updateWatchlistItem(wl.id, item.id, { status: next });                           
+      await updateWatchlistItem(wl.id, item.id, { status: next });
     } catch (err) {
-      // rollback
-      setWl(prev);
-      setError(err.message || "Failed to update movie status.");
+      setWl(prev); // rollback
+      setError(err?.message || "Failed to update movie status.");
     }
   }
 
-  // Remove an item
   async function removeItem(itemId) {
     if (!wl) return;
     if (!confirm("Remove this movie from the list?")) return;
     const prev = wl;
-    setWl((p) => ({ ...p, items: p.items.filter((it) => it.id !== itemId) }));
+    setWl((p) => ({
+      ...p,
+      items: (Array.isArray(p.items) ? p.items : []).filter((it) => it.id !== itemId),
+    }));
     try {
       await removeMovieFromWatchlist(wl.id, itemId);
     } catch (err) {
-      setWl(prev); // rollback
-      setError(err.message || "Failed to remove movie.");
+      setWl(prev);
+      setError(err?.message || "Failed to remove movie.");
     }
   }
 
-  // Rename the list
   async function saveRename() {
     const name = newName.trim();
     if (!name || !wl) return;
     try {
       const updated = await updateWatchlist(wl.id, { name });
-      setWl(updated);
+      setWl(updated || wl);
       setRenaming(false);
     } catch (err) {
-      setError(err.message || "Rename failed.");
+      setError(err?.message || "Rename failed.");
     }
   }
 
-  // Filtering logic
   const visibleItems = useMemo(() => {
-    const items = wl?.items || [];
+    const items = Array.isArray(wl?.items) ? wl.items : [];
     if (filter === "all") return items;
-    return items.filter((it) => (it.status || STATUS.PLANNED) === filter);
+    return items.filter((it) => (it?.status || STATUS.PLANNED) === filter);
   }, [wl, filter]);
 
   if (loading) {
@@ -281,7 +289,7 @@ export default function WatchlistDetail() {
         <div className="glass p-2 d-flex align-items-center gap-2 flex-wrap">
           <FilterPill label={`All (${counts.all})`} active={filter === "all"} onClick={() => setFilter("all")} />
           <FilterPill label={`Will Watch (${counts.planned})`} active={filter === STATUS.PLANNED} onClick={() => setFilter(STATUS.PLANNED)} />
-          <FilterPill label={`Watching (${counts.watching})`} active={filter === STATUS.WATCHING} onClick={() => setFilter(STATUS.WATCHING)} /> 
+          <FilterPill label={`Watching (${counts.watching})`} active={filter === STATUS.WATCHING} onClick={() => setFilter(STATUS.WATCHING)} />
           <FilterPill label={`Watched (${counts.watched})`} active={filter === STATUS.WATCHED} onClick={() => setFilter(STATUS.WATCHED)} />
           <FilterPill label={`Dropped (${counts.dropped})`} active={filter === STATUS.DROPPED} onClick={() => setFilter(STATUS.DROPPED)} />
         </div>
@@ -302,18 +310,14 @@ export default function WatchlistDetail() {
                   className="wl-item glass"
                   draggable={filter === "all"}
                   onDragStart={() => onDragStart(it.id)}
-                  onDragOver={(e) => filter === "all" ? onDragOver(e, it.id) : null}
-                  onDrop={() => filter === "all" ? onDrop() : null}
-                  onDragEnd={() => filter === "all" ? onDrop() : null}
+                  onDragOver={(e) => (filter === "all" ? onDragOver(e, it.id) : null)}
+                  onDrop={() => (filter === "all" ? onDrop() : null)}
+                  onDragEnd={() => (filter === "all" ? onDrop() : null)}
                 >
                   {/* poster */}
                   <div className="wl-item-poster">
                     {it.poster_path ? (
-                      <img
-                        src={posterUrl(it.poster_path)}
-                        alt={it.title || "Poster"}
-                        loading="lazy"
-                      />
+                      <img src={posterUrl(it.poster_path)} alt={it.title || "Poster"} loading="lazy" />
                     ) : (
                       <div className="wl-item-noimg">No Image</div>
                     )}
@@ -321,9 +325,10 @@ export default function WatchlistDetail() {
 
                   {/* middle: title + meta */}
                   <div className="wl-item-main">
-                    {/* drag handle appears only in "All" filter to avoid confusing cross-segment moves - KR 28/09/2025 */}
                     {filter === "all" && (
-                      <div className="wl-item-handle text-muted small mb-1" title="Drag to reorder" aria-hidden="true">⋮⋮</div>
+                      <div className="wl-item-handle text-muted small mb-1" title="Drag to reorder" aria-hidden="true">
+                        ⋮⋮
+                      </div>
                     )}
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                       <h3 className="wl-item-title mb-0">{it.title}</h3>
@@ -331,9 +336,7 @@ export default function WatchlistDetail() {
                         {STATUS_LABEL[it.status || STATUS.PLANNED]}
                       </span>
                     </div>
-                    <div className="text-muted small mt-1">
-                      Added {formatDate(it.added_at)}
-                    </div>
+                    <div className="text-muted small mt-1">Added {formatDate(it.added_at)}</div>
                   </div>
 
                   {/* right: status control + remove */}
@@ -373,9 +376,6 @@ export default function WatchlistDetail() {
   );
 }
 
-/* helper components & utils - KR 25/09/2025 */
-
-// Filter pill button
 function FilterPill({ label, active, onClick }) {
   return (
     <button
@@ -388,10 +388,9 @@ function FilterPill({ label, active, onClick }) {
   );
 }
 
-// Badge color helper
 function badgeClass(status) {
-  if (status === "watched") return "wl-badge-success";
-  if (status === "watching") return "wl-badge-success";
-  if (status === "dropped") return "wl-badge-dark"; 
-  return "";                                        
+  if (status === STATUS.WATCHED) return "wl-badge-success";
+  if (status === STATUS.WATCHING) return "wl-badge-info";
+  if (status === STATUS.DROPPED) return "wl-badge-dark";
+  return "";
 }

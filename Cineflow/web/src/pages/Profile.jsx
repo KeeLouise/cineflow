@@ -14,11 +14,12 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // 2FA enabling flow (setup)
+  // 2FA enabling (setup)
   const [enabling, setEnabling] = useState(false);
   const [setupToken, setSetupToken] = useState("");
   const [setupCode, setSetupCode] = useState("");
   const [actionMsg, setActionMsg] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -30,60 +31,76 @@ export default function Profile() {
         if (alive) setMe(data || null);
       } catch (e) {
         if (alive) {
-          setErr(e?.message || "Failed to load profile.");
+          setErr(e?.response?.data?.detail || e?.message || "Failed to load profile.");
           setMe(null);
         }
       } finally {
         if (alive) setLoading(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function onResendVerify() {
     try {
+      setBusy(true);
       setActionMsg("");
       await resendVerificationEmail();
       setActionMsg("Verification email sent.");
     } catch (e) {
       setActionMsg(e?.response?.data?.detail || "Could not send verification email.");
+    } finally {
+      setBusy(false);
     }
   }
 
   async function enable2FAStart() {
     try {
       setActionMsg("");
-      setEnabling(true);
+      setBusy(true);
       const data = await start2FAEmailSetup();
       setSetupToken(data?.setup_token || "");
+      setEnabling(true);
     } catch (e) {
       setEnabling(false);
       setActionMsg(e?.response?.data?.detail || "Could not start 2FA setup.");
+    } finally {
+      setBusy(false);
     }
   }
 
   async function enable2FAConfirm(e) {
     e.preventDefault();
+    if (!setupToken) {
+      setActionMsg("Setup token missing. Start setup again.");
+      return;
+    }
     try {
-      const out = await confirm2FAEmailSetup({ code: setupCode, setupToken });
+      setBusy(true);
+      const out = await confirm2FAEmailSetup({ code: setupCode, setup_token: setupToken });
       if (out?.enabled) {
         setActionMsg("Two-factor authentication enabled.");
         const fresh = await getMyProfile().catch(() => null);
         if (fresh) setMe(fresh);
       } else {
-        setActionMsg("Incorrect code. Try again.");
+        setActionMsg(out?.detail || "Incorrect code. Try again.");
       }
       setEnabling(false);
       setSetupCode("");
       setSetupToken("");
     } catch (e2) {
       setActionMsg(e2?.response?.data?.detail || "Could not confirm 2FA setup.");
+    } finally {
+      setBusy(false);
     }
   }
 
   async function disable2FA() {
     if (!confirm("Disable two-factor authentication?")) return;
     try {
+      setBusy(true);
       setActionMsg("");
       const out = await disable2FAEmail();
       if (out?.disabled) {
@@ -91,10 +108,12 @@ export default function Profile() {
         const fresh = await getMyProfile().catch(() => null);
         if (fresh) setMe(fresh);
       } else {
-        setActionMsg("Could not disable 2FA.");
+        setActionMsg(out?.detail || "Could not disable 2FA.");
       }
     } catch (e) {
       setActionMsg(e?.response?.data?.detail || "Could not disable 2FA.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -105,6 +124,7 @@ export default function Profile() {
       </div>
     );
   }
+
   if (err || !me) {
     return (
       <div className="container py-4">
@@ -116,15 +136,18 @@ export default function Profile() {
   const emailVerified = !!me.email_verified;
   const twoFAEnabled = !!me.two_factor_enabled;
 
+  // make avatar absolute + cache-bust
+  const avatarSrc = me.avatar ? `${mediaUrl(me.avatar)}?v=${me.updated_at || Date.now()}` : null;
+
   return (
     <div className="container py-4">
       <div className="glass p-4">
         <h1 className="h4 mb-3">Profile</h1>
 
         <div className="d-flex align-items-center gap-3 mb-3">
-          {me.avatar ? (
+          {avatarSrc ? (
             <img
-              src={mediaUrl(me.avatar)}
+              src={avatarSrc}
               alt={me.username || "Avatar"}
               className="rounded-circle profile-avatar"
             />
@@ -150,7 +173,7 @@ export default function Profile() {
               <span className="badge bg-warning-subtle text-warning fw-semibold">Unverified</span>
             )}
             {!emailVerified && (
-              <button className="btn btn-sm btn-outline-ghost" onClick={onResendVerify}>
+              <button className="btn btn-sm btn-outline-ghost" onClick={onResendVerify} disabled={busy}>
                 Resend verification
               </button>
             )}
@@ -162,7 +185,7 @@ export default function Profile() {
           <h2 className="h6 mb-2">Two-Factor Authentication</h2>
 
           {!emailVerified && (
-            <div className="alert alert-warning">
+            <div className="alert alert-warning mb-2">
               Verify your email first to enable 2FA.
             </div>
           )}
@@ -173,7 +196,7 @@ export default function Profile() {
               <button
                 className="btn btn-sm btn-outline-danger"
                 onClick={disable2FA}
-                disabled={!emailVerified}
+                disabled={!emailVerified || busy}
               >
                 Disable 2FA
               </button>
@@ -184,7 +207,7 @@ export default function Profile() {
                 <button
                   className="btn btn-sm btn-gradient"
                   onClick={enable2FAStart}
-                  disabled={!emailVerified}
+                  disabled={!emailVerified || busy}
                 >
                   Enable 2FA via email
                 </button>
@@ -203,16 +226,20 @@ export default function Profile() {
                     placeholder="123456"
                     required
                   />
-                  <div className="mt-2">
-                    <button type="submit" className="btn btn-sm btn-gradient">Confirm</button>
+                  <div className="mt-2 d-flex gap-2">
+                    <button type="submit" className="btn btn-sm btn-gradient" disabled={busy}>
+                      Confirm
+                    </button>
                     <button
                       type="button"
-                      className="btn btn-sm btn-outline-ghost ms-2"
+                      className="btn btn-sm btn-outline-ghost"
                       onClick={() => {
                         setEnabling(false);
                         setSetupToken("");
                         setSetupCode("");
+                        setActionMsg("");
                       }}
+                      disabled={busy}
                     >
                       Cancel
                     </button>

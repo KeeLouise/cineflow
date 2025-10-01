@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchMoodDiscover } from "@/api/movies";
@@ -31,9 +30,11 @@ function PosterCard({ m }) {
           <div className="poster-overlay" />
         </div>
         <div className="poster-meta">
-          <div className="title" title={m.title}>{m.title}</div>
+          <div className="title" title={m.title}>
+            {m.title}
+          </div>
           <div className="sub text-muted">
-            <span className="chip-year">{(m.release_date || "").slice(0,4) || "—"}</span>
+            <span className="chip-year">{(m.release_date || "").slice(0, 4) || "—"}</span>
           </div>
         </div>
       </Link>
@@ -41,21 +42,19 @@ function PosterCard({ m }) {
   );
 }
 
-// Mood chips
 const MOODS = [
-  { key: "feelgood",     label: "Feel-Good" },
+  { key: "feelgood", label: "Feel-Good" },
   { key: "heartwarming", label: "Heartwarming" },
-  { key: "high_energy",  label: "High Energy" },
-  { key: "chill",        label: "Chill" },
+  { key: "high_energy", label: "High Energy" },
+  { key: "chill", label: "Chill" },
   { key: "mind_bending", label: "Mind-Bending" },
-  { key: "romantic",     label: "Romantic" },
-  { key: "family",       label: "Family" },
-  { key: "scary",        label: "Scary" },
-  { key: "tearjerker",   label: "Tearjerker" },
-  { key: "dark_gritty",  label: "Dark & Gritty" },
+  { key: "romantic", label: "Romantic" },
+  { key: "family", label: "Family" },
+  { key: "scary", label: "Scary" },
+  { key: "tearjerker", label: "Tearjerker" },
+  { key: "dark_gritty", label: "Dark & Gritty" },
 ];
 
-// Decades
 const DECADES = [
   { value: "", label: "Any decade" },
   { value: "2020s", label: "2020s" },
@@ -67,9 +66,8 @@ const DECADES = [
   { value: "1960s", label: "1960s" },
 ];
 
-// TMDB thresholds
 const TMDB_MIN_OPTIONS = [
-  { value: 0,   label: "Any rating" },
+  { value: 0, label: "Any rating" },
   { value: 5.0, label: "≥ 5.0" },
   { value: 6.0, label: "≥ 6.0" },
   { value: 6.5, label: "≥ 6.5" },
@@ -78,11 +76,10 @@ const TMDB_MIN_OPTIONS = [
   { value: 8.0, label: "≥ 8.0" },
 ];
 
-// See-All style provider options (mapped by provider_name -> provider_id)
 const ALLOWED_PROVIDERS = [
-  { key: "netflix",        labels: ["Netflix"] },
-  { key: "disney_plus",    labels: ["Disney+", "Disney Plus", "Disney Plus UK", "Star on Disney+"] },
-  { key: "prime_video",    labels: ["Amazon Prime Video", "Prime Video"] },
+  { key: "netflix", labels: ["Netflix"] },
+  { key: "disney_plus", labels: ["Disney+", "Disney Plus", "Disney Plus UK", "Star on Disney+"] },
+  { key: "prime_video", labels: ["Amazon Prime Video", "Prime Video"] },
   { key: "paramount_plus", labels: ["Paramount+", "Paramount Plus"] },
 ];
 
@@ -90,7 +87,7 @@ const API_BASE = "/api";
 const REGION = "GB";
 
 export default function Dashboard() {
-  // Signed-in user (for email verification banner)
+  // Signed-in user (for email verification banner); null means unknown or unauth
   const [me, setMe] = useState(null);
 
   // Mood/list
@@ -101,21 +98,21 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // Providers catalog (name→id map like See-All)
+  // Providers map
   const [providersMap, setProvidersMap] = useState({});
   const [provLoading, setProvLoading] = useState(true);
 
-  // APPLIED filters (used in requests)
+  // Applied filters
   const [appliedDecade, setAppliedDecade] = useState("");
   const [appliedTmdbMin, setAppliedTmdbMin] = useState(0);
-  const [appliedPickedProviders, setAppliedPickedProviders] = useState([]); // keys from ALLOWED_PROVIDERS
+  const [appliedPickedProviders, setAppliedPickedProviders] = useState([]);
   const [appliedIncludeRentBuy, setAppliedIncludeRentBuy] = useState(false);
 
-  // STAGED UI (edit here, apply to above on Apply)
+  // Staged filters (UI)
   const [stagedMood, setStagedMood] = useState("feelgood");
   const [stagedDecade, setStagedDecade] = useState("");
   const [stagedTmdbMin, setStagedTmdbMin] = useState(0);
-  const [stagedPickedProviders, setStagedPickedProviders] = useState([]); // keys
+  const [stagedPickedProviders, setStagedPickedProviders] = useState([]);
   const [stagedIncludeRentBuy, setStagedIncludeRentBuy] = useState(false);
 
   // Apply/Reset
@@ -147,21 +144,23 @@ export default function Dashboard() {
   const sentinelRef = useRef(null);
   const inFlightRef = useRef(null);
 
-  // Load profile for banner
+  // Load profile for banner (ignore errors; never render Login here)
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const p = await getMyProfile();
-        if (alive) setMe(p);
+        if (alive) setMe(p || null);
       } catch {
         if (alive) setMe(null);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  // Providers (fetch once; map names to ids like See-All)
+  // Providers (fetch once; map names to ids)
   const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").replace(/[’'"]/g, "").trim();
   useEffect(() => {
     let mounted = true;
@@ -180,8 +179,7 @@ export default function Dashboard() {
         });
 
         if (mounted) setProvidersMap(map);
-      } catch (e) {
-        console.warn("Providers load failed", e);
+      } catch {
         if (mounted) setProvidersMap({});
       } finally {
         if (mounted) setProvLoading(false);
@@ -192,14 +190,14 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Build providers param from applied keys -> TMDB ids
+  // Build providers param
   const providersParam = useMemo(() => {
     const ids = (appliedPickedProviders || []).map((k) => providersMap[k]).filter(Boolean);
     if (!ids.length) return "";
     return Array.from(new Set(ids)).join("|");
   }, [appliedPickedProviders, providersMap]);
 
-  // Request params (ALWAYS commas for monetization types)
+  // Request params
   const commonParams = useMemo(() => {
     const base = {
       region: REGION,
@@ -219,7 +217,7 @@ export default function Dashboard() {
     appliedPickedProviders.length,
   ]);
 
-  // Fetch (first load + on apply)
+  // Fetch initial + on apply
   useEffect(() => {
     if (inFlightRef.current) inFlightRef.current.abort();
     const controller = new AbortController();
@@ -243,7 +241,6 @@ export default function Dashboard() {
       } catch (e) {
         if (!active) return;
         if (e?.name !== "CanceledError" && e?.name !== "AbortError") {
-          console.error("Mood fetch failed:", e);
           setErr("Could not load mood picks.");
           setItems([]);
           setHasMore(false);
@@ -287,7 +284,6 @@ export default function Dashboard() {
               setHasMore((res.page || next) < (res.total_pages || next));
             } catch (e) {
               if (e?.name !== "CanceledError" && e?.name !== "AbortError") {
-                console.error("Mood load more failed:", e);
                 setHasMore(false);
               }
             } finally {
@@ -304,7 +300,7 @@ export default function Dashboard() {
     return () => io.disconnect();
   }, [hasMore, page, loading, mood, items, commonParams]);
 
-  // Toggle staged provider (name-keyed, like See-All)
+  // Toggle staged provider
   const toggleProviderStaged = (key) => {
     setStagedPickedProviders((prev) => {
       const s = new Set(prev);
@@ -313,7 +309,6 @@ export default function Dashboard() {
     });
   };
 
-  // Filters label
   const selectedCount =
     (stagedPickedProviders.length ? 1 : 0) +
     (stagedDecade ? 1 : 0) +
@@ -322,7 +317,6 @@ export default function Dashboard() {
     (stagedMood !== mood ? 1 : 0);
   const filtersLabel = selectedCount ? `Filters • ${selectedCount}` : "Filters";
 
-  // See-All link
   const providersParamForSeeAll = useMemo(() => {
     const ids = (appliedPickedProviders || []).map((k) => providersMap[k]).filter(Boolean);
     return ids.length ? Array.from(new Set(ids)).join("|") : "";
@@ -346,14 +340,11 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* Fixed background that the glass layer will blur */}
       <div className="page-bg" aria-hidden="true" />
 
-      {/* Glass wrapper for the whole page */}
       <div className="glass-dashboard">
         <div className="container-fluid py-5">
-
-          {/* EMAIL VERIFICATION BANNER */}
+          {/* Email verification banner (only if profile loaded and says unverified) */}
           {me && me.email_verified === false && (
             <div className="alert alert-warning d-flex align-items-center justify-content-between">
               <div>
@@ -380,7 +371,6 @@ export default function Dashboard() {
             <div className="d-flex align-items-center gap-2">
               <Link to="/" className="link-ghost">← Home</Link>
               <Link to={seeAllHref} className="btn btn-sm btn-outline-light">See all</Link>
-              {/* Mobile Filters trigger */}
               <button
                 className="btn btn-sm btn-primary d-md-none"
                 type="button"
@@ -393,11 +383,10 @@ export default function Dashboard() {
             </div>
           </header>
 
-          {/* Desktop filter toolbar */}
+          {/** Desktop filter toolbar */}
           <div className="card bg-dark border-0 shadow-sm mb-4 d-none d-md-block">
             <div className="card-body">
               <div className="row g-3 align-items-end">
-                {/* Mood */}
                 <div className="col-md-3">
                   <label className="form-label text-secondary small">Mood</label>
                   <select
@@ -414,7 +403,6 @@ export default function Dashboard() {
                   </select>
                 </div>
 
-                {/* Providers */}
                 <div className="col-md-5">
                   <label className="form-label text-secondary small d-block">Providers</label>
                   <div className="d-flex flex-wrap gap-2">
@@ -437,7 +425,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Decade */}
                 <div className="col-md-2">
                   <label className="form-label text-secondary small">Decade</label>
                   <select
@@ -454,7 +441,6 @@ export default function Dashboard() {
                   </select>
                 </div>
 
-                {/* TMDB rating */}
                 <div className="col-md-2">
                   <label className="form-label text-secondary small">TMDB rating</label>
                   <select
@@ -471,7 +457,6 @@ export default function Dashboard() {
                   </select>
                 </div>
 
-                {/* Include buy/rent */}
                 <div className="col-md-3">
                   <label className="form-label text-secondary small d-block">Options</label>
                   <div className="form-check form-switch">
@@ -490,7 +475,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="d-flex justify-content-end gap-2 mt-3">
                 <button
                   type="button"
@@ -542,7 +526,9 @@ export default function Dashboard() {
               No picks for this mood. Try another mood or widen filters/providers.
               {!!seeAllHref && (
                 <div className="mt-3">
-                  <Link to={seeAllHref} className="btn btn-outline-light btn-sm">Open full list</Link>
+                  <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
+                    Open full list
+                  </Link>
                 </div>
               )}
             </div>
@@ -564,7 +550,6 @@ export default function Dashboard() {
             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close" />
           </div>
           <div className="offcanvas-body">
-            {/* Mood selector (mobile) */}
             <div className="mb-3">
               <label className="form-label small text-secondary d-block">Mood</label>
               <select
@@ -581,7 +566,6 @@ export default function Dashboard() {
               </select>
             </div>
 
-            {/* Providers */}
             <div className="mb-3">
               <label className="form-label small text-secondary d-block">Providers</label>
               <div className="d-flex flex-wrap gap-2">
@@ -604,7 +588,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Decade + Rating */}
             <div className="row g-3">
               <div className="col-6">
                 <label className="form-label small text-secondary">Decade</label>
@@ -638,7 +621,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Include buy/rent (mobile) */}
             <div className="mt-3 d-flex gap-4">
               <div className="form-check form-switch">
                 <input
@@ -655,7 +637,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="d-flex justify-content-between align-items-center mt-4">
               <button type="button" className="btn btn-outline-light" onClick={resetFilters}>
                 Reset

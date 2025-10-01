@@ -11,7 +11,7 @@ import {
 import { searchMovies } from "@/api/movies";
 import { mediaUrl } from "@/utils/media";
 import { getMyProfile } from "@/api/profile";
-import "../styles/room.css";
+import "@/styles/room.css";
 
 export default function RoomDetail() {
   const { id } = useParams();
@@ -140,7 +140,7 @@ export default function RoomDetail() {
     }
   }
 
-  // Close dropdown
+  // Close dropdown when clicking outside
   useEffect(() => {
     function onDocClick(e) {
       if (!searchBoxRef.current) return;
@@ -238,18 +238,22 @@ export default function RoomDetail() {
             <h2 className="h6 m-0">Members</h2>
           </div>
           <div className="room-members">
-            {safeMembers.map((m) => (
-              <div key={m?.id ?? `mem-${m?.username ?? Math.random()}`} className="member-chip">
-                {m?.avatar ? (
-                  <img className="member-avatar" src={mediaUrl(m.avatar)} alt={m?.username || "user"} />
-                ) : (
-                  <div className="member-avatar member-initial">
-                    {(m?.username?.[0] || "?").toUpperCase()}
-                  </div>
-                )}
-                <span className="wl-badge">{m?.is_host ? "Host" : "Member"}</span>
-              </div>
-            ))}
+            {safeMembers.map((m) => {
+              const avatarSrc = m?.avatar ? `${mediaUrl(m.avatar)}?v=${Date.now()}` : null;
+              return (
+                <div key={m?.id ?? `mem-${m?.username ?? Math.random()}`} className="member-chip">
+                  {avatarSrc ? (
+                    <img className="member-avatar" src={avatarSrc} alt={m?.username || "user"} />
+                  ) : (
+                    <div className="member-avatar member-initial">
+                      {(m?.username?.[0] || "?").toUpperCase()}
+                    </div>
+                  )}
+                  <span className="member-name small">{m?.username || "user"}</span>
+                  <span className="wl-badge">{m?.is_host ? "Host" : "Member"}</span>
+                </div>
+              );
+            })}
             {safeMembers.length === 0 && <div className="text-muted small">No members</div>}
           </div>
 
@@ -286,7 +290,7 @@ export default function RoomDetail() {
           </div>
         </section>
 
-        {/* Queue + Search in the same card */}
+        {/* Queue + Search */}
         <section className="glass room-panel">
           <div className="room-panel-head">
             <h2 className="h6 m-0">Queue</h2>
@@ -342,7 +346,7 @@ export default function RoomDetail() {
 
           {/* Movies list */}
           <div className="room-list">
-            {(Array.isArray(movies) ? movies : []).map((m) => (
+            {safeMovies.map((m) => (
               <div key={m?.id ?? `rm-${m?.tmdb_id ?? Math.random()}`} className="room-item glass">
                 {m?.poster_path ? (
                   <img
@@ -364,14 +368,14 @@ export default function RoomDetail() {
                   <button
                     className="btn btn-ghost btn-compact"
                     title="Upvote"
-                    onClick={() => handleVote(m?.id, 1)}
+                    onClick={() => m?.id && handleVote(m.id, 1)}
                   >
                     ▲
                   </button>
                   <button
                     className="btn btn-ghost btn-compact"
                     title="Downvote"
-                    onClick={() => handleVote(m?.id, -1)}
+                    onClick={() => m?.id && handleVote(m.id, -1)}
                   >
                     ▼
                   </button>
@@ -385,7 +389,7 @@ export default function RoomDetail() {
                 </div>
               </div>
             ))}
-            {(Array.isArray(movies) ? movies : []).length === 0 && (
+            {safeMovies.length === 0 && (
               <div className="text-muted p-3">No movies yet. Use the search box above to add one.</div>
             )}
           </div>

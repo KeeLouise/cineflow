@@ -1,64 +1,80 @@
-import React, { useEffect, useState } from "react";                                               // react hooks
-import { useNavigate, Link } from "react-router-dom";                                             // useNavigate helps to programmatically go to "/watchlists/:id" after creating a list
-import { fetchMyWatchlists, createWatchlist, deleteWatchlist } from "@/api/watchlists";           // imports api helpers to load the user's lists and create/delete a list
-import { updateWatchlist } from "@/api/watchlists";                                               // NEW: rename / toggle public - KR 25/09/2025
-import "@/styles/watchlists.css";                                                                 // modern styles for this page - KR 25/09/2025
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  fetchMyWatchlists,
+  createWatchlist,
+  deleteWatchlist,
+  updateWatchlist,
+} from "@/api/watchlists";
+import "@/styles/watchlists.css";
 
-const TMDB_IMG = "https://image.tmdb.org/t/p/w92";                                               // lighter thumbs for strips
+const TMDB_IMG = "https://image.tmdb.org/t/p/w92";
+
+function posterUrl(path) {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  return `${TMDB_IMG}${clean}`;
+}
 
 export default function Watchlists() {
-  const navigate = useNavigate();
-
-  // Local state - what the UI needs to remember
-  const [lists, setLists] = useState([]);        // user's watchlists - starts as an empty array
-  const [loading, setLoading] = useState(true);  // show a spinner while loading until API finishes
+  const [lists, setLists] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");        // a place to show any error text
+  const [error, setError] = useState("");
 
-  // "Create new list" form fields
-  const [newName, setNewName] = useState("");    // text input for list name
+  // Create form
+  const [newName, setNewName] = useState("");
 
-  // Inline edit UI state - KR 25/09/2025
+  // Inline rename
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState("");
 
+  // Load my lists
   useEffect(() => {
-  (async () => {
-    try {
-      const data = await fetchMyWatchlists();
-      setLists(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err.message || "Failed to load watchlists.");
-    } finally {
-      setLoading(false);
-    }
-  })();
-}, []);                                    
+    let alive = true;
+    (async () => {
+      try {
+        const data = await fetchMyWatchlists();
+        if (!alive) return;
+        setLists(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (alive) setError(err.message || "Failed to load watchlists.");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
-  async function handleCreate(e) {              // handles submitting the new list form
+  async function handleCreate(e) {
     e.preventDefault();
-    if (!newName.trim() || submitting) return;
+    const name = newName.trim();
+    if (!name || submitting) return;
+
     setError("");
     setSubmitting(true);
     try {
-      const wl = await createWatchlist(newName);          // POST /api/watchlists/
-      setLists((prev) => [wl, ...prev]);                  // put new list first, keep others
+      const wl = await createWatchlist(name); // POST /api/watchlists/
+      setLists((prev) => [wl, ...prev]);
       setNewName("");
     } catch (err) {
-      setError(err.message || "Create failed");
-      console.error("Create failed:", err);
+      setError(err.message || "Create failed.");
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
   }
 
-  // Start inline rename for a list - KR 25/09/2025
+  // Start inline rename
   function beginRename(wl) {
     setEditingId(wl.id);
     setEditingName(wl.name);
   }
 
-  // Save rename via PUT /api/watchlists/:id/ - KR 25/09/2025
+  // Save rename
   async function saveRename(id) {
     const name = editingName.trim();
     if (!name) return;
@@ -68,17 +84,16 @@ export default function Watchlists() {
       setEditingId(null);
       setEditingName("");
     } catch (err) {
-      setError(err.message || "Rename failed");
+      setError(err.message || "Rename failed.");
     }
   }
 
-  // Cancel inline rename - KR 25/09/2025
   function cancelRename() {
     setEditingId(null);
     setEditingName("");
   }
 
-  // Toggle public/private with UI - KR 25/09/2025
+  // Toggle public/private with optimistic UI
   async function togglePublic(wl) {
     const prev = lists;
     const nextPublic = !wl.is_public;
@@ -86,21 +101,21 @@ export default function Watchlists() {
     try {
       await updateWatchlist(wl.id, { is_public: nextPublic });
     } catch (err) {
-      setLists(prev);
-      setError(err.message || "Update visibility failed");
+      setLists(prev); // rollback
+      setError(err.message || "Update visibility failed.");
     }
   }
 
-  // Delete list with confirm + optimistic UI - KR 25/09/2025
+  // Delete list
   async function handleDelete(id) {
     if (!confirm("Delete this watchlist? This cannot be undone.")) return;
     const prev = lists;
     setLists((p) => p.filter((l) => l.id !== id));
     try {
-      await deleteWatchlist(id); // DELETE /api/watchlists/:id/
+      await deleteWatchlist(id);
     } catch (err) {
       setLists(prev); // rollback
-      setError(err.message || "Delete failed");
+      setError(err.message || "Delete failed.");
     }
   }
 
@@ -138,12 +153,12 @@ export default function Watchlists() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             required
-            maxLength={120}                           // gentle guard against super-long names - KR 25/09/2025
+            maxLength={120}
           />
           <button
             className="btn btn-gradient btn-gradient--v2"
             type="submit"
-            disabled={submitting || !newName.trim()}       // prevent double-submit / empty - KR 25/09/2025
+            disabled={submitting || !newName.trim()}
           >
             {submitting ? "Creating…" : "Create List"}
           </button>
@@ -165,12 +180,12 @@ export default function Watchlists() {
                     {(wl.items || []).length ? (
                       <div className="wl-thumbs" aria-label="Poster thumbnails">
                         {(wl.items || []).slice(0, 12).map((m, i) =>
-                          m.poster_path ? (
+                          m?.poster_path ? (
                             <img
-                              key={i}
+                              key={`${wl.id}-thumb-${i}`}
                               className="wl-thumb"
-                              src={`${TMDB_IMG}${m.poster_path}`}
-                              alt={m.title || "Poster"}
+                              src={posterUrl(m.poster_path)}
+                              alt={m?.title || "Poster"}
                               loading="lazy"
                             />
                           ) : null
@@ -222,7 +237,8 @@ export default function Watchlists() {
                         </span>
                       </div>
                     )}
-                    {/* right cell: actions */}
+
+                    {/* right-side actions */}
                     {editingId !== wl.id ? (
                       <div className="d-flex align-items-center gap-1 wl-actions">
                         <button
