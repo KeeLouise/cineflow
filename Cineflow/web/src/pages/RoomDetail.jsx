@@ -12,7 +12,6 @@ import { searchMovies } from "@/api/movies";
 import { mediaUrl } from "@/utils/media";
 import { getMyProfile } from "@/api/profile"; 
 import "../styles/room.css";
-import "../styles/index.css";
 
 export default function RoomDetail() {
   const { id } = useParams();
