@@ -95,12 +95,10 @@ export default function Navbar() {
                         src={me.avatar}
                         alt={me?.username || "Profile"}
                         className="rounded-circle"
-                        style={{ width: 28, height: 28, objectFit: "cover" }}
                       />
                     ) : (
                       <div
                         className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center"
-                        style={{ width: 28, height: 28 }}
                       >
                         {me?.username?.[0]?.toUpperCase() || "?"}
                       </div>

@@ -1,82 +1,90 @@
-:root {
-  --nav-text: #e6e8ee;
-  --nav-muted: #a7b0bd;
-  --nav-active: #7aa2ff;
-  --nav-hover: #cfd6e2;
-}
-
+/* Global font */
 body {
   font-family: "Exo 2", system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
 }
 
-.navbar.big-navbar {
-  background: rgba(16, 18, 28, 0.6);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+/* Variables */
+:root {
+  --nav-text: #f0f0f0;
+  --nav-hover: #cf90fc;   
+  --nav-active: #ff4da6;
+  --nav-muted: #a7b0bd;
 }
 
-.navbar-thin .nav-link,
-.navbar-thin .navbar-brand {
-  padding-top: .5rem;
-  padding-bottom: .5rem;
+/* Navbar container */
+.big-navbar {
+  background: linear-gradient(to right, black 20%, rgb(144, 58, 144) 80%);
+  min-height: 125px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.logo-img {
-  height: 34px;
-  width: auto;
+/* Logo styling */
+.navbar .logo-img,
+.navbar-thin .brand-logo {
+  width: 250px;
+  height: 125px;
+  object-fit: contain;
   display: block;
 }
 
+@media (max-width: 992px) {
+  .navbar .logo-img,
+  .navbar-thin .brand-logo {
+    width: 125px;
+    height: auto;
+  }
+}
+@media (max-width: 576px) {
+  .navbar .logo-img,
+  .navbar-thin .brand-logo {
+    width: 125px;
+  }
+}
+
+/* Base nav link styling */
 .navbar .nav-link,
 .navbar .btn.btn-link.nav-link {
   color: var(--nav-text);
+  font-size: 1.25rem;
+  font-weight: 500;
   text-decoration: none !important;
-  transition: color .15s ease;
-  font-weight: 600;
+  transition: color 0.2s ease;
+  padding: 0.75rem 1rem;
 }
 
+/* Hover */
 .navbar .nav-link:hover,
-.navbar .nav-link:focus {
+.navbar .btn.btn-link.nav-link:hover {
   color: var(--nav-hover);
-  text-decoration: none;
 }
 
-.navbar .nav-link.active,
-.navbar .nav-link[aria-current="page"] {
+/* Active link */
+.navbar-thin .nav-link.active,
+.navbar-thin .nav-link[aria-current="page"] {
+  font-weight: 600;
   color: var(--nav-active) !important;
   text-decoration: none !important;
 }
 
-.navbar .text-muted {
-  color: var(--nav-muted) !important;
+.navbar .navbar-brand {
+  letter-spacing: 0.3px;
 }
 
+/* Space buttons inside nav */
+.navbar .btn + .btn {
+  margin-left: 0.25rem;
+}
+
+/* Avatar sizing */
 .nav-avatar {
   width: 28px;
   height: 28px;
   object-fit: cover;
 }
-
 .nav-initial {
   width: 28px;
   height: 28px;
   font-weight: 700;
-}
-
-.navbar .btn.btn-link.nav-link {
-  border: 0;
-  padding: 0 .75rem;
-}
-.navbar .btn.btn-link.nav-link:hover,
-.navbar .btn.btn-link.nav-link:focus {
-  color: var(--nav-hover);
-  text-decoration: none;
-}
-
-@media (min-width: 992px) {
-  .navbar .navbar-nav .nav-link {
-    padding-left: .75rem;
-    padding-right: .75rem;
-  }
 }
