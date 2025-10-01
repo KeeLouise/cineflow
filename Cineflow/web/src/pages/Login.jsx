@@ -10,6 +10,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
 
+  // MFA step
   const [mfaNeeded, setMfaNeeded] = useState(false);
   const [mfaToken, setMfaToken] = useState("");
   const [code, setCode] = useState("");
@@ -20,9 +21,9 @@ export default function Login() {
   const next = params.get("next") || "/dashboard";
 
   function completeLogin({ access, refresh }) {
-    setTokens({ access, refresh });              
-    window.dispatchEvent(new Event("auth-changed")); 
-    navigate(next, { replace: true });            
+    setTokens({ access, refresh });
+    window.dispatchEvent(new Event("auth-changed"));
+    navigate(next, { replace: true });               
   }
 
   async function onSubmit(e) {
@@ -32,13 +33,11 @@ export default function Login() {
     try {
       const { data } = await api.post("/token/", { username, password });
 
-      // Normal login (no MFA)
       if (data?.access && data?.refresh) {
-        completeLogin({ access: data.access, refresh: data.refresh });
+        completeLogin(data);
         return;
       }
 
-      // MFA challenge
       if (data?.mfa_required && data?.mfa_token) {
         setMfaNeeded(true);
         setMfaToken(data.mfa_token);
@@ -64,7 +63,7 @@ export default function Login() {
     try {
       const data = await confirm2FAEmailLogin({ code, mfaToken });
       if (data?.access && data?.refresh) {
-        completeLogin({ access: data.access, refresh: data.refresh });
+        completeLogin(data);
         return;
       }
       setErr("Incorrect code. Try again.");

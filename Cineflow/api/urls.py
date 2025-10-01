@@ -28,6 +28,7 @@ from api.views.auth_views import (
     resend_verification_public, resend_verification_authenticated
 )
 from api.views.jwt_views import ActiveUserTokenObtainPairView
+from .views.auth_email import resend_email_verification
 
 urlpatterns = [
     # --- Auth (JWT) ---
@@ -88,4 +89,9 @@ urlpatterns = [
     path("rooms/<int:room_id>/movies/reorder/", rooms.room_movies_reorder, name="room_movies_reorder"),
     path("rooms/<int:room_id>/movies/<int:movie_id>/", rooms.room_movie_delete, name="room_movie_delete"),
     path("rooms/<int:room_id>/movies/<int:movie_id>/vote/", rooms.room_movie_vote, name="room_movie_vote"),
+
+    # Auth Email
+
+    path("auth/email/resend/", resend_email_verification, name="resend-email"),
+    path("auth/email/verify/", verify_email, name="verify-email"),
 ]
