@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate } from "react-router-dom";
 import { looksLoggedIn, logout } from "@/api/auth";
 import { getMyProfile } from "@/api/profile";
 import logo from "../assets/logo.webp";
-import "../styles/navbar.css";
+import "@/styles/navbar.css";
 import { mediaUrl } from "@/utils/media";
 
 export default function Navbar() {
