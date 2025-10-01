@@ -148,83 +148,66 @@ class RoomReorderSerializer(serializers.Serializer):
         return ids
 
 # --- User Profile ---
+from django.contrib.auth.models import User
 from rest_framework import serializers
-from django.contrib.auth import get_user_model
 from .models import UserProfile
 
-User = get_user_model()
-
-class UserProfileSerializer(serializers.ModelSerializer):
-    # expose user fields
-    username = serializers.CharField(source="user.username", read_only=True)
-    email = serializers.EmailField(source="user.email", read_only=True)
-    first_name = serializers.CharField(source="user.first_name", required=False, allow_blank=True)
-    last_name = serializers.CharField(source="user.last_name", required=False, allow_blank=True)
-
-    # avatar handling + computed url
-    avatar = serializers.ImageField(write_only=True, required=False, allow_null=True)
-    avatar_url = serializers.SerializerMethodField(read_only=True)
-
-    # 2FA & verification flags (already on profile model)
-    two_factor_enabled = serializers.BooleanField(read_only=True)
-    email_verified = serializers.BooleanField(read_only=True)
+class UserProfileMeSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField(read_only=True)
+    avatar = serializers.SerializerMethodField(read_only=True)  # URL only
+    email_verified = serializers.SerializerMethodField(read_only=True)
+    two_factor_enabled = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
-        model = UserProfile
-        # NOTE: keep "avatar" for uploads, "avatar_url" for reading; also return username/email
+        model = User
+        # All user-facing profile fields come from User; avatar is read from UserProfile
         fields = [
-            "username", "email", "first_name", "last_name",
-            "avatar", "avatar_url",
-            "two_factor_enabled", "email_verified",
-            "updated_at",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "full_name",
+            "email_verified",
+            "two_factor_enabled",
+            "avatar",
         ]
-        read_only_fields = ["updated_at"]
+        read_only_fields = ["full_name", "email_verified", "two_factor_enabled", "avatar"]
 
-    def get_avatar_url(self, obj: UserProfile):
+    def get_full_name(self, obj: User):
+        full = f"{(obj.first_name or '').strip()} {(obj.last_name or '').strip()}".strip()
+        return full or obj.username
+
+    def get_avatar(self, obj: User):
         try:
-            if obj.avatar and hasattr(obj.avatar, "url"):
-                return obj.avatar.url
+            prof = obj.userprofile  
+        except UserProfile.DoesNotExist:
+            return None
+        img = getattr(prof, "avatar", None)
+        try:
+            return img.url if img else None
         except Exception:
-            pass
-        return None
+            return None
 
-    def to_representation(self, instance: UserProfile):
-        """Keep backward compatibility: also put avatar_url into 'avatar' for the FE."""
-        data = super().to_representation(instance)
-        data["avatar"] = data.get("avatar_url")
-        return data
+    def get_email_verified(self, obj: User):
+        prof = getattr(obj, "userprofile", None)
+        return bool(getattr(prof, "email_verified", False)) if prof else False
 
-    def update(self, instance: UserProfile, validated_data):
+    def get_two_factor_enabled(self, obj: User):
+        prof = getattr(obj, "userprofile", None)
+        return bool(getattr(prof, "two_factor_enabled", False)) if prof else False
+
+    def update(self, instance: User, validated_data):
         """
-        Allow updating first/last name on the related User and avatar on the profile.
-        Pass 'avatar': null to remove image, or use 'remove_avatar' flag in the view.
+        Allow PATCH of first_name, last_name, email, username.
+        Avatar changes are handled in the view via request.FILES (so we can also support remove flag).
         """
-        user_data = validated_data.pop("user", {})
-        avatar_file = validated_data.pop("avatar", serializers.empty)
+        username = validated_data.pop("username", None)
+        if username and username != instance.username:
+            instance.username = username
 
-        # Update user fields if provided
-        user = instance.user
-        changed = False
-        for field in ("first_name", "last_name"):
-            if field in user_data:
-                setattr(user, field, user_data[field])
-                changed = True
-        if changed:
-            user.save(update_fields=["first_name", "last_name"])
+        for fld in ("first_name", "last_name", "email"):
+            if fld in validated_data:
+                setattr(instance, fld, validated_data[fld])
 
-        # Update avatar if provided in payload
-        if avatar_file is not serializers.empty:
-            if avatar_file is None:
-                # remove existing avatar
-                if instance.avatar:
-                    try:
-                        instance.avatar.delete(save=False)
-                    except Exception:
-                        pass
-                instance.avatar = None
-            else:
-                instance.avatar = avatar_file
-
-        # Save profile (captures avatar + updated_at)
-        instance.save()
+        instance.save(update_fields=["username", "first_name", "last_name", "email"])
         return instance
