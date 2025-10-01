@@ -1,14 +1,30 @@
-import { Navigate } from "react-router-dom";
-import { safeLocalStorage } from "@/api/auth";
+import React, { useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { isAuthenticated } from "@/api/auth";
 
 export default function PrivateRoute({ children }) {
-    const token = safeLocalStorage.getItem("access");
+  const [allowed, setAllowed] = useState(null);
+  const location = useLocation();
 
-    //if no token, kick user back to login - KR 20/08/2025
-    if (!token) {
-        return <Navigate to="/login" replace />;
-    }
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const ok = await isAuthenticated(); // will try silent refresh if needed
+      if (alive) setAllowed(ok);
+    })();
+    return () => { alive = false; };
+  }, []);
 
-    //Otherwise render the protected page - KR 20/08/2025
-    return children;
+  if (allowed === null) {
+    return (
+      <div className="container py-5 text-center">
+        <div className="glass p-4">Checking session…</div>
+      </div>
+    );
+  }
+
+  if (!allowed) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  return children;
 }
