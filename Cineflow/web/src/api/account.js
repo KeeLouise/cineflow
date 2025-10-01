@@ -6,18 +6,17 @@ export async function resendVerificationEmail() {
   return data; // { sent: true }
 }
 
-// 2FA
+// 2FA (MFA)
 export async function start2FASetup() {
   const { data } = await api.post("/auth/2fa/setup/");
-  return data;
+  return data; // { qr_svg, secret } (or similar)
 }
 
-export async function confirm2FA(code) {
-  const payload = { code: String(code || "").trim() };
-  if (!/^\d{6}$/.test(payload.code)) {
-    throw new Error("Enter a 6-digit code.");
-  }
-  const { data } = await api.post("/auth/2fa/confirm/", payload);
+export async function confirm2FA({ code, mfaToken }) {
+  const { data } = await api.post("/auth/2fa/confirm/", {
+    code: String(code || "").trim(),
+    mfa_token: String(mfaToken || "").trim(),
+  });
   return data;
 }
 
