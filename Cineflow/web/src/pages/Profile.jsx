@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import api from "@/api/client";
-import { completeMFAChallenge } from "@/api/mfa";
+import { start2FASetup, confirm2FA, disable2FA, resendVerificationEmail } from "@/api/account";
 import { useNavigate } from "react-router-dom";
-import "@/styles/security.css";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -46,22 +45,22 @@ export default function Login() {
   }
 
   async function onSubmitMFA(e) {
-    e.preventDefault();
-    setErr("");
-    try {
-      const data = await completeMFAChallenge({ code, mfaToken });
-      if (data?.access && data?.refresh) {
-        localStorage.setItem("access", data.access);
-        localStorage.setItem("refresh", data.refresh);
-        window.dispatchEvent(new Event("auth-changed"));
-        navigate("/dashboard");
-        return;
-      }
-      setErr("Incorrect code. Try again.");
-    } catch (e2) {
-      setErr(e2?.response?.data?.detail || e2?.message || "MFA failed.");
+  e.preventDefault();
+  setErr("");
+  try {
+    const data = await confirm2FA(code);
+    if (data?.access && data?.refresh) {
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refresh", data.refresh);
+      window.dispatchEvent(new Event("auth-changed"));
+      navigate("/dashboard");
+      return;
     }
+    setErr("Incorrect code. Try again.");
+  } catch (e2) {
+    setErr(e2?.response?.data?.detail || e2?.message || "MFA failed.");
   }
+}
 
   return (
     <div className="container py-4 security-page">
