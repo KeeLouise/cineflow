@@ -11,21 +11,14 @@ from django.dispatch import receiver
 
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="profile",
-    )
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # 2FA
     two_factor_enabled = models.BooleanField(default=False)
     two_factor_secret = models.CharField(max_length=64, blank=True, default="")
     two_factor_confirmed_at = models.DateTimeField(blank=True, null=True)
-    # verification
     email_verified = models.BooleanField(default=False)
-
 
     def __str__(self):
         return f"Profile({self.user.username})"
