@@ -6,7 +6,7 @@ import {
   fetchStreamingTrending,
   searchMovies,
   searchByPerson,
-} from "../api/movies"; // calls Django proxy - KR 21/08/2025
+} from "@/api/movies"; // calls Django proxy - KR 21/08/2025
 import SearchBar from "@/components/SearchBar.jsx"; // hero search - KR 25/08/2025
 import SkeletonRow from "@/components/SkeletonRow.jsx"; // shimmer loaders - KR 25/08/2025
 import "@/styles/home.css";

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { confirm2FAEmailLogin } from "@/api/account";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/auth/AuthContext";
+import { setTokens } from "@/api/auth";
 import "@/styles/security.css";
 
 export default function Login() {
@@ -16,24 +16,22 @@ export default function Login() {
   const [code, setCode] = useState("");
 
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const next = params.get("next") || "/dashboard";
 
   async function onSubmit(e) {
     e.preventDefault();
     setErr("");
 
     try {
-      // Step 1: username/password
       const { data } = await api.post("/token/", { username, password });
 
-      // Case A: normal login (no MFA required)
       if (data?.access && data?.refresh) {
-        await login({ access: data.access, refresh: data.refresh });
-        navigate("/dashboard");
+        setTokens({ access: data.access, refresh: data.refresh });
         return;
       }
 
-      // Case B: MFA challenge (email code)
       if (data?.mfa_required && data?.mfa_token) {
         setMfaNeeded(true);
         setMfaToken(data.mfa_token);
@@ -57,12 +55,10 @@ export default function Login() {
     setErr("");
 
     try {
-      // Step 2: confirm the emailed code
       const data = await confirm2FAEmailLogin({ code, mfaToken });
-
       if (data?.access && data?.refresh) {
-        await login({ access: data.access, refresh: data.refresh });
-        navigate("/dashboard");
+        setTokens({ access: data.access, refresh: data.refresh });
+        navigate(next, { replace: true });
         return;
       }
       setErr("Incorrect code. Try again.");
