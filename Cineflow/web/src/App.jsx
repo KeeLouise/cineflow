@@ -6,14 +6,14 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
 import SeeAllPage from "@/pages/SeeAllPage.jsx";
-import Footer from "./components/Footer.jsx";
+import Footer from "@/components/Footer.jsx";
 import PrivateRoute from "@/components/PrivateRoute";
 import Profile from "@/pages/Profile.jsx";
 import MovieDetail from "@/pages/MovieDetail.jsx";
 import Watchlists from "@/pages/Watchlists.jsx";
 import WatchlistDetail from "@/pages/WatchlistDetail.jsx";
-import Rooms from "./pages/Rooms";        
-import RoomDetail from "./pages/RoomDetail"; 
+import Rooms from "@/pages/Rooms";        
+import RoomDetail from "@/pages/RoomDetail"; 
 
 export default function App() {
   return (
