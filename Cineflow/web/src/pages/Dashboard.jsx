@@ -10,6 +10,24 @@ import "@/styles/home.css";
  
 function PosterCard({ m }) {
   return (
+    // Pseudocode inside a component where you have `me` (profile)
+{me && me.email_verified === false && (
+  <div className="alert alert-warning d-flex align-items-center justify-content-between">
+    <div>
+      <strong>Verify your email.</strong> We’ve sent a link to {me.email}.  
+      You’ll need to verify before enabling 2FA.
+    </div>
+    <button
+      className="btn btn-outline-ghost"
+      onClick={async () => {
+        try { await resendVerificationEmail(); alert("Verification email sent."); }
+        catch (e) { alert(e.response?.data?.detail || "Could not send verification email."); }
+      }}
+    >
+      Resend
+    </button>
+  </div>
+)}
     <article className="poster-card">
       <Link to={`/movie/${m.id}`} className="text-decoration-none">
         <div className="poster-media">
