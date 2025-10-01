@@ -1,14 +1,15 @@
 import axios from "axios";
 
-// Create a base Axios instance pointing to Django backend via Vite proxy - KR 18/08/2025
-const apiBase =
-  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL)
-    ? import.meta.env.VITE_API_URL.replace(/\/+$/, "") // strip trailing slashes
-    : "/api"; // dev fallback
+const raw =
+  (typeof import.meta !== "undefined" && import.meta.env && (
+    import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_BASE
+  )) ?? "/api";
 
-    export const API_BASE =apiBase;
-    
+const apiBase = String(raw).replace(/\/+$/, "");
+export const API_BASE = apiBase;
+
 const api = axios.create({ baseURL: apiBase });
+
 
 // --- Public endpoints (no Authorization header required) - KR 02/09/2025
 const PUBLIC_PREFIXES = [
