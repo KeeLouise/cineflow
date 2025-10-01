@@ -5,7 +5,7 @@ import { safeLocalStorage } from "@/api/auth";
 
 let useAuth;
 try {
-  ({ useAuth } = require("@/context/AuthContext"));
+  ({ useAuth } = require("@/auth/AuthContext"));
 } catch {
   useAuth = null;
 }
