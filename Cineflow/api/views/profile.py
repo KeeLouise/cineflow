@@ -1,37 +1,41 @@
+from django.db import transaction
+from django.contrib.auth import get_user_model
+
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db import transaction
 
-from django.contrib.auth.models import User
 from ..serializers import UserProfileMeSerializer
 from ..models import UserProfile
+
+UserModel = get_user_model()
+
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def me_profile(request):
-    user: User = request.user
-    # Ensure a profile row exists
+    user = request.user 
+
     prof, _ = UserProfile.objects.get_or_create(user=user)
 
     if request.method == "GET":
         ser = UserProfileMeSerializer(user, context={"request": request})
         return Response(ser.data, status=200)
 
-    # PATCH:
+    # PATCH
     data = request.data.copy()
     remove_flag = str(data.get("remove_avatar", "")).lower() in ("1", "true", "yes", "on")
-    avatar_file = request.FILES.get("avatar", None) if "avatar" in request.FILES or "avatar" in data else None
+    avatar_file = request.FILES.get("avatar") if "avatar" in request.FILES else None
 
     with transaction.atomic():
-        # Update user fields
+        # Update basic user fields (username/first_name/last_name/email)
         ser = UserProfileMeSerializer(user, data=data, partial=True, context={"request": request})
         ser.is_valid(raise_exception=True)
         ser.save()
 
-        # Update avatar on profile
+        # Update / remove avatar on the profile
         if remove_flag:
             if prof.avatar:
                 try:
