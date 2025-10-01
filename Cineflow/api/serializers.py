@@ -151,10 +151,12 @@ class RoomReorderSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField(read_only=True)
     avatar = serializers.ImageField(required=False, allow_null=True)
+
     class Meta:
         model = User
         fields = ["username", "email", "first_name", "last_name", "full_name", "avatar"]
         read_only_fields = ["full_name"]
+
     def validate_username(self, value):
         v = (value or "").strip()
         if not v:
@@ -165,30 +167,48 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if qs.exists():
             raise serializers.ValidationError("This username is already taken.")
         return v
+
     def get_full_name(self, obj):
         fn = (obj.first_name or "").strip()
         ln = (obj.last_name or "").strip()
         full = f"{fn} {ln}".strip()
         return full or obj.username
+
     def to_representation(self, instance):
+        """
+        Avoid 500s if storage is misconfigured or file missing —
+        return avatar=None instead of crashing.
+        """
         data = super().to_representation(instance)
         prof = getattr(instance, "profile", None)
-        data["avatar"] = prof.avatar.url if (prof and prof.avatar) else None
+        url = None
+        if prof and prof.avatar:
+            try:
+                url = prof.avatar.url
+            except Exception:
+                url = None
+        data["avatar"] = url
         return data
+
     def update(self, instance, validated_data):
-        from .models import UserProfile
         avatar_file = validated_data.pop("avatar", serializers.empty)
         username = validated_data.pop("username", None)
         if username is not None and username != instance.username:
             instance.username = username
+
         instance = super().update(instance, validated_data)
+
         prof, _ = UserProfile.objects.get_or_create(user=instance)
         if avatar_file is not serializers.empty:
             if avatar_file is None:
-                if prof.avatar:
-                    prof.avatar.delete(save=False)
+                try:
+                    if prof.avatar:
+                        prof.avatar.delete(save=False)
+                except Exception:
+                    pass
                 prof.avatar = None
             else:
                 prof.avatar = avatar_file
             prof.save(update_fields=["avatar", "updated_at"])
+
         return instance
