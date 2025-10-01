@@ -148,25 +148,20 @@ class RoomReorderSerializer(serializers.Serializer):
         return ids
 
 # --- User Profile ---
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from .models import UserProfile
+
+User = get_user_model()
+
 class UserProfileSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField(read_only=True)
-    avatar = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    avatar = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = User
         fields = ["username", "email", "first_name", "last_name", "full_name", "avatar"]
         read_only_fields = ["full_name"]
-
-    def validate_username(self, value):
-        v = (value or "").strip()
-        if not v:
-            raise serializers.ValidationError("Username cannot be blank.")
-        qs = User._default_manager.filter(username__iexact=v)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError("This username is already taken.")
-        return v
 
     def get_full_name(self, obj):
         fn = (obj.first_name or "").strip()
@@ -175,39 +170,28 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return full or obj.username
 
     def to_representation(self, instance):
-        # Start with the User fields
         data = super().to_representation(instance)
-        # Safely add profile + avatar URL
-        prof = getattr(instance, "profile", None)
         url = None
+        prof = getattr(instance, "profile", None)
         if prof and getattr(prof, "avatar", None):
-            # Guard against storage/Cloudinary issues locally
             try:
-                if prof.avatar and getattr(prof.avatar, "url", None):
+                if hasattr(prof.avatar, "url"):
                     url = prof.avatar.url
+                else:
+                    url = str(prof.avatar)
             except Exception:
                 url = None
         data["avatar"] = url
-        if prof:
-            data["email_verified"] = bool(getattr(prof, "email_verified", False))
-            data["two_factor_enabled"] = bool(getattr(prof, "two_factor_enabled", False))
-        else:
-            data["email_verified"] = False
-            data["two_factor_enabled"] = False
         return data
 
     def update(self, instance, validated_data):
-        # Handle username/first/last/email on the User model
         avatar_file = validated_data.pop("avatar", serializers.empty)
         username = validated_data.pop("username", None)
         if username is not None and username != instance.username:
             instance.username = username
         instance = super().update(instance, validated_data)
 
-        # Ensure profile row exists
         prof, _ = UserProfile.objects.get_or_create(user=instance)
-
-        # If avatar posted (file or null), update profile storage
         if avatar_file is not serializers.empty:
             if avatar_file is None:
                 try:
@@ -219,5 +203,4 @@ class UserProfileSerializer(serializers.ModelSerializer):
             else:
                 prof.avatar = avatar_file
             prof.save(update_fields=["avatar", "updated_at"])
-
         return instance

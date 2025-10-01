@@ -1,9 +1,8 @@
-# api/views/profile.py
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
+from rest_framework import status
 from ..serializers import UserProfileSerializer
 from ..models import UserProfile
 
@@ -16,9 +15,12 @@ def me_profile(request):
     UserProfile.objects.get_or_create(user=user)
 
     if request.method == "GET":
-        UserProfile.objects.get_or_create(user=user)
-        data = UserProfileSerializer(user, context={"request": request}).data
-        return Response(data, status=200)
+        try:
+            data = UserProfileSerializer(user, context={"request": request}).data
+            return Response(data, status=status.HTTP_200_OK)
+        except Exception as e:
+            print("[me_profile GET] serialization error:", repr(e))
+            return Response({"detail": "Failed to load profile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     data = request.data.copy()
     remove_flag = str(data.get("remove_avatar", "")).lower() in ("1", "true", "yes", "on")
@@ -26,6 +28,7 @@ def me_profile(request):
     ser = UserProfileSerializer(user, data=data, partial=True, context={"request": request})
     ser.is_valid(raise_exception=True)
     instance = ser.save()
+
     if remove_flag:
         prof, _ = UserProfile.objects.get_or_create(user=instance)
         try:
@@ -36,5 +39,4 @@ def me_profile(request):
         prof.avatar = None
         prof.save(update_fields=["avatar", "updated_at"])
 
-    fresh = UserProfileSerializer(instance, context={"request": request}).data
-    return Response(fresh, status=200)
+    return Response(UserProfileSerializer(instance, context={"request": request}).data, status=status.HTTP_200_OK)
