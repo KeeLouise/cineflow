@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import api from "@/api/client";
 import { confirm2FAEmailLogin } from "@/api/account";
-import { setTokens } from "@/api/auth";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import "@/styles/security.css";
 
 export default function Login() {
@@ -16,6 +16,7 @@ export default function Login() {
   const [code, setCode] = useState("");
 
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -27,12 +28,12 @@ export default function Login() {
 
       // Case A: normal login (no MFA required)
       if (data?.access && data?.refresh) {
-        setTokens({ access: data.access, refresh: data.refresh });
+        await login({ access: data.access, refresh: data.refresh });
         navigate("/dashboard");
         return;
       }
 
-      // Case B: MFA challenge
+      // Case B: MFA challenge (email code)
       if (data?.mfa_required && data?.mfa_token) {
         setMfaNeeded(true);
         setMfaToken(data.mfa_token);
@@ -56,9 +57,11 @@ export default function Login() {
     setErr("");
 
     try {
+      // Step 2: confirm the emailed code
       const data = await confirm2FAEmailLogin({ code, mfaToken });
+
       if (data?.access && data?.refresh) {
-        setTokens({ access: data.access, refresh: data.refresh });
+        await login({ access: data.access, refresh: data.refresh });
         navigate("/dashboard");
         return;
       }
@@ -126,6 +129,7 @@ export default function Login() {
                   setMfaNeeded(false);
                   setMfaToken("");
                   setCode("");
+                  setErr("");
                 }}
               >
                 Use a different account

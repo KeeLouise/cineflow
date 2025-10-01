@@ -155,57 +155,67 @@ from .models import UserProfile
 User = get_user_model()
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    
-    username = serializers.CharField(source="user.username", required=False)
-    email = serializers.EmailField(source="user.email", required=False)
+    # expose user fields
+    username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
     first_name = serializers.CharField(source="user.first_name", required=False, allow_blank=True)
-    last_name  = serializers.CharField(source="user.last_name",  required=False, allow_blank=True)
+    last_name = serializers.CharField(source="user.last_name", required=False, allow_blank=True)
 
-    full_name = serializers.SerializerMethodField(read_only=True)
-    avatar    = serializers.ImageField(required=False, allow_null=True)
+    # avatar handling + computed url
+    avatar = serializers.ImageField(write_only=True, required=False, allow_null=True)
     avatar_url = serializers.SerializerMethodField(read_only=True)
+
+    # 2FA & verification flags (already on profile model)
+    two_factor_enabled = serializers.BooleanField(read_only=True)
+    email_verified = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = UserProfile
+        # NOTE: keep "avatar" for uploads, "avatar_url" for reading; also return username/email
         fields = [
-            "username", "email", "first_name", "last_name", "full_name",
+            "username", "email", "first_name", "last_name",
             "avatar", "avatar_url",
             "two_factor_enabled", "email_verified",
             "updated_at",
         ]
-        read_only_fields = ["full_name", "avatar_url", "updated_at", "email_verified"]
-
-    def get_full_name(self, obj: UserProfile):
-        fn = (obj.user.first_name or "").strip()
-        ln = (obj.user.last_name or "").strip()
-        full = f"{fn} {ln}".strip()
-        return full or obj.user.username
+        read_only_fields = ["updated_at"]
 
     def get_avatar_url(self, obj: UserProfile):
         try:
-            if obj.avatar:
+            if obj.avatar and hasattr(obj.avatar, "url"):
                 return obj.avatar.url
         except Exception:
             pass
         return None
 
+    def to_representation(self, instance: UserProfile):
+        """Keep backward compatibility: also put avatar_url into 'avatar' for the FE."""
+        data = super().to_representation(instance)
+        data["avatar"] = data.get("avatar_url")
+        return data
+
     def update(self, instance: UserProfile, validated_data):
-        # split nested user fields
+        """
+        Allow updating first/last name on the related User and avatar on the profile.
+        Pass 'avatar': null to remove image, or use 'remove_avatar' flag in the view.
+        """
         user_data = validated_data.pop("user", {})
         avatar_file = validated_data.pop("avatar", serializers.empty)
 
-        # update user core fields
-        updated_user = False
-        for field in ("username", "email", "first_name", "last_name"):
+        # Update user fields if provided
+        user = instance.user
+        changed = False
+        for field in ("first_name", "last_name"):
             if field in user_data:
-                setattr(instance.user, field, user_data[field])
-                updated_user = True
-        if updated_user:
-            instance.user.save(update_fields=[f for f in ("username","email","first_name","last_name") if f in user_data])
+                setattr(user, field, user_data[field])
+                changed = True
+        if changed:
+            user.save(update_fields=["first_name", "last_name"])
 
-        # avatar handling
+        # Update avatar if provided in payload
         if avatar_file is not serializers.empty:
             if avatar_file is None:
+                # remove existing avatar
                 if instance.avatar:
                     try:
                         instance.avatar.delete(save=False)
@@ -215,9 +225,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
             else:
                 instance.avatar = avatar_file
 
-        # update any remaining profile fields (rare)
-        for k, v in validated_data.items():
-            setattr(instance, k, v)
-
+        # Save profile (captures avatar + updated_at)
         instance.save()
         return instance

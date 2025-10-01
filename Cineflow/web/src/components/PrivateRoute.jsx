@@ -4,13 +4,12 @@ import api from "@/api/client";
 import { safeLocalStorage } from "@/api/auth";
 
 export default function PrivateRoute({ children }) {
-  const location = useLocation();
-  const token = safeLocalStorage.getItem("access");
+  let token = "";
+  try { token = safeLocalStorage.getItem("access") || ""; } catch { token = ""; }
 
-  // no token -> go to login immediately
-  if (!token) {
-    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
-  }
+  if (!token) return <Navigate to="/login" replace />;
+  return children;
+}
 
   // check: verify token actually works with the backend
   const [status, setStatus] = useState<"checking" | "ok" | "fail">("checking");
@@ -42,4 +41,3 @@ export default function PrivateRoute({ children }) {
   }
 
   return children;
-}
