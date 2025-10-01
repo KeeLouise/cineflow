@@ -148,19 +148,21 @@ class RoomReorderSerializer(serializers.Serializer):
         return ids
 
 # --- User Profile ---
-from django.contrib.auth.models import User
-from rest_framework import serializers
-from .models import UserProfile
 
+from typing import Optional
+from django.contrib.auth import get_user_model
+from .models import UserProfile
+UserModel = get_user_model()
+
+User = get_user_model()
 class UserProfileMeSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField(read_only=True)
-    avatar = serializers.SerializerMethodField(read_only=True)  # URL only
+    avatar = serializers.SerializerMethodField(read_only=True)          
     email_verified = serializers.SerializerMethodField(read_only=True)
     two_factor_enabled = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
-        model = User
-        # All user-facing profile fields come from User; avatar is read from UserProfile
+        model = UserModel
         fields = [
             "username",
             "email",
@@ -173,14 +175,18 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["full_name", "email_verified", "two_factor_enabled", "avatar"]
 
-    def get_full_name(self, obj: User):
-        full = f"{(obj.first_name or '').strip()} {(obj.last_name or '').strip()}".strip()
-        return full or obj.username
+    # --- computed fields ---
 
-    def get_avatar(self, obj: User):
-        try:
-            prof = obj.userprofile  
-        except UserProfile.DoesNotExist:
+    def get_full_name(self, obj) -> str:
+        fn = (getattr(obj, "first_name", "") or "").strip()
+        ln = (getattr(obj, "last_name", "") or "").strip()
+        full = f"{fn} {ln}".strip()
+        return full or getattr(obj, "username", "")
+
+    def get_avatar(self, obj) -> Optional[str]:
+        # Prefer the reverse OneToOne name your model uses; common are `userprofile` or `profile`
+        prof = getattr(obj, "userprofile", None) or getattr(obj, "profile", None)
+        if not prof:
             return None
         img = getattr(prof, "avatar", None)
         try:
@@ -188,19 +194,17 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
-    def get_email_verified(self, obj: User):
-        prof = getattr(obj, "userprofile", None)
+    def get_email_verified(self, obj) -> bool:
+        prof = getattr(obj, "userprofile", None) or getattr(obj, "profile", None)
         return bool(getattr(prof, "email_verified", False)) if prof else False
 
-    def get_two_factor_enabled(self, obj: User):
-        prof = getattr(obj, "userprofile", None)
+    def get_two_factor_enabled(self, obj) -> bool:
+        prof = getattr(obj, "userprofile", None) or getattr(obj, "profile", None)
         return bool(getattr(prof, "two_factor_enabled", False)) if prof else False
 
-    def update(self, instance: User, validated_data):
-        """
-        Allow PATCH of first_name, last_name, email, username.
-        Avatar changes are handled in the view via request.FILES (so we can also support remove flag).
-        """
+    # --- partial updates for name/email/username ---
+
+    def update(self, instance, validated_data):
         username = validated_data.pop("username", None)
         if username and username != instance.username:
             instance.username = username
