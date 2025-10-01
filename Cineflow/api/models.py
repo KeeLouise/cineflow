@@ -5,7 +5,6 @@ from django.utils.crypto import get_random_string  # for simple invite codes - K
 from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from cloudinary_storage.storage import MediaCloudinaryStorage
 
 
 # user profile model - KR 30/09/2025
@@ -17,8 +16,16 @@ class UserProfile(models.Model):
         on_delete=models.CASCADE,
         related_name="profile",
     )
-    avatar = models.ImageField(upload_to="avatars/", storage=MediaCloudinaryStorage(), blank=True, null=True)
+    avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # 2FA
+    two_factor_enabled = models.BooleanField(default=False)
+    two_factor_secret = models.CharField(max_length=64, blank=True, default="")
+    two_factor_confirmed_at = models.DateTimeField(blank=True, null=True)
+    # verification
+    email_verified = models.BooleanField(default=False)
+
 
     def __str__(self):
         return f"Profile({self.user.username})"
