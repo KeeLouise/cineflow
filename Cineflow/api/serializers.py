@@ -9,8 +9,6 @@ from .models import (
     Room, RoomMembership, RoomMovie, WatchRoomVote, WatchlistCollaborator,
 )
 
-from .models import UserProfile
-
 User = get_user_model()
 
 # Allowed item statuses – KR 27/09/2025
@@ -42,18 +40,20 @@ class RegisterSerializer(serializers.ModelSerializer):
         return v
 
     def create(self, validated_data):
+        """
+        Create a normal *active* user so they can log in immediately.
+        Email verification can happen later and gates enabling 2FA.
+        """
         username = (validated_data.get("username") or "").strip()
         email = (validated_data.get("email") or "").strip().lower()
         password = validated_data.get("password")
 
         user = User.objects.create_user(username=username, email=email, password=password)
 
-        # Ensure active
+        # Ensure active (some custom user models may default to inactive)
         if not user.is_active:
             user.is_active = True
             user.save(update_fields=["is_active"])
-
-        UserProfile.objects.get_or_create(user=user)
 
         return user
 
@@ -126,20 +126,27 @@ class RoomMembershipSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "joined_at", "username", "avatar"]
 
     def get_avatar(self, obj) -> Optional[str]:
-        prof = getattr(obj.user, "profile", None) or getattr(obj.user, "userprofile", None)
-        if not prof:
-            return None
-        img = getattr(prof, "avatar", None)
-        if not img:
-            return None
+        """
+        Safe absolute URL for the member's avatar. Works with Cloudinary or local.
+        """
         try:
+            prof = getattr(obj.user, "profile", None) or getattr(obj.user, "userprofile", None)
+            if not prof:
+                return None
+            img = getattr(prof, "avatar", None)
+            if not img:
+                return None
+
             url = getattr(img, "url", None)
             if not url:
                 return None
-            if url.startswith("/media/media/"):
+
+            if isinstance(url, str) and url.startswith("/media/media/"):
                 url = url.replace("/media/media/", "/media/", 1)
+
             if url.startswith("http://") or url.startswith("https://"):
                 return url
+
             request = self.context.get("request")
             return request.build_absolute_uri(url) if (request and url) else url
         except Exception:
@@ -220,6 +227,7 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
     avatar = serializers.SerializerMethodField(read_only=True)
     email_verified = serializers.SerializerMethodField(read_only=True)
     two_factor_enabled = serializers.SerializerMethodField(read_only=True)
+    profile_updated_at = serializers.SerializerMethodField(read_only=True)  # for cache-busting
 
     class Meta:
         model = User
@@ -232,9 +240,11 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
             "email_verified",
             "two_factor_enabled",
             "avatar",
+            "profile_updated_at",
         ]
-        read_only_fields = ["full_name", "email_verified", "two_factor_enabled", "avatar"]
+        read_only_fields = ["full_name", "email_verified", "two_factor_enabled", "avatar", "profile_updated_at"]
 
+    # computed fields
     def get_full_name(self, obj) -> str:
         fn = (getattr(obj, "first_name", "") or "").strip()
         ln = (getattr(obj, "last_name", "") or "").strip()
@@ -242,30 +252,51 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         return full or getattr(obj, "username", "")
 
     def get_avatar(self, obj) -> Optional[str]:
-        prof = getattr(obj, "profile", None) or getattr(obj, "userprofile", None)
-        if not prof:
-            return None
-
-        img = getattr(prof, "avatar", None)
-        if not img:
-            return None
-
+        """
+        Safe absolute URL for the user's avatar. Works with Cloudinary (absolute)
+        or local storage (/media/...). Never raises.
+        """
         try:
+            prof = getattr(obj, "profile", None) or getattr(obj, "userprofile", None)
+            if not prof:
+                return None
+
+            img = getattr(prof, "avatar", None)
+            if not img:
+                return None
+
             url = getattr(img, "url", None)
             if not url:
                 return None
 
-            if url.startswith("/media/media/"):
+            # Fix accidental double /media
+            if isinstance(url, str) and url.startswith("/media/media/"):
                 url = url.replace("/media/media/", "/media/", 1)
 
-            if url.startswith("http://") or url.startswith("https://"):
+            # If Cloudinary (absolute), just return it
+            if isinstance(url, str) and (url.startswith("http://") or url.startswith("https://")):
                 return url
 
+            # Otherwise make it absolute (helps local/dev)
             request = self.context.get("request")
-            return request.build_absolute_uri(url) if request else url
+            return request.build_absolute_uri(url) if (request and isinstance(url, str)) else url
         except Exception:
             return None
 
+    def get_email_verified(self, obj) -> bool:
+        prof = getattr(obj, "profile", None) or getattr(obj, "userprofile", None)
+        return bool(getattr(prof, "email_verified", False)) if prof else False
+
+    def get_two_factor_enabled(self, obj) -> bool:
+        prof = getattr(obj, "profile", None) or getattr(obj, "userprofile", None)
+        return bool(getattr(prof, "two_factor_enabled", False)) if prof else False
+
+    def get_profile_updated_at(self, obj) -> Optional[str]:
+        prof = getattr(obj, "profile", None) or getattr(obj, "userprofile", None)
+        ts = getattr(prof, "updated_at", None)
+        return ts.isoformat() if ts else None
+
+    # partial updates for name/email/username
     def update(self, instance, validated_data):
         update_fields = []
 
