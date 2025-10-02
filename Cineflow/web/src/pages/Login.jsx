@@ -4,6 +4,9 @@ import api from "@/api/client";
 import { setTokens } from "@/api/auth";
 import "@/styles/security.css";
 
+const RESEND_COOLDOWN_SECONDS =
+  Number(import.meta.env.VITE_OTP_RESEND_COOLDOWN) || 60;
+
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -13,6 +16,7 @@ export default function Login() {
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,6 +36,19 @@ export default function Login() {
     return data;
   }
 
+  function startCooldown(seconds = RESEND_COOLDOWN_SECONDS) {
+    setCooldown(seconds);
+    const id = setInterval(() => {
+      setCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(id);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     setErr(""); setMsg(""); setLoading(true);
@@ -44,16 +61,14 @@ export default function Login() {
         return;
       }
 
-      // Unexpected success shape
       setErr("Unexpected response from server.");
     } catch (e2) {
       const body = e2?.response?.data || {};
-      // Backend signals email-OTP step with an `otp` field (array/string)
       if (body?.otp) {
         setNeedsOtp(true);
-        // Show server message if present (e.g. "We've sent a code to your email.")
         const text = Array.isArray(body.otp) ? body.otp[0] : String(body.otp);
         setMsg(text || "We emailed you a 6-digit code. Enter it to continue.");
+        startCooldown(); // 60s
       } else {
         setErr(body?.detail || e2.message || "Login failed.");
       }
@@ -63,19 +78,19 @@ export default function Login() {
   }
 
   async function onResend() {
-    // Re-trigger first step: call /token/ again WITHOUT otp - KR 02/10/2025
     setMsg("Requesting a new code…");
     setErr("");
     setLoading(true);
     try {
       await api.post("/token/", { username, password });
-      // If server still returns 400 with otp, catch block in onSubmit handles it - KR 02/10/2025
       setMsg("We sent you a new code (check spam too).");
+      startCooldown(); // 60s
     } catch (e2) {
       const body = e2?.response?.data || {};
       if (body?.otp) {
         const text = Array.isArray(body.otp) ? body.otp[0] : String(body.otp);
         setMsg(text || "We emailed you a 6-digit code.");
+        startCooldown(); // 60s
       } else {
         setErr(body?.detail || e2.message || "Could not resend code.");
       }
@@ -157,10 +172,10 @@ export default function Login() {
                 className="btn btn-outline-dark ms-auto"
                 type="button"
                 onClick={onResend}
-                disabled={loading}
-                title="Request a new code (rate-limited)"
+                disabled={loading || cooldown > 0}
+                title={cooldown > 0 ? `You can resend in ${cooldown}s` : "Request a new code (rate-limited)"}
               >
-                Resend code
+                {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
               </button>
             </div>
           </form>

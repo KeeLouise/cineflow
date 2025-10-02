@@ -26,35 +26,32 @@ class ActiveUserTokenObtainPairSerializer(TokenObtainPairSerializer):
         token["two_factor_enabled"] = bool(getattr(prof, "two_factor_enabled", False))
         return token
 
-    def validate(self, attrs):
-        otp_code = (attrs.pop("otp", None) or "").strip()
-        data = super().validate(attrs)         # authenticates username/password - KR 02/10/2025
-        user = self.user
+    
+def validate(self, attrs):
+    otp_code = attrs.pop("otp", None)
+    data = super().validate(attrs)
+    user = self.user
+    prof = _get_profile(user)
 
-        if not user.is_active:
-            raise serializers.ValidationError("User account is inactive.")
+    if prof and getattr(prof, "two_factor_enabled", False):
+        # if no code provided → send new OTP + raise ValidationError
+        if not otp_code:
+            code = generate_and_store_code(user)
+            if code:
+                try:
+                    send_code_email(user, code)
+                except Exception:
+                    pass
+            raise serializers.ValidationError(
+                {"otp": ["We’ve sent a code to your email. Please enter it."]}
+            )
 
-        prof = _get_profile(user)
-        tfa_on = bool(getattr(prof, "two_factor_enabled", False))
-
-        if tfa_on:
-            if not otp_code:
-                # No code provided → send code then prompt for OTP - KR 02/10/2025
-                if not user.email:
-                    raise serializers.ValidationError({"otp": ["No email on account to receive a code."]})
-                code = generate_and_store_code(user)
-                if code is not None:
-                    try:
-                        send_code_email(user, code)
-                    except Exception:
-                        pass
-                # Tell client to ask for OTP - - KR 02/10/2025
-                raise serializers.ValidationError({"otp": ["OTP code required. We've sent a code to your email."]}, code="otp_required")
-
-            # Code provided → verify
-            cached = pop_code(user)  # single-use
-            if (not cached) or (otp_code != cached):
-                raise serializers.ValidationError({"otp": ["Invalid or expired OTP."]})
+        # if code provided → verify
+        expected = pop_code(user)
+        if not expected:
+            raise serializers.ValidationError({"otp": ["Code expired. Request a new one."]})
+        if str(otp_code).strip() != str(expected):
+            raise serializers.ValidationError({"otp": ["Invalid code."]})
 
         # Normal JWT payload - - KR 02/10/2025
         refresh = self.get_token(user)
