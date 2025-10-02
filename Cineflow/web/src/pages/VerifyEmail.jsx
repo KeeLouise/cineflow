@@ -1,80 +1,63 @@
-import { useSearchParams, Link } from "react-router-dom";
-import api from "@/api/client";
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
+import API_ROOT from "@/utils/apiRoot";
 
 export default function VerifyEmail() {
-  const [params] = useSearchParams();
-  const ok = params.get("ok");
-  const reason = params.get("reason");
+  const [state, setState] = useState({ status: "working", message: "Verifying your email…" });
 
-  const [resending, setResending] = useState(false);
-  const [resendMsg, setResendMsg] = useState("");
-
-  async function handleResend() {
-    setResending(true);
-    setResendMsg("");
-    try {
-      await api.post("/auth/resend_me/");
-      setResendMsg("Verification email sent! Check your inbox.");
-    } catch {
-      setResendMsg("Could not resend verification email. Try again later.");
-    } finally {
-      setResending(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (!token) {
+      setState({ status: "error", message: "Missing verification token." });
+      return;
     }
-  }
 
-  if (ok === "1") {
-    return (
-      <div className="container py-4">
-        <div className="alert alert-success mb-3">
-          ✅ Your email has been verified successfully!
-        </div>
-        <Link to="/login" className="btn btn-gradient">
-          Go to Login
-        </Link>
-      </div>
-    );
-  }
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API_ROOT}/auth/verify/?token=${encodeURIComponent(token)}&redirect=0`,
+          { method: "GET", credentials: "omit" }
+        );
+        const data = await res.json().catch(() => ({}));
 
-  if (ok === "0" && reason === "expired") {
-    return (
-      <div className="container py-4">
-        <div className="alert alert-warning mb-3">
-          ⚠️ Verification link expired. Please request a new one.
-        </div>
-        <button
-          className="btn btn-outline-dark"
-          onClick={handleResend}
-          disabled={resending}
-        >
-          {resending ? "Resending…" : "Resend verification email"}
-        </button>
-        {resendMsg && <div className="mt-2 alert alert-info">{resendMsg}</div>}
-      </div>
-    );
-  }
-
-  if (ok === "0" && reason === "invalid") {
-    return (
-      <div className="container py-4">
-        <div className="alert alert-danger mb-3">
-          ❌ Invalid verification link. Please request a new one.
-        </div>
-        <button
-          className="btn btn-outline-dark"
-          onClick={handleResend}
-          disabled={resending}
-        >
-          {resending ? "Resending…" : "Resend verification email"}
-        </button>
-        {resendMsg && <div className="mt-2 alert alert-info">{resendMsg}</div>}
-      </div>
-    );
-  }
+        if (res.ok) {
+          setState({ status: "ok", message: "Email verified! You can now sign in." });
+        } else {
+          const detail = (data && data.detail) || "Verification failed.";
+          if (/expired/i.test(detail)) {
+            setState({ status: "expired", message: "Verification link expired. Please request a new one." });
+          } else if (/invalid/i.test(detail)) {
+            setState({ status: "error", message: "Invalid verification link." });
+          } else {
+            setState({ status: "error", message: detail });
+          }
+        }
+      } catch (e) {
+        console.error("Verify error:", e);
+        setState({ status: "error", message: "Network error verifying email. Try again." });
+      }
+    })();
+  }, []);
 
   return (
     <div className="container py-4">
-      <div className="alert alert-info">Processing verification…</div>
+      {state.status === "working" && <div className="alert alert-info">{state.message}</div>}
+      {state.status === "ok" && <div className="alert alert-success">{state.message}</div>}
+      {state.status === "expired" && (
+        <div className="alert alert-warning">
+          {state.message}
+          <div className="mt-3">
+            <a className="btn btn-outline-dark" href="/profile">Resend from Profile</a>
+          </div>
+        </div>
+      )}
+      {state.status === "error" && <div className="alert alert-danger">{state.message}</div>}
+
+      {(state.status === "ok" || state.status === "error") && (
+        <div className="mt-3">
+          <a className="btn btn-gradient" href="/login">Go to Login</a>
+        </div>
+      )}
     </div>
   );
 }
