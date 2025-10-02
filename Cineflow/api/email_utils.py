@@ -4,9 +4,6 @@ from django.urls import reverse
 from .tokens import make_email_token
 
 def build_verify_url(request, token):
-    fe = getattr(settings, "FRONTEND_URL", "") or ""
-    if fe:
-        return f"{fe.rstrip('/')}/verify-email?token={token}"
     path = reverse("auth_verify_email")
     base = f"{request.scheme}://{request.get_host()}"
     return f"{base}{path}?token={token}"
@@ -24,7 +21,6 @@ def send_verification_email(user, request):
         "If you didn’t sign up, you can ignore this message.\n"
     )
 
-    # Respect EMAIL_TIMEOUT
     conn = get_connection(timeout=getattr(settings, "EMAIL_TIMEOUT", 10))
     EmailMessage(subject, body, sender, [user.email], connection=conn).send(fail_silently=False)
     return token, url

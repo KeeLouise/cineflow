@@ -14,7 +14,7 @@ import RoomDetail from "@/pages/RoomDetail";
 import Profile from "@/pages/Profile";
 import MovieDetail from "@/pages/MovieDetail";
 import SeeAllPage from "@/pages/SeeAllPage";
-
+import VerifyEmail from "@/pages/VerifyEmail";
 import PrivateRoute from "@/components/PrivateRoute";
 import AuthProvider from "@/auth/AuthContext"; 
 
@@ -27,6 +27,7 @@ const router = createBrowserRouter([
       { path: "/login", element: <Login /> },
       { path: "/register", element: <Register /> },
       { path: "/movie/:id", element: <MovieDetail /> },
+      { path: "/verify-email", element: <VerifyEmail /> },
 
       // Protected routes
       {
