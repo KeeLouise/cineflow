@@ -10,7 +10,7 @@ def build_verify_url(request, token):
         fe = fe.rstrip("/")
         return f"{fe}/verify-email?token={token}"
     
-    path = reverse("auth-verify-email")
+    path = reverse("auth_verify_email")
     base = f"{request.scheme}://{request.get_host()}"
     return f"{base}{path}?token={token}"
 
