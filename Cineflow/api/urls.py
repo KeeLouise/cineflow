@@ -29,6 +29,8 @@ from api.views.auth_views import (
 )
 from api.views.jwt_views import ActiveUserTokenObtainPairView
 
+from api.views.two_factor_email import email2fa_enable, email2fa_disable
+
 
 urlpatterns = [
     # --- Auth (JWT) ---
@@ -93,4 +95,6 @@ urlpatterns = [
     # Auth Email
 
     path("auth/resend_me/", resend_verification_authenticated, name="auth_resend_me"),
+    path("auth/2fa/email/enable/", email2fa_enable, name="email2fa_enable"),
+    path("auth/2fa/email/disable/", email2fa_disable, name="email2fa_disable"),
 ]

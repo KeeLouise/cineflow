@@ -3,6 +3,46 @@
 const ACCESS_KEY = "access";
 const REFRESH_KEY = "refresh";
 
+// Email 2FA–aware login helper 
+
+import API_ROOT from "@/utils/apiRoot";
+
+export async function loginAttempt({ username, password, otp } = {}) {
+  const body = { username, password };
+  if (otp) body.otp = otp;
+
+  const res = await fetch(`${API_ROOT}/token/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (res.ok) {
+    // success: persist tokens the same way the rest of your app expects
+    if (data?.access || data?.refresh) {
+      setTokens({ access: data.access, refresh: data.refresh });
+    }
+    return { ok: true, data };
+  }
+
+  // 400 from server with an OTP hint means "OTP required" or "invalid/expired OTP"
+  if (data?.otp) {
+    return {
+      ok: false,
+      otpRequired: true,
+      message: Array.isArray(data.otp) ? data.otp[0] : String(data.otp),
+    };
+  }
+
+  // generic error
+  return {
+    ok: false,
+    message: data?.detail || "Invalid credentials.",
+  };
+}
+
 //wrapper in case window/localstorage is not available - KR 25/09/2025
 export const safeLocalStorage =
   typeof window !== "undefined" && window.localStorage

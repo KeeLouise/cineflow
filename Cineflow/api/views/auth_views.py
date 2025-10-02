@@ -74,49 +74,51 @@ def register(request):
     )
 
 
-# Verify email (via link)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def verify_email(request):
     """
     GET /api/auth/verify/?token=...
-    Validates token. On success, activates user.
-    Redirects to FRONTEND_URL/verify-email?ok=1 (or ?ok=0&reason=expired|invalid) when FRONTEND_URL is set
-    unless redirect=0 is passed in query.
+    Validates token. On success, activates user and marks profile.email_verified=True (if present).
+    Redirects to FRONTEND_URL/verify-email?ok=1 (or ...?ok=0&reason=expired|invalid) when FRONTEND_URL is set,
+    unless redirect=0 is passed in the querystring.
     """
     token = request.query_params.get("token", "")
     redirect_param = request.query_params.get("redirect", "1")
     redirect_ok = (redirect_param != "0")
-    fe = _frontend_base()
+    fe = (getattr(settings, "FRONTEND_URL", None) or "").rstrip("/")
 
     if not token:
         return Response({"detail": "Missing token."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        payload = read_email_token(token)
+        payload = read_email_token(token)  # e.g. {'uid': 1, 'email': 'user@example.com'}
         user = get_object_or_404(User, pk=payload["uid"], email=payload["email"])
     except signing.SignatureExpired:
-        # redirect to /verify-email with reason=expired
         if fe and redirect_ok:
             return redirect(f"{fe}/verify-email?ok=0&reason=expired")
-        return Response({"detail": "Token expired. Please request a new verification email."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"detail": "Token expired. Please request a new verification email."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     except signing.BadSignature:
-        # redirect to /verify-email with reason=invalid
         if fe and redirect_ok:
             return redirect(f"{fe}/verify-email?ok=0&reason=invalid")
         return Response({"detail": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Activate account if not already active
+    # Activate account if needed
     if not user.is_active:
         user.is_active = True
         user.save(update_fields=["is_active"])
 
+    # Also mark profile.email_verified = True when that field exists
     prof = getattr(user, "userprofile", None) or getattr(user, "profile", None)
     if prof and hasattr(prof, "email_verified") and not getattr(prof, "email_verified", False):
         try:
             prof.email_verified = True
             prof.save(update_fields=["email_verified"])
         except Exception:
+            # Non-fatal; verification succeeded for the account regardless
             pass
 
     if fe and redirect_ok:
