@@ -7,7 +7,6 @@ from rest_framework import serializers
 from .models import (
     Watchlist, WatchlistItem, MoodKeyword,
     Room, RoomMembership, RoomMovie, WatchRoomVote, WatchlistCollaborator,
-    UserProfile,
 )
 
 User = get_user_model()
@@ -45,13 +44,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         Create a normal *active* user so they can log in immediately.
         Email verification will still be emailed and gates enabling 2FA.
         """
-        username = validated_data.get("username").strip()
+        username = validated_data.get("username", "").strip()
         email = (validated_data.get("email") or "").strip().lower()
         password = validated_data.get("password")
 
         user = User.objects.create_user(username=username, email=email, password=password)
 
-        # Ensure active
         if not user.is_active:
             user.is_active = True
             user.save(update_fields=["is_active"])
@@ -126,14 +124,23 @@ class RoomMembershipSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "username", "avatar", "is_host", "joined_at"]
         read_only_fields = ["id", "joined_at", "username", "avatar"]
 
-    def get_avatar(self, obj):
-        prof = getattr(obj.user, "profile", None)
-        if prof and prof.avatar:
-            try:
-                return prof.avatar.url
-            except Exception:
-                return None
-        return None
+    def get_avatar(self, obj) -> Optional[str]:
+        prof = getattr(obj.user, "profile", None) or getattr(obj.user, "userprofile", None)
+        if not prof:
+            return None
+        img = getattr(prof, "avatar", None)
+        if not img:
+            return None
+        try:
+            url = img.url  # Cloudinary returns absolute; local returns /media/...
+            if isinstance(url, str) and url.startswith("/media/media/"):
+                url = url.replace("/media/media/", "/media/", 1)
+            if url.startswith("http://") or url.startswith("https://"):
+                return url
+            request = self.context.get("request")
+            return request.build_absolute_uri(url) if (request and url) else url
+        except Exception:
+            return None
 
 
 class RoomVoteSerializer(serializers.ModelSerializer):
@@ -225,7 +232,6 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["full_name", "email_verified", "two_factor_enabled", "avatar"]
 
-    # computed fields
     def get_full_name(self, obj) -> str:
         fn = (getattr(obj, "first_name", "") or "").strip()
         ln = (getattr(obj, "last_name", "") or "").strip()
@@ -236,31 +242,19 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         prof = getattr(obj, "profile", None) or getattr(obj, "userprofile", None)
         if not prof:
             return None
-
         img = getattr(prof, "avatar", None)
         if not img:
             return None
-
         try:
             url = img.url
             if isinstance(url, str) and url.startswith("/media/media/"):
                 url = url.replace("/media/media/", "/media/", 1)
-
             if url.startswith("http://") or url.startswith("https://"):
                 return url
-
             request = self.context.get("request")
-            return request.build_absolute_uri(url) if request else url
+            return request.build_absolute_uri(url) if (request and url) else url
         except Exception:
             return None
-
-    def get_email_verified(self, obj) -> bool:
-        prof = getattr(obj, "userprofile", None) or getattr(obj, "profile", None)
-        return bool(getattr(prof, "email_verified", False)) if prof else False
-
-    def get_two_factor_enabled(self, obj) -> bool:
-        prof = getattr(obj, "userprofile", None) or getattr(obj, "profile", None)
-        return bool(getattr(prof, "two_factor_enabled", False)) if prof else False
 
     def update(self, instance, validated_data):
         update_fields = []

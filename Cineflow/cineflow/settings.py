@@ -140,33 +140,29 @@ CACHES = {
     }
 }
 
-# --- Media / Cloudinary ---
+# --- Cloudinary media storage ---
+CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
+
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
-
 if CLOUDINARY_URL:
-    # Cloudinary first, then storage
-    if "cloudinary" not in INSTALLED_APPS:
-        INSTALLED_APPS += ["cloudinary"]
-    if "cloudinary_storage" not in INSTALLED_APPS:
-        INSTALLED_APPS += ["cloudinary_storage"]
-
+    INSTALLED_APPS = [
+        "cloudinary_storage",
+        "django.contrib.staticfiles",
+        "cloudinary",
+        *[a for a in INSTALLED_APPS if a not in ("cloudinary_storage",
+                                                 "django.contrib.staticfiles",
+                                                 "cloudinary")],
+    ]
     DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-
-    # SECURE=True gives https urls
-    CLOUDINARY_STORAGE = {
-        "SECURE": True,
-    }
-
 else:
-    # Fallback to local only in dev
     DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
-
-if not DEBUG and not CLOUDINARY_URL:
-    raise RuntimeError("CLOUDINARY_URL must be set in production.")
-
+    
 #  Security
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
