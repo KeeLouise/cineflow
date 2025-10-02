@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getMyProfile, updateMyProfile } from "@/api/profile";
-import api from "@/api/client"; 
-import {
-  start2FAEmailSetup,
-  confirm2FAEmailSetup,
-  disable2FAEmail,
-} from "@/api/account";
+import api from "@/api/client";
+import { enableEmail2FA, disableEmail2FA } from "@/api/account";
 import "@/styles/security.css";
 
 export default function Profile() {
@@ -15,11 +11,9 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [resendMsg, setResendMsg] = useState("");
 
-  // 2FA state
-  const [setupToken, setSetupToken] = useState("");
-  const [code, setCode] = useState("");
+  // 2FA UI state
   const [twoFaMsg, setTwoFaMsg] = useState("");
-  const [twoFaError, setTwoFaError] = useState("");
+  const [tfaBusy, setTfaBusy] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -60,42 +54,40 @@ export default function Profile() {
     }
   }
 
-  async function handleEnable2FA() {
-    setTwoFaError(""); setTwoFaMsg("");
+  async function refreshMe() {
     try {
-      const data = await start2FAEmailSetup();
-      setSetupToken(data.setup_token);
-      setTwoFaMsg("We emailed you a 6-digit code. Enter it below to confirm enabling 2FA.");
-    } catch (err) {
-      setTwoFaError("Could not start 2FA setup.");
-    }
+      const data = await getMyProfile();
+      setMe(data);
+    } catch {}
   }
 
-  async function handleConfirm2FA(e) {
-    e.preventDefault();
-    setTwoFaError(""); setTwoFaMsg("");
+  async function handleEnable2FA() {
+    setTwoFaMsg("");
+    setError("");
+    setTfaBusy(true);
     try {
-      const data = await confirm2FAEmailSetup({ code, setupToken });
-      if (data.enabled) {
-        setTwoFaMsg("Email-based 2FA has been enabled.");
-        setMe({ ...me, two_factor_enabled: true });
-        setSetupToken(""); setCode("");
-      }
-    } catch {
-      setTwoFaError("Invalid code. Please try again.");
+      await enableEmail2FA();
+      setTwoFaMsg("Email 2FA enabled. Next login will require a 6-digit code sent to your email.");
+      await refreshMe();
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Could not enable 2FA.");
+    } finally {
+      setTfaBusy(false);
     }
   }
 
   async function handleDisable2FA() {
-    setTwoFaError(""); setTwoFaMsg("");
+    setTwoFaMsg("");
+    setError("");
+    setTfaBusy(true);
     try {
-      const data = await disable2FAEmail();
-      if (data.disabled) {
-        setTwoFaMsg("2FA disabled.");
-        setMe({ ...me, two_factor_enabled: false });
-      }
-    } catch {
-      setTwoFaError("Could not disable 2FA.");
+      await disableEmail2FA();
+      setTwoFaMsg("Email 2FA disabled.");
+      await refreshMe();
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Could not disable 2FA.");
+    } finally {
+      setTfaBusy(false);
     }
   }
 
@@ -184,37 +176,30 @@ export default function Profile() {
 
       {/* 2FA SECTION */}
       <div className="glass security-card p-3">
-        <h2 className="h5">Two-Factor Authentication</h2>
-        {twoFaError && <div className="alert alert-danger">{twoFaError}</div>}
+        <h2 className="h5">Two-Factor Authentication (Email code)</h2>
         {twoFaMsg && <div className="alert alert-info">{twoFaMsg}</div>}
 
         {!me?.two_factor_enabled ? (
-          setupToken ? (
-            <form onSubmit={handleConfirm2FA}>
-              <label className="form-label mt-2">Enter the 6-digit code:</label>
-              <input
-                className="form-control wl-input"
-                inputMode="numeric"
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="123456"
-                required
-              />
-              <button className="btn btn-gradient mt-2" type="submit">
-                Confirm & Enable
-              </button>
-            </form>
-          ) : (
-            <button className="btn btn-outline-dark mt-2" onClick={handleEnable2FA}>
-              Enable Email 2FA
-            </button>
-          )
+          <button
+            className="btn btn-outline-primary mt-2"
+            onClick={handleEnable2FA}
+            disabled={tfaBusy || !me?.email}
+            title={!me?.email ? "Add an email first" : ""}
+          >
+            {tfaBusy ? "Enabling…" : "Enable Email 2FA"}
+          </button>
         ) : (
-          <button className="btn btn-danger mt-2" onClick={handleDisable2FA}>
-            Disable 2FA
+          <button
+            className="btn btn-outline-danger mt-2"
+            onClick={handleDisable2FA}
+            disabled={tfaBusy}
+          >
+            {tfaBusy ? "Disabling…" : "Disable 2FA"}
           </button>
         )}
+        <p className="text-muted mt-2 mb-0">
+          When enabled, each sign-in emails you a 6-digit code. Enter that code on the login screen.
+        </p>
       </div>
     </div>
   );
