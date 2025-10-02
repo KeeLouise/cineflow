@@ -13,6 +13,7 @@ debugpy==1.8.12
 decorator==5.1.1
 dj-database-url==2.2.0
 Django==5.2.3
+django-anymail>=10.0
 django-cloudinary-storage==0.3.0
 django-cors-headers==4.7.0
 django-crispy-forms==2.4
