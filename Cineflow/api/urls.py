@@ -93,5 +93,5 @@ urlpatterns = [
     # Auth Email
 
     path("auth/email/resend/", resend_email_verification, name="resend-email"),
-    path("auth/email/verify/", verify_email, name="verify-email"),
+    path("auth/email/verify/", verify_email, name="verify-email")
 ]
