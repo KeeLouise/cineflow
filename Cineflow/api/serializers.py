@@ -24,7 +24,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ("username", "password", "email")
 
-    # Case-insensitive uniqueness + normalization
     def validate_username(self, value: str) -> str:
         v = (value or "").strip()
         if not v:
@@ -234,21 +233,24 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         return full or getattr(obj, "username", "")
 
     def get_avatar(self, obj) -> Optional[str]:
-        prof = getattr(obj, "userprofile", None) or getattr(obj, "profile", None)
+        prof = getattr(obj, "profile", None) or getattr(obj, "userprofile", None)
         if not prof:
             return None
+
         img = getattr(prof, "avatar", None)
         if not img:
             return None
+
         try:
             url = img.url
-            # Clean up duplicate "media/media"
-            if url.startswith("/media/media/"):
+            if isinstance(url, str) and url.startswith("/media/media/"):
                 url = url.replace("/media/media/", "/media/", 1)
+
+            if url.startswith("http://") or url.startswith("https://"):
+                return url
+
             request = self.context.get("request")
-            if request:
-                return request.build_absolute_uri(url)
-            return url
+            return request.build_absolute_uri(url) if request else url
         except Exception:
             return None
 
@@ -260,12 +262,13 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         prof = getattr(obj, "userprofile", None) or getattr(obj, "profile", None)
         return bool(getattr(prof, "two_factor_enabled", False)) if prof else False
 
-    # partial updates for name/email/username
     def update(self, instance, validated_data):
         update_fields = []
 
         username = validated_data.pop("username", None)
         if username and username != instance.username:
+            if User.objects.filter(username__iexact=username).exclude(pk=instance.pk).exists():
+                raise serializers.ValidationError({"username": "This username is already taken."})
             instance.username = username
             update_fields.append("username")
 
@@ -274,6 +277,8 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
                 val = validated_data[fld]
                 if fld == "email":
                     val = (val or "").strip().lower()
+                    if User.objects.filter(email__iexact=val).exclude(pk=instance.pk).exists():
+                        raise serializers.ValidationError({"email": "This email is already taken."})
                 setattr(instance, fld, val)
                 update_fields.append(fld)
 
