@@ -102,7 +102,6 @@ export default function Navbar() {
     return (
       <div
         className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center"
-        style={{ width: size, height: size, fontSize: 14 }}
         aria-label="Avatar"
       >
         {initials}
