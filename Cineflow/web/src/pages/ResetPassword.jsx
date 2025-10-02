@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { confirmPasswordReset } from "@/api/account";
+import PasswordStrength from "@/components/PasswordStrength";
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
   const token = params.get("token") || "";
-  const navigate = useNavigate();
 
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
@@ -74,6 +74,8 @@ export default function ResetPassword() {
             minLength={8}
             autoFocus
           />
+          <PasswordStrength password={password} />
+
           <label className="form-label mt-2">Confirm new password</label>
           <input
             type="password"

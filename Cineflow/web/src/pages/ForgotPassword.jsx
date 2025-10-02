@@ -1,44 +1,37 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { requestPasswordReset } from "@/api/account";
+import AuthLayout from "@/components/AuthLayout";
+import AuthField from "@/components/AuthField";
+import AuthButton from "@/components/AuthButton";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e) {
     e.preventDefault();
-    setMsg(""); setErr(""); setLoading(true);
+    setMsg(""); setLoading(true);
     try {
       await requestPasswordReset(email);
       setMsg("If the address exists, we’ve emailed reset instructions.");
-    } catch (e2) {
-      setMsg("If the address exists, we’ve emailed reset instructions.");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
-  return (
-    <div className="container py-4" style={{ maxWidth: 420 }}>
-      <h1 className="h4 mb-3">Forgot your password?</h1>
-      {msg && <div className="alert alert-info">{msg}</div>}
-      {err && <div className="alert alert-danger">{err}</div>}
-      <form onSubmit={onSubmit}>
-        <label className="form-label">Email address</label>
-        <input
-          type="email"
-          className="form-control"
-          value={email}
-          onChange={(e)=>setEmail(e.target.value)}
-          required
-          autoFocus
-        />
-        <button className="btn btn-dark mt-3 w-100" disabled={loading}>
-          {loading ? "Sending…" : "Send reset link"}
-        </button>
-      </form>
+  const footer = (
+    <div className="auth-links">
+      <Link to="/login">Back to login</Link>
     </div>
+  );
+
+  return (
+    <AuthLayout title="Forgot your password?" subtitle="We’ll send you a reset link." footer={footer}>
+      {msg && <div className="callout info">{msg}</div>}
+      <form onSubmit={onSubmit} className="vstack gap-12">
+        <AuthField label="Email address" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required autoFocus />
+        <AuthButton type="submit" loading={loading}>Send reset link</AuthButton>
+      </form>
+    </AuthLayout>
   );
 }
