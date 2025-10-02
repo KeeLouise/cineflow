@@ -17,6 +17,8 @@ import SeeAllPage from "@/pages/SeeAllPage";
 import VerifyEmail from "@/pages/VerifyEmail";
 import PrivateRoute from "@/components/PrivateRoute";
 import AuthProvider from "@/auth/AuthContext"; 
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 
 // Define route tree
 const router = createBrowserRouter([
@@ -28,6 +30,8 @@ const router = createBrowserRouter([
       { path: "/register", element: <Register /> },
       { path: "/movie/:id", element: <MovieDetail /> },
       { path: "/verify-email", element: <VerifyEmail /> },
+      { path: "/forgot-password", element: <ForgotPassword /> },
+      { path: "/reset-password",  element: <ResetPassword /> },
 
       // Protected routes
       {

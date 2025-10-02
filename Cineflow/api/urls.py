@@ -30,6 +30,7 @@ from api.views.auth_views import (
 from api.views.jwt_views import ActiveUserTokenObtainPairView
 
 from api.views.two_factor_email import email2fa_enable, email2fa_disable
+from api.views.password_reset import password_reset_request, password_reset_confirm
 
 
 urlpatterns = [
@@ -97,4 +98,9 @@ urlpatterns = [
     path("auth/resend_me/", resend_verification_authenticated, name="auth_resend_me"),
     path("auth/2fa/email/enable/", email2fa_enable, name="email2fa_enable"),
     path("auth/2fa/email/disable/", email2fa_disable, name="email2fa_disable"),
+
+    # password Reset
+
+    path("auth/password/reset/", password_reset_request, name="password_reset_request"),
+    path("auth/password/reset/confirm/", password_reset_confirm, name="password_reset_confirm"),
 ]
