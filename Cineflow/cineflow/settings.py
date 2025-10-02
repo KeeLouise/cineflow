@@ -9,18 +9,22 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
-SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-dev-key") 
+SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-dev-key")
+
 ALLOWED_HOSTS = [
     "localhost", "127.0.0.1",
     ".onrender.com",
-    os.getenv("APP_DOMAIN", ""), 
+    os.getenv("APP_DOMAIN", ""),
 ]
 
-
+#  App constants / external APIs
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+SITE_NAME = "Cineflow"
 
+# Single, canonical FRONTEND_URL (used for email links, CORS/CSRF below)
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 
+# --- CORS / CSRF ---
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "https://*.onrender.com",
@@ -29,7 +33,6 @@ CSRF_TRUSTED_ORIGINS = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ] + ([FRONTEND_URL] if FRONTEND_URL else [])
-
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -43,15 +46,18 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "corsheaders",
 
+    # Email via HTTP providers (SendGrid/Mailgun/Postmark/etc.)
+    "anymail",
+
     "core",
     "api",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",       
+    "corsheaders.middleware.CorsMiddleware", 
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -78,6 +84,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "cineflow.wsgi.application"
 
+# --- Database ---
 DATABASES = {
     "default": dj_database_url.config(
         env="DATABASE_URL",
@@ -86,6 +93,7 @@ DATABASES = {
     )
 }
 
+# --- DRF / JWT ---
 SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
@@ -103,18 +111,22 @@ REST_FRAMEWORK = {
     ],
 }
 
-SITE_NAME = "Cineflow"
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://your-frontend.example.com")
-
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@cineflow.app")
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "no.reply.cineflow@gmail.com")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+#  Email (SendGrid via Anymail)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no.reply.cineflow@gmail.com")
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+if SENDGRID_API_KEY:
+    EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+    ANYMAIL = {"SENDGRID_API_KEY": SENDGRID_API_KEY}
+else:
+    # If no provider key set, be safe in dev: print emails to console.
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+if DEBUG and os.getenv("EMAIL_USE_CONSOLE_IN_DEBUG", "true").lower() == "true":
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+#  Caching
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -122,6 +134,7 @@ CACHES = {
     }
 }
 
+#  Static / Media
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
@@ -136,7 +149,7 @@ if CLOUDINARY_URL:
 else:
     DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
-
+#  Security
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 LANGUAGE_CODE = "en-us"
