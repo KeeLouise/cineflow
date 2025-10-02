@@ -1,49 +1,31 @@
 import api from "@/api/client";
-import { authFetch } from "@/api/auth"; 
-// Email verification (account activation)
-export async function resendVerificationEmail() {
-  try {
-    const { data } = await api.post("/auth/resend_me/");
-    return data; // { detail: "Verification email sent." }
-  } catch (e) {
-    const status = e?.response?.status;
-    const detail = e?.response?.data?.detail;
-    // Backend returns 400 when the account is already verified.
-    if (status === 400 && /already verified/i.test(String(detail || ""))) {
-      return { detail }; // treat as non-fatal "you're already verified"
-    }
-    throw e;
-  }
-}
+
+
+ // Email verification (account activation)
+ export async function resendVerificationEmail() {
+   try {
+     const { data } = await api.post("/auth/resend_me/");
+     return data; // { detail: "Verification email sent." }
+   } catch (e) {
+     const status = e?.response?.status;
+     const detail = e?.response?.data?.detail;
+     // Backend returns 400 when the account is already verified.
+     if (status === 400 && /already verified/i.test(String(detail || ""))) {
+       return { detail }; // treat as non-fatal "you're already verified"
+     }
+     throw e;
+   }
+ }
 
 // Email-based 2FA
 
-// Start enabling 2FA via email. Backend emails a code and returns a temporary setup token.
-export async function start2FAEmailSetup() {
-  const { data } = await api.post("/auth/2fa/email/setup/start/");
-  return data; // { setup_token }
+// Email-based 2FA (simple enable/disable; login OTP is handled by /token/)
+export async function enableEmail2FA() {
+  const { data } = await api.post("/auth/2fa/email/enable/");
+  return data; // { detail: "Email 2FA enabled." }
 }
 
-// Confirm enabling 2FA by submitting the emailed code and the setup token.
-export async function confirm2FAEmailSetup({ code, setupToken }) {
-  const { data } = await api.post("/auth/2fa/email/setup/confirm/", {
-    code: String(code || "").trim(),
-    setup_token: String(setupToken || "").trim(),
-  });
-  return data; // { enabled: true }
-}
-
-// Disable email 2FA
-export async function disable2FAEmail() {
+export async function disableEmail2FA() {
   const { data } = await api.post("/auth/2fa/email/disable/");
-  return data; // { disabled: true }
-}
-
-// Confirm the login-time MFA challenge using the code sent to email.
-export async function confirm2FAEmailLogin({ code, mfaToken }) {
-  const { data } = await api.post("/auth/2fa/email/confirm/", {
-    code: String(code || "").trim(),
-    mfa_token: String(mfaToken || "").trim(),
-  });
-  return data; 
+  return data; // { detail: "Email 2FA disabled." }
 }
