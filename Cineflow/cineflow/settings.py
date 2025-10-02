@@ -111,21 +111,19 @@ REST_FRAMEWORK = {
     ],
 }
 
-#  Email (SendGrid via Anymail)
+# Email (SendGrid via Anymail) — hard requirement
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no.reply.cineflow@gmail.com")
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 
+INSTALLED_APPS += ["anymail"]
+
+# Raise loudly if the key is missing so we don't silently use console
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-if SENDGRID_API_KEY:
-    EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
-    ANYMAIL = {"SENDGRID_API_KEY": SENDGRID_API_KEY}
-else:
-    # If no provider key set, be safe in dev: print emails to console.
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+if not SENDGRID_API_KEY:
+    raise RuntimeError("SENDGRID_API_KEY is not set in the environment")
 
-if DEBUG and os.getenv("EMAIL_USE_CONSOLE_IN_DEBUG", "true").lower() == "true":
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-
+EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+ANYMAIL = {"SENDGRID_API_KEY": SENDGRID_API_KEY}
 #  Caching
 CACHES = {
     "default": {
