@@ -2,13 +2,32 @@ import React, { useEffect, useState } from "react";
 import API_ROOT from "@/utils/apiRoot";
 
 export default function VerifyEmail() {
-  const [state, setState] = useState({ status: "working", message: "Verifying your email…" });
+  const [state, setState] = useState({
+    status: "working",
+    message: "Verifying your email…",
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const pending = params.get("ok") === "pending";
     const token = params.get("token");
+
+    // If came from Register: show "check inbox" and don't call API
+    if (pending && !token) {
+      setState({
+        status: "pending",
+        message:
+          "Account created. We’ve sent a verification email. Please check your inbox (and spam) to activate your account.",
+      });
+      return;
+    }
+
     if (!token) {
-      setState({ status: "error", message: "Missing verification token." });
+      setState({
+        status: "error",
+        message:
+          "Missing verification token. Open the verification link from your email, or request a new one from your profile.",
+      });
       return;
     }
 
@@ -21,41 +40,81 @@ export default function VerifyEmail() {
         const data = await res.json().catch(() => ({}));
 
         if (res.ok) {
-          setState({ status: "ok", message: "Email verified! You can now sign in." });
+          setState({
+            status: "ok",
+            message: "Email verified! You can now sign in.",
+          });
         } else {
           const detail = (data && data.detail) || "Verification failed.";
           if (/expired/i.test(detail)) {
-            setState({ status: "expired", message: "Verification link expired. Please request a new one." });
+            setState({
+              status: "expired",
+              message:
+                "Verification link expired. Please request a new one from your profile.",
+            });
           } else if (/invalid/i.test(detail)) {
-            setState({ status: "error", message: "Invalid verification link." });
+            setState({
+              status: "error",
+              message: "Invalid verification link. Request a new one.",
+            });
           } else {
             setState({ status: "error", message: detail });
           }
         }
       } catch (e) {
         console.error("Verify error:", e);
-        setState({ status: "error", message: "Network error verifying email. Try again." });
+        setState({
+          status: "error",
+          message: "Network error verifying email. Try again.",
+        });
       }
     })();
   }, []);
 
   return (
     <div className="container py-4">
-      {state.status === "working" && <div className="alert alert-info">{state.message}</div>}
-      {state.status === "ok" && <div className="alert alert-success">{state.message}</div>}
+      {state.status === "working" && (
+        <div className="alert alert-info">{state.message}</div>
+      )}
+
+      {state.status === "pending" && (
+        <div className="alert alert-info">
+          {state.message}
+          <div className="mt-3 d-flex gap-2">
+            <a className="btn btn-outline-dark" href="/login">
+              Go to Login
+            </a>
+            <a className="btn btn-outline-secondary" href="/profile">
+              Resend verification
+            </a>
+          </div>
+        </div>
+      )}
+
+      {state.status === "ok" && (
+        <div className="alert alert-success">{state.message}</div>
+      )}
+
       {state.status === "expired" && (
         <div className="alert alert-warning">
           {state.message}
           <div className="mt-3">
-            <a className="btn btn-outline-dark" href="/profile">Resend from Profile</a>
+            <a className="btn btn-outline-dark" href="/profile">
+              Resend from Profile
+            </a>
           </div>
         </div>
       )}
-      {state.status === "error" && <div className="alert alert-danger">{state.message}</div>}
+
+      {state.status === "error" && (
+        <div className="alert alert-danger">{state.message}</div>
+      )}
 
       {(state.status === "ok" || state.status === "error") && (
         <div className="mt-3">
-          <a className="btn btn-gradient" href="/login">Go to Login</a>
+          <a className="btn btn-gradient" href="/login">
+            Go to Login
+          </a>
         </div>
       )}
     </div>
