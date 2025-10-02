@@ -88,7 +88,6 @@ export function looksLoggedIn() {
 }
 
 // public: authoritative check – verifies/refreshes if needed - KR 02/09/2025
-import API_ROOT from "@/utils/apiRoot";
 export async function isAuthenticated() {
   const access = safeLocalStorage.getItem(ACCESS_KEY);
   if (access && !isExpired(access)) return true;
