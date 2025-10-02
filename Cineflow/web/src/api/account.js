@@ -1,5 +1,5 @@
 import api from "@/api/client";
-
+import { authFetch } from "@/api/auth"; 
 // Email verification (account activation)
 export async function resendVerificationEmail() {
   const res = await authFetch("/api/auth/email/resend/", { method: "POST" });
