@@ -8,20 +8,20 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# --- Core ---
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-dev-key")
 
 ALLOWED_HOSTS = [
-    "localhost", "127.0.0.1",
+    "localhost",
+    "127.0.0.1",
     ".onrender.com",
     os.getenv("APP_DOMAIN", ""),
 ]
 
-#  App constants / external APIs
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 SITE_NAME = "Cineflow"
 
-# Single, canonical FRONTEND_URL (used for email links, CORS/CSRF below)
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 
 # --- CORS / CSRF ---
@@ -34,6 +34,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ] + ([FRONTEND_URL] if FRONTEND_URL else [])
 
+# --- Apps ---
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -53,11 +54,12 @@ INSTALLED_APPS = [
     "api",
 ]
 
+# --- Middleware ---
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware", 
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -111,7 +113,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Email (SendGrid via Anymail)
+# --- Email  ---
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no.reply.cineflow@outlook.com")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
@@ -125,31 +127,30 @@ EMAIL_HOST_PASSWORD = os.getenv("SENDGRID_API_KEY", "")
 
 if not EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-#2FA Codes
 
-EMAIL_2FA_CODE_TTL = 300   # 5 minutes
-EMAIL_2FA_RATE_TTL = 60    # 1 min throttle for re-sends
+# 2FA / Password resets
+EMAIL_2FA_CODE_TTL = 300  
+EMAIL_2FA_RATE_TTL = 60  
+PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  
 
-PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  # seconds
-
-#  Caching
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "cineflow-cache",
-    }
-}
-
-# --- Cloudinary media storage ---
-CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
-
+# --- Static & Media (Django 5.x style) ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+if (BASE_DIR / "static").exists():
+    STATICFILES_DIRS = [BASE_DIR / "static"]
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+# --- Cloudinary media storage) ---
+CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
 if CLOUDINARY_URL:
     INSTALLED_APPS = [
         "cloudinary_storage",
@@ -159,11 +160,21 @@ if CLOUDINARY_URL:
                                                  "django.contrib.staticfiles",
                                                  "cloudinary")],
     ]
-    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+    # Use Cloudinary for media files
+    STORAGES["default"] = {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"}
 else:
-    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
-    
-#  Security
+    # Local filesystem for media in absence of Cloudinary
+    STORAGES["default"] = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+
+# --- Caching ---
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "cineflow-cache",
+    }
+}
+
+# --- Security / Headers ---
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 LANGUAGE_CODE = "en-us"
