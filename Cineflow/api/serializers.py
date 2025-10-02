@@ -184,15 +184,26 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         return full or getattr(obj, "username", "")
 
     def get_avatar(self, obj) -> Optional[str]:
-        # Prefer the reverse OneToOne name your model uses; common are `userprofile` or `profile`
         prof = getattr(obj, "userprofile", None) or getattr(obj, "profile", None)
         if not prof:
-            return None
+          return None
+
         img = getattr(prof, "avatar", None)
+        if not img:
+          return None
         try:
-            return img.url if img else None
+            url = img.url
+        # Clean up duplicate "media/media"
+            if url.startswith("/media/media/"):
+                 url = url.replace("/media/media/", "/media/", 1)
+
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(url)
+
+            return url
         except Exception:
-            return None
+         return None
 
     def get_email_verified(self, obj) -> bool:
         prof = getattr(obj, "userprofile", None) or getattr(obj, "profile", None)

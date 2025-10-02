@@ -137,7 +137,6 @@ export default function Profile() {
                 <img
                   src={me.avatar}
                   alt="Avatar"
-                  style={{ width: 80, height: 80, borderRadius: "50%" }}
                 />
               </div>
             )}
