@@ -16,7 +16,6 @@ import api from "@/api/client";
      throw e;
    }
  }
-A
 
 // Email-based 2FA (simple enable/disable; login OTP is handled by /token/)
 export async function enableEmail2FA() {
