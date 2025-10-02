@@ -9,20 +9,19 @@ except Exception:
 
 
 def _get_profile(user):
-    return getattr(user, "profile", None)
+    return getattr(user, "profile", None) or getattr(user, "userprofile", None)
 
 
 class ActiveUserTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
-    Login serializer
+    Login serializer (soft email verification).
+    - Issues tokens even if email not verified.
+    - Frontend can check `email_verified` field in returned payload.
     """
     otp = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     @classmethod
     def get_token(cls, user):
-        """
-        Customize JWT claims if you want – helpful on the frontend.
-        """
         token = RefreshToken.for_user(user)
         prof = _get_profile(user)
         token["username"] = user.username
@@ -41,11 +40,9 @@ class ActiveUserTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise serializers.ValidationError("User account is inactive.")
 
         prof = _get_profile(user)
-        if prof is not None and not getattr(prof, "email_verified", False):
-            raise serializers.ValidationError("Please verify your email before logging in.")
 
+        # Handle 2FA if enabled
         if prof is not None and getattr(prof, "two_factor_enabled", False):
-
             if pyotp is None:
                 raise serializers.ValidationError(
                     "Two-factor auth is enabled for this account, but TOTP support is not installed on the server."
@@ -53,23 +50,21 @@ class ActiveUserTokenObtainPairSerializer(TokenObtainPairSerializer):
 
             secret = (prof.two_factor_secret or "").strip()
             if not secret:
-                # 2FA enabled but no secret seeded
                 raise serializers.ValidationError("Two-factor authentication is misconfigured for this account.")
 
             if not otp_code:
-                # Signal to the client that OTP is required
                 raise serializers.ValidationError({"otp": ["OTP code required."]}, code="otp_required")
 
             totp = pyotp.TOTP(secret)
             if not totp.verify(str(otp_code).strip(), valid_window=1):
                 raise serializers.ValidationError({"otp": ["Invalid or expired OTP."]})
 
+        # Normal JWT payload
         refresh = self.get_token(user)
         access = refresh.access_token
 
         data["refresh"] = str(refresh)
         data["access"] = str(access)
-
         data["user"] = {
             "id": user.id,
             "username": user.username,

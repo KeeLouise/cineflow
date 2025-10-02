@@ -1,89 +1,80 @@
 import React, { useEffect, useState } from "react";
 import { getMyProfile, updateMyProfile } from "@/api/profile";
-import { resendVerificationEmail } from "@/api/account";
+import api from "@/api/client"; // axios instance with tokens attached
 import "@/styles/security.css";
 
 export default function Profile() {
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-
-  // editable fields
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [avatarFile, setAvatarFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [resendMsg, setResendMsg] = useState("");
 
   useEffect(() => {
-    (async () => {
+    async function load() {
       try {
         const data = await getMyProfile();
         setMe(data);
-        setUsername(data.username || "");
-        setEmail(data.email || "");
-        setFirstName(data.first_name || "");
-        setLastName(data.last_name || "");
       } catch (err) {
-        setError("Failed to load profile.");
+        setError("Could not load profile.");
       } finally {
         setLoading(false);
       }
-    })();
+    }
+    load();
   }, []);
 
   async function handleSave(e) {
     e.preventDefault();
+    setSaving(true);
     setError("");
-    setMessage("");
-
     try {
-      const form = new FormData();
-      form.append("username", username);
-      form.append("email", email);
-      form.append("first_name", firstName);
-      form.append("last_name", lastName);
-      if (avatarFile) form.append("avatar", avatarFile);
-
-      const updated = await updateMyProfile(form); 
+      const updated = await updateMyProfile(me);
       setMe(updated);
-      setMessage("Profile updated successfully!");
     } catch (err) {
-      setError(err.message || "Could not update profile.");
+      setError("Could not update profile.");
+    } finally {
+      setSaving(false);
     }
   }
 
   async function handleResend() {
+    setResendMsg("");
     setError("");
-    setMessage("");
     try {
-      await resendVerificationEmail();
-      setMessage("Verification email sent! Check your inbox.");
+      await api.post("/auth/email/resend/");
+      setResendMsg("Verification email sent! Check your inbox.");
     } catch (err) {
-      setError(err.message || "Could not resend verification email.");
+      setError("Could not resend verification email.");
     }
   }
 
-  if (loading) {
-    return <div className="container py-5">Loading profile…</div>;
-  }
+  if (loading) return <div className="container py-4">Loading…</div>;
 
   return (
-    <div className="container py-4 security-page">
-      <div className="glass security-card">
-        <h1 className="h4 mb-3">My Profile</h1>
+    <div className="container py-4">
+      <h1 className="h4 mb-3">My Profile</h1>
+      {error && <div className="alert alert-danger">{error}</div>}
+      {resendMsg && <div className="alert alert-success">{resendMsg}</div>}
 
-        {error && <div className="alert alert-danger">{error}</div>}
-        {message && <div className="alert alert-success">{message}</div>}
+      {/* Email not verified banner */}
+      {me && !me.email_verified && (
+        <div className="alert alert-warning d-flex justify-content-between align-items-center">
+          <span>Your email is not verified.</span>
+          <button className="btn btn-sm btn-outline-dark" onClick={handleResend}>
+            Resend verification
+          </button>
+        </div>
+      )}
 
-        <form onSubmit={handleSave}>
+      {me && (
+        <form onSubmit={handleSave} className="glass security-card p-3">
           <div className="mb-3">
             <label className="form-label">Username</label>
             <input
-              className="form-control wl-input"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              className="form-control"
+              value={me.username || ""}
+              onChange={(e) => setMe({ ...me, username: e.target.value })}
             />
           </div>
 
@@ -91,62 +82,57 @@ export default function Profile() {
             <label className="form-label">Email</label>
             <input
               type="email"
-              className="form-control wl-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              className="form-control"
+              value={me.email || ""}
+              onChange={(e) => setMe({ ...me, email: e.target.value })}
             />
-            {!me?.email_verified && (
-              <button
-                type="button"
-                className="btn btn-outline-ghost mt-2"
-                onClick={handleResend}
-              >
-                Resend Verification Email
-              </button>
-            )}
           </div>
 
           <div className="mb-3">
-            <label className="form-label">First name</label>
+            <label className="form-label">First Name</label>
             <input
-              className="form-control wl-input"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
+              className="form-control"
+              value={me.first_name || ""}
+              onChange={(e) => setMe({ ...me, first_name: e.target.value })}
             />
           </div>
 
           <div className="mb-3">
-            <label className="form-label">Last name</label>
+            <label className="form-label">Last Name</label>
             <input
-              className="form-control wl-input"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
+              className="form-control"
+              value={me.last_name || ""}
+              onChange={(e) => setMe({ ...me, last_name: e.target.value })}
             />
           </div>
 
+          {/* Avatar */}
+          {me.avatar && (
+            <div className="mb-3">
+              <img
+                src={me.avatar}
+                alt="Avatar"
+                style={{ width: 80, height: 80, borderRadius: "50%" }}
+              />
+            </div>
+          )}
           <div className="mb-3">
-            <label className="form-label">Avatar</label>
+            <label className="form-label">Change Avatar</label>
             <input
               type="file"
               className="form-control"
               accept="image/*"
-              onChange={(e) => setAvatarFile(e.target.files[0] || null)}
+              onChange={(e) =>
+                setMe({ ...me, avatar: e.target.files ? e.target.files[0] : null })
+              }
             />
-            {me?.avatar && (
-              <div className="mt-2">
-                <img
-                  src={me.avatar}
-                  alt="Avatar"
-                />
-              </div>
-            )}
           </div>
 
-          <button className="btn btn-gradient" type="submit">
-            Save Changes
+          <button className="btn btn-gradient" type="submit" disabled={saving}>
+            {saving ? "Saving…" : "Save Changes"}
           </button>
         </form>
-      </div>
+      )}
     </div>
   );
 }
