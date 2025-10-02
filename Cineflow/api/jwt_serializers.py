@@ -1,22 +1,18 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.exceptions import ValidationError
 
-try:
-    import pyotp
-except Exception:
-    pyotp = None
-
+from .twofa_email import generate_and_store_code, pop_code, send_code_email
 
 def _get_profile(user):
     return getattr(user, "profile", None) or getattr(user, "userprofile", None)
 
-
 class ActiveUserTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
-    Login serializer (soft email verification).
-    - Issues tokens even if email not verified.
-    - Frontend can check `email_verified` field in returned payload.
+    Login serializer with email 2FA:
+    - If profile.two_factor_enabled and no otp provided: generate+email code, raise otp_required.
+    - If otp provided: verify against cached code, then issue tokens.
     """
     otp = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
@@ -31,35 +27,36 @@ class ActiveUserTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        otp_code = attrs.pop("otp", None)
-
-        data = super().validate(attrs)
+        otp_code = (attrs.pop("otp", None) or "").strip()
+        data = super().validate(attrs)         # authenticates username/password - KR 02/10/2025
         user = self.user
 
         if not user.is_active:
             raise serializers.ValidationError("User account is inactive.")
 
         prof = _get_profile(user)
+        tfa_on = bool(getattr(prof, "two_factor_enabled", False))
 
-        # Handle 2FA if enabled
-        if prof is not None and getattr(prof, "two_factor_enabled", False):
-            if pyotp is None:
-                raise serializers.ValidationError(
-                    "Two-factor auth is enabled for this account, but TOTP support is not installed on the server."
-                )
-
-            secret = (prof.two_factor_secret or "").strip()
-            if not secret:
-                raise serializers.ValidationError("Two-factor authentication is misconfigured for this account.")
-
+        if tfa_on:
             if not otp_code:
-                raise serializers.ValidationError({"otp": ["OTP code required."]}, code="otp_required")
+                # No code provided → send code then prompt for OTP - KR 02/10/2025
+                if not user.email:
+                    raise serializers.ValidationError({"otp": ["No email on account to receive a code."]})
+                code = generate_and_store_code(user)
+                if code is not None:
+                    try:
+                        send_code_email(user, code)
+                    except Exception:
+                        pass
+                # Tell client to ask for OTP - - KR 02/10/2025
+                raise serializers.ValidationError({"otp": ["OTP code required. We've sent a code to your email."]}, code="otp_required")
 
-            totp = pyotp.TOTP(secret)
-            if not totp.verify(str(otp_code).strip(), valid_window=1):
+            # Code provided → verify
+            cached = pop_code(user)  # single-use
+            if (not cached) or (otp_code != cached):
                 raise serializers.ValidationError({"otp": ["Invalid or expired OTP."]})
 
-        # Normal JWT payload
+        # Normal JWT payload - - KR 02/10/2025
         refresh = self.get_token(user)
         access = refresh.access_token
 
@@ -70,6 +67,6 @@ class ActiveUserTokenObtainPairSerializer(TokenObtainPairSerializer):
             "username": user.username,
             "email": user.email or "",
             "email_verified": bool(getattr(prof, "email_verified", False)),
-            "two_factor_enabled": bool(getattr(prof, "two_factor_enabled", False)),
+            "two_factor_enabled": bool(tfa_on),
         }
         return data

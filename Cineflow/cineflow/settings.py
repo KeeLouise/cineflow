@@ -125,6 +125,11 @@ if SENDGRID_API_KEY:
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
+#2FA Codes
+
+EMAIL_2FA_CODE_TTL = 300   # 5 minutes
+EMAIL_2FA_RATE_TTL = 60    # 1 min throttle for re-sends
+
 #  Caching
 CACHES = {
     "default": {
