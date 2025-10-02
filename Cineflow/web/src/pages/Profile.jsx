@@ -42,7 +42,7 @@ export default function Profile() {
     setResendMsg("");
     setError("");
     try {
-      await api.post("/api/auth/resend_me/");
+      await api.post("/auth/resend_me/", {});
       setResendMsg("Verification email sent! Check your inbox.");
     } catch (err) {
       setError("Could not resend verification email.");
