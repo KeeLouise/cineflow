@@ -9,6 +9,8 @@ from .models import (
     Room, RoomMembership, RoomMovie, WatchRoomVote, WatchlistCollaborator,
 )
 
+from .models import UserProfile
+
 User = get_user_model()
 
 # Allowed item statuses – KR 27/09/2025
@@ -40,19 +42,18 @@ class RegisterSerializer(serializers.ModelSerializer):
         return v
 
     def create(self, validated_data):
-        """
-        Create a normal *active* user so they can log in immediately.
-        Email verification will still be emailed and gates enabling 2FA.
-        """
-        username = validated_data.get("username", "").strip()
+        username = (validated_data.get("username") or "").strip()
         email = (validated_data.get("email") or "").strip().lower()
         password = validated_data.get("password")
 
         user = User.objects.create_user(username=username, email=email, password=password)
 
+        # Ensure active
         if not user.is_active:
             user.is_active = True
             user.save(update_fields=["is_active"])
+
+        UserProfile.objects.get_or_create(user=user)
 
         return user
 
@@ -132,8 +133,10 @@ class RoomMembershipSerializer(serializers.ModelSerializer):
         if not img:
             return None
         try:
-            url = img.url
-            if isinstance(url, str) and url.startswith("/media/media/"):
+            url = getattr(img, "url", None)
+            if not url:
+                return None
+            if url.startswith("/media/media/"):
                 url = url.replace("/media/media/", "/media/", 1)
             if url.startswith("http://") or url.startswith("https://"):
                 return url
@@ -242,17 +245,22 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         prof = getattr(obj, "profile", None) or getattr(obj, "userprofile", None)
         if not prof:
             return None
+
         img = getattr(prof, "avatar", None)
         if not img:
             return None
+
         try:
             url = getattr(img, "url", None)
             if not url:
                 return None
-            if isinstance(url, str) and url.startswith("/media/media/"):
+
+            if url.startswith("/media/media/"):
                 url = url.replace("/media/media/", "/media/", 1)
+
             if url.startswith("http://") or url.startswith("https://"):
                 return url
+
             request = self.context.get("request")
             return request.build_absolute_uri(url) if request else url
         except Exception:
