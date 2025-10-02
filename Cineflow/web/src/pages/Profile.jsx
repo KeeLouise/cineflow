@@ -28,19 +28,28 @@ export default function Profile() {
   const [emailTouched, setEmailTouched] = useState(false);
   const emailInvalid = emailTouched && me?.email && !emailRegex.test(me.email);
 
+  // Use profile.updated_at to version the image URL and break caches
+  const version = useMemo(() => {
+    if (!me?.updated_at) return Date.now();
+    const t = Date.parse(me.updated_at);
+    return Number.isFinite(t) ? t : Date.now();
+  }, [me?.updated_at]);
+
+  // URL the server returned (absolute Cloudinary or /media/...), plus a ?v= param
   const avatarUrl = useMemo(() => {
     if (!me?.avatar) return "";
-    const v = (me.updated_at && Date.parse(me.updated_at)) || Date.now();
     try {
       const u = new URL(me.avatar, window.location.origin);
-      u.searchParams.set("v", String(v));
+      u.searchParams.set("v", String(version));
       return u.toString();
     } catch {
-      return me.avatar;
+      // if me.avatar is a bare path (rare), just append ?v
+      const sep = me.avatar.includes("?") ? "&" : "?";
+      return `${me.avatar}${sep}v=${version}`;
     }
-  }, [me?.avatar, me?.updated_at]);
+  }, [me?.avatar, version]);
 
-  // Live preview for newly selected avatar (before upload completes)
+  // Local preview while an upload is in progress
   const localPreview = useMemo(
     () => (avatarFile ? URL.createObjectURL(avatarFile) : ""),
     [avatarFile]
@@ -70,7 +79,6 @@ export default function Profile() {
     e.preventDefault();
     if (!me) return;
 
-    // client-side email validation gate
     if (me.email && !emailRegex.test(me.email)) {
       setEmailTouched(true);
       setError("Please enter a valid email address.");
@@ -88,10 +96,7 @@ export default function Profile() {
         last_name: me.last_name,
         email: me.email,
       };
-
-      if (removeAvatar) {
-        patch.remove_avatar = true;
-      }
+      if (removeAvatar) patch.remove_avatar = true;
 
       const updated = await updateMyProfile(patch);
       setMe(updated);
@@ -121,7 +126,7 @@ export default function Profile() {
 
     try {
       const updated = await updateMyProfile({ avatar: file });
-      setMe(updated);              
+      setMe(updated); // updated.avatar should now be Cloudinary (abs) or /media/... + updated_at changed
       setOkMsg("Avatar updated.");
     } catch (err) {
       const detail =
@@ -145,7 +150,6 @@ export default function Profile() {
     }
   }
 
-  // Email 2FA enable/disable
   async function enable2FA() {
     setTwoFaMsg(""); setTwoFaError("");
     try {
@@ -157,6 +161,7 @@ export default function Profile() {
       setTwoFaError(d);
     }
   }
+
   async function disable2FA() {
     setTwoFaMsg(""); setTwoFaError("");
     try {
@@ -193,7 +198,6 @@ export default function Profile() {
 
       {me && (
         <>
-          {/* Profile form */}
           <form onSubmit={handleSave} className="glass security-card p-3 mb-4">
             {/* Username */}
             <div className="mb-3">
@@ -253,8 +257,9 @@ export default function Profile() {
                   src={imgSrc}
                   alt="Avatar"
                   onError={(e) => {
+                    e.currentTarget.onerror = null;
                     e.currentTarget.src =
-                      "https://ui-avatars.com/api/?name=" +
+                      "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
                       encodeURIComponent(me.username || "User");
                   }}
                   style={{
