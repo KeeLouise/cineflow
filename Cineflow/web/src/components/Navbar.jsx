@@ -1,121 +1,83 @@
-import React, { useEffect, useState } from "react";
-import { NavLink, Link, useNavigate } from "react-router-dom";
-import { looksLoggedIn, logout } from "@/api/auth";
-import { getMyProfile } from "@/api/profile";
-import logo from "@/assets/logo.webp";
-import "@/styles/navbar.css";
-import { mediaUrl } from "@/utils/media";
+import { useEffect, useMemo, useState } from "react";
+import api from "@/api/client";
 
 export default function Navbar() {
-  const [authed, setAuthed] = useState(looksLoggedIn());
   const [me, setMe] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
-    const onAuth = () => setAuthed(looksLoggedIn());
-    window.addEventListener("auth-changed", onAuth);
-    window.addEventListener("storage", onAuth);
-    return () => {
-      window.removeEventListener("auth-changed", onAuth);
-      window.removeEventListener("storage", onAuth);
-    };
-  }, []);
-
-  const normalizeProfile = (p) => {
-    if (!p || typeof p !== "object") return null;
-    const url = p.avatar ? `${mediaUrl(p.avatar)}?v=${Date.now()}` : null;
-    return { ...p, avatar: url };
-  };
-
-  useEffect(() => {
-    let alive = true;
+    let mounted = true;
     (async () => {
-      if (!authed) {
-        if (alive) setMe(null);
-        return;
-      }
       try {
-        const data = await getMyProfile();
-        if (!alive) return;
-        if (data && typeof data === "object") {
-          setMe(normalizeProfile(data));
-        } else {
-          setMe(null);
-        }
+        const { data } = await api.get("/me/profile/");
+        if (mounted) setMe(data);
       } catch {
-        if (alive) setMe(null);
+        // not logged in or error — silently ignore
       }
     })();
-    return () => { alive = false; };
-  }, [authed]);
+    return () => { mounted = false; };
+  }, []);
 
-  function handleLogout() {
-    logout();
-    navigate("/");
-  }
+  const version = useMemo(() => {
+    if (!me?.updated_at) return Date.now();
+    const t = Date.parse(me.updated_at);
+    return Number.isFinite(t) ? t : Date.now();
+  }, [me?.updated_at]);
+
+  const avatarUrl = useMemo(() => {
+    if (!me?.avatar) return "";
+    try {
+      const u = new URL(me.avatar, window.location.origin);
+      u.searchParams.set("v", String(version));
+      return u.toString();
+    } catch {
+      const sep = me.avatar.includes("?") ? "&" : "?";
+      return `${me.avatar}${sep}v=${version}`;
+    }
+  }, [me?.avatar, version]);
 
   return (
-    <nav className="navbar navbar-expand-lg px-3 big-navbar navbar-thin">
-      <div className="container-fluid">
-        <Link className="navbar-brand" to="/">
-          <img src={logo} alt="Cineflow Logo" className="logo-img" />
-        </Link>
-
-        <div className="collapse navbar-collapse">
-          <ul className="navbar-nav ms-auto">
-            <li className="nav-item">
-              <NavLink to="/" className="nav-link">Home</NavLink>
-            </li>
-
-            {authed ? (
-              <>
-                <li className="nav-item">
-                  <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink to="/watchlists" className="nav-link">Watchlists</NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink to="/rooms" className="nav-link">Rooms</NavLink>
-                </li>
-
-                <li className="nav-item">
-                  <NavLink to="/profile" className="nav-link d-flex align-items-center gap-2">
-                    {me?.avatar ? (
-                      <img
-                        src={me.avatar}
-                        alt={me?.username || "Profile"}
-                        className="rounded-circle"
-                        style={{ width: 28, height: 28, objectFit: "cover" }}
-                      />
-                    ) : (
-                      <div
-                        className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center"
-                        style={{ width: 28, height: 28 }}
-                      >
-                        {(me?.username?.[0] || "?").toUpperCase()}
-                      </div>
-                    )}
-                    <span>{me?.username || "Profile"}</span>
-                  </NavLink>
-                </li>
-
-                <li className="nav-item">
-                  <button onClick={handleLogout} className="btn btn-link nav-link">Logout</button>
-                </li>
-              </>
+    <nav className="navbar glass px-3">
+      <a className="navbar-brand" href="/">Cineflow</a>
+      <div className="ms-auto d-flex align-items-center gap-3">
+        {me ? (
+          <a href="/profile" className="d-flex align-items-center text-decoration-none">
+            {me.avatar ? (
+              <img
+                src={avatarUrl}
+                alt="Avatar"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src =
+                    "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
+                    encodeURIComponent(me.username || "User");
+                }}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                }}
+              />
             ) : (
-              <>
-                <li className="nav-item">
-                  <NavLink to="/login" className="nav-link">Login</NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink to="/register" className="nav-link">Register</NavLink>
-                </li>
-              </>
+              <div
+                className="d-inline-flex justify-content-center align-items-center"
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  background: "#0d6efd22",
+                  color: "#cfe2ff",
+                  fontWeight: 600,
+                }}
+              >
+                {(me.username || "U").slice(0, 1).toUpperCase()}
+              </div>
             )}
-          </ul>
-        </div>
+          </a>
+        ) : (
+          <a className="btn btn-sm btn-outline-light" href="/login">Sign in</a>
+        )}
       </div>
     </nav>
   );

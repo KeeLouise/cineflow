@@ -148,6 +148,7 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # --- Cloudinary media storage) ---
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
