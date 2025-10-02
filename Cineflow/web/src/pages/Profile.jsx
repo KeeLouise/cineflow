@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import api from "@/api/client"; // axios instance with auth headers
+import { getMyProfile, updateMyProfile } from "@/api/profile";
+import api from "@/api/client";
 import "@/styles/security.css";
 
 // Email validation
-const emailRegex =
-  /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 
 export default function Profile() {
   const [me, setMe] = useState(null);
@@ -28,17 +28,29 @@ export default function Profile() {
   const [emailTouched, setEmailTouched] = useState(false);
   const emailInvalid = emailTouched && me?.email && !emailRegex.test(me.email);
 
-  // Live preview for newly avatar
-  const previewSrc = useMemo(
-    () => (avatarFile ? URL.createObjectURL(avatarFile) : me?.avatar || ""),
-    [avatarFile, me?.avatar]
+  const avatarUrl = useMemo(() => {
+    if (!me?.avatar) return "";
+    const v = (me.updated_at && Date.parse(me.updated_at)) || Date.now();
+    try {
+      const u = new URL(me.avatar, window.location.origin);
+      u.searchParams.set("v", String(v));
+      return u.toString();
+    } catch {
+      return me.avatar;
+    }
+  }, [me?.avatar, me?.updated_at]);
+
+  // Live preview for newly selected avatar (before upload completes)
+  const localPreview = useMemo(
+    () => (avatarFile ? URL.createObjectURL(avatarFile) : ""),
+    [avatarFile]
   );
 
   // Fetch current profile
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await api.get("/me/profile/");
+        const data = await getMyProfile();
         setMe(data);
       } catch {
         setError("Could not load profile.");
@@ -50,9 +62,9 @@ export default function Profile() {
 
   useEffect(() => {
     return () => {
-      if (avatarFile) URL.revokeObjectURL(previewSrc);
+      if (avatarFile) URL.revokeObjectURL(localPreview);
     };
-  }, [avatarFile, previewSrc]);
+  }, [avatarFile, localPreview]);
 
   async function handleSave(e) {
     e.preventDefault();
@@ -70,33 +82,21 @@ export default function Profile() {
     setOkMsg("");
 
     try {
-      if (avatarFile || removeAvatar) {
-        const fd = new FormData();
-        if (me.username != null) fd.append("username", me.username);
-        if (me.first_name != null) fd.append("first_name", me.first_name);
-        if (me.last_name != null) fd.append("last_name", me.last_name);
-        if (me.email != null) fd.append("email", me.email);
-        if (avatarFile) fd.append("avatar", avatarFile);
-        if (removeAvatar) fd.append("remove_avatar", "1");
+      const patch = {
+        username: me.username,
+        first_name: me.first_name,
+        last_name: me.last_name,
+        email: me.email,
+      };
 
-        const { data } = await api.patch("/me/profile/", fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        setMe(data);
-        setAvatarFile(null);
-        setRemoveAvatar(false);
-      } else {
-        const payload = {
-          username: me.username,
-          first_name: me.first_name,
-          last_name: me.last_name,
-          email: me.email,
-        };
-        const { data } = await api.patch("/me/profile/", payload);
-        setMe(data);
+      if (removeAvatar) {
+        patch.remove_avatar = true;
       }
 
+      const updated = await updateMyProfile(patch);
+      setMe(updated);
       setOkMsg("Profile updated.");
+      setRemoveAvatar(false);
     } catch (err) {
       const detail =
         err?.response?.data?.detail ||
@@ -105,6 +105,32 @@ export default function Profile() {
       setError(String(detail));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onFileChange(e) {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+    setError("");
+    setOkMsg("");
+    setTwoFaError("");
+    setTwoFaMsg("");
+
+    setAvatarFile(file);
+    setRemoveAvatar(false);
+
+    try {
+      const updated = await updateMyProfile({ avatar: file });
+      setMe(updated);              
+      setOkMsg("Avatar updated.");
+    } catch (err) {
+      const detail =
+        err?.response?.data?.detail ||
+        Object.values(err?.response?.data || {})?.[0]?.[0] ||
+        "Could not upload avatar.";
+      setError(String(detail));
+    } finally {
+      setAvatarFile(null);
     }
   }
 
@@ -144,6 +170,8 @@ export default function Profile() {
   }
 
   if (loading) return <div className="container py-4">Loading…</div>;
+
+  const imgSrc = localPreview || avatarUrl;
 
   return (
     <div className="container py-4">
@@ -187,9 +215,7 @@ export default function Profile() {
                 value={me.email || ""}
                 onChange={(e) => {
                   setMe({ ...me, email: e.target.value });
-                  if (emailTouched) {
-                    
-                  }
+                  if (!emailTouched) setEmailTouched(true);
                 }}
                 onBlur={() => setEmailTouched(true)}
                 autoComplete="email"
@@ -222,10 +248,15 @@ export default function Profile() {
             {/* Avatar preview */}
             <div className="mb-2">
               <label className="form-label d-block">Avatar</label>
-              {previewSrc ? (
+              {imgSrc ? (
                 <img
-                  src={previewSrc}
+                  src={imgSrc}
                   alt="Avatar"
+                  onError={(e) => {
+                    e.currentTarget.src =
+                      "https://ui-avatars.com/api/?name=" +
+                      encodeURIComponent(me.username || "User");
+                  }}
                   style={{
                     width: 88,
                     height: 88,
@@ -248,12 +279,9 @@ export default function Profile() {
                 type="file"
                 className="form-control"
                 accept="image/*"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] || null;
-                  setAvatarFile(f);
-                  if (f) setRemoveAvatar(false);
-                }}
+                onChange={onFileChange}
               />
+
               {me.avatar && !avatarFile && (
                 <div className="form-check mt-2">
                   <input
@@ -261,9 +289,23 @@ export default function Profile() {
                     type="checkbox"
                     id="removeAvatar"
                     checked={removeAvatar}
-                    onChange={(e) => {
-                      setRemoveAvatar(e.target.checked);
-                      if (e.target.checked) setAvatarFile(null);
+                    onChange={async (e) => {
+                      const checked = e.target.checked;
+                      setRemoveAvatar(checked);
+                      if (checked) {
+                        try {
+                          const updated = await updateMyProfile({ remove_avatar: true });
+                          setMe(updated);
+                          setOkMsg("Avatar removed.");
+                        } catch (err) {
+                          const detail =
+                            err?.response?.data?.detail ||
+                            Object.values(err?.response?.data || {})?.[0]?.[0] ||
+                            "Could not remove avatar.";
+                          setError(String(detail));
+                          setRemoveAvatar(false);
+                        }
+                      }
                     }}
                   />
                   <label className="form-check-label" htmlFor="removeAvatar">
