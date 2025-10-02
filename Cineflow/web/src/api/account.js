@@ -2,9 +2,18 @@ import api from "@/api/client";
 import { authFetch } from "@/api/auth"; 
 // Email verification (account activation)
 export async function resendVerificationEmail() {
-  const res = await authFetch("/api/auth/email/resend/", { method: "POST" });
-  if (!res.ok) throw new Error("Failed to resend verification email");
-  return res.json();
+  try {
+    const { data } = await api.post("/auth/resend_me/");
+    return data; // { detail: "Verification email sent." }
+  } catch (e) {
+    const status = e?.response?.status;
+    const detail = e?.response?.data?.detail;
+    // Backend returns 400 when the account is already verified.
+    if (status === 400 && /already verified/i.test(String(detail || ""))) {
+      return { detail }; // treat as non-fatal "you're already verified"
+    }
+    throw e;
+  }
 }
 
 // Email-based 2FA
