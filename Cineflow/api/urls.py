@@ -28,7 +28,7 @@ from api.views.auth_views import (
     resend_verification_public, resend_verification_authenticated
 )
 from api.views.jwt_views import ActiveUserTokenObtainPairView
-from .views.auth_email import resend_email_verification
+
 
 urlpatterns = [
     # --- Auth (JWT) ---
@@ -92,6 +92,5 @@ urlpatterns = [
 
     # Auth Email
 
-    path("auth/email/resend/", resend_email_verification, name="resend-email"),
-    path("auth/email/verify/", verify_email, name="verify-email")
+    path("auth/resend_me/", resend_verification_authenticated, name="auth_resend_me"),
 ]
