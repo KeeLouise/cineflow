@@ -16,8 +16,7 @@ import api from "@/api/client";
      throw e;
    }
  }
-
-// Email-based 2FA
+A
 
 // Email-based 2FA (simple enable/disable; login OTP is handled by /token/)
 export async function enableEmail2FA() {
@@ -28,4 +27,19 @@ export async function enableEmail2FA() {
 export async function disableEmail2FA() {
   const { data } = await api.post("/auth/2fa/email/disable/");
   return data; // { detail: "Email 2FA disabled." }
+}
+
+// Password Reset
+
+
+export async function requestPasswordReset(email) {
+  const { data } = await api.post("/auth/password/reset/", { email });
+  return data;
+}
+
+export async function confirmPasswordReset({ token, password, password2 }) {
+  const { data } = await api.post("/auth/password/reset/confirm/", {
+    token, password, password2
+  });
+  return data; 
 }

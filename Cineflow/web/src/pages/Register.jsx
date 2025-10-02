@@ -3,42 +3,51 @@ import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
 
 export default function Register() {
-  const [username, setUsername] = useState("");
-  const [email, setEmail]     = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm]   = useState("");
-  const [error, setError] = useState("");
-  const [okMsg, setOkMsg] = useState("");
+  const [username, setUsername]   = useState("");
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
+  const [confirm, setConfirm]     = useState("");
+  const [error, setError]         = useState("");
+  const [okMsg, setOkMsg]         = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const navigate = useNavigate();
 
-  const passwordsMatch = password && confirm && password === confirm;
-  const pwTooShort = password && password.length < 8;
+  const trimmedUsername = username.trim();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const passwordsMatch = !!password && !!confirm && password === confirm;
+  const pwTooShort     = !!password && password.length < 8;
+  const formInvalid    = pwTooShort || !passwordsMatch || !trimmedUsername || !normalizedEmail || submitting;
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError(""); setOkMsg("");
+    if (formInvalid) return;
 
-    if (!passwordsMatch) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (pwTooShort) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-
+    setError(""); 
+    setOkMsg("");
     setSubmitting(true);
-    try {
-      await api.post("/auth/register/", { username, email, password });
 
-      setOkMsg("Account created. Check your email to verify, then sign in.");
-      setTimeout(() => navigate("/login"), 1200);
+    try {
+      await api.post("/auth/register/", {
+        username: trimmedUsername,
+        email: normalizedEmail,
+        password,
+      });
+
+      setOkMsg("Account created. Check your inbox for the verification link.");
+
+      setTimeout(() => navigate("/verify-email?ok=pending"), 1200);
     } catch (err) {
+    
+      const data = err?.response?.data || {};
+      const fieldFirst =
+        typeof data === "object"
+          ? Object.values(data).find(v => Array.isArray(v) && v.length) || []
+          : [];
       const detail =
-        err?.response?.data?.detail ||
-        Object.values(err?.response?.data || {})?.[0]?.[0] ||
+        data?.detail ||
+        fieldFirst[0] ||
         err?.message ||
         "Registration failed. Try another username/email.";
       setError(String(detail));
@@ -99,7 +108,9 @@ export default function Register() {
           <input
             type="password"
             className={`form-control ${
-              confirm && !passwordsMatch ? "is-invalid" : confirm && passwordsMatch ? "is-valid" : ""
+              confirm
+                ? (passwordsMatch ? "is-valid" : "is-invalid")
+                : ""
             }`}
             value={confirm}
             onChange={(e)=>setConfirm(e.target.value)}
@@ -111,9 +122,13 @@ export default function Register() {
           )}
         </div>
 
-        <button className="btn btn-gradient w-100" disabled={submitting}>
+        <button className="btn btn-gradient w-100" disabled={formInvalid}>
           {submitting ? "Creating…" : "Create account"}
         </button>
+
+        <p className="text-muted small mt-3 mb-0">
+          We’ll email a verification link. Check spam if you don’t see it.
+        </p>
       </form>
     </div>
   );

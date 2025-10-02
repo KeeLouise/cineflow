@@ -128,6 +128,10 @@ export default function Login() {
               autoComplete="current-password"
             />
 
+            <p className="mt-2">
+  <a href="/forgot-password" className="link-secondary">Forgot password?</a>
+</p>
+
             <div className="actions mt-3">
               <button className="btn btn-gradient" type="submit" disabled={loading}>
                 {loading ? "Continuing…" : "Continue"}
