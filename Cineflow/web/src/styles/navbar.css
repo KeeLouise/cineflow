@@ -78,13 +78,19 @@ body {
 }
 
 /* Avatar sizing */
-.nav-avatar {
-  width: 28px;
-  height: 28px;
+.navbar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   object-fit: cover;
+  display: block;
 }
-.nav-initial {
-  width: 28px;
-  height: 28px;
-  font-weight: 700;
+.navbar-avatar-fallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
