@@ -103,23 +103,22 @@ def resend_verification_public(request):
     # Generic response either way
     return Response({"detail": "If your account exists and needs verification, an email has been sent."}, status=status.HTTP_200_OK)
 
+import threading
+
+def _send_async(user, request):
+    try:
+        send_verification_email(user, request)
+    except Exception as e:
+        print("Async verification failed:", repr(e))
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def resend_verification_authenticated(request):
-    """
-    POST (auth required) -> resend to current user if still NOT verified.
-    Uses your signed-token flow (send_verification_email).
-    """
     user = request.user
     prof = getattr(user, "userprofile", None) or getattr(user, "profile", None)
-
     if not user.email:
-        return Response({"detail": "This account has no email set."}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Only block if the *profile* is already verified
+        return Response({"detail":"No email on this account."}, status=400)
     if prof and getattr(prof, "email_verified", False):
-        return Response({"detail": "Email already verified."}, status=status.HTTP_400_BAD_REQUEST)
-
-    # OK to resend regardless of user.is_active
-    send_verification_email(user, request)
-    return Response({"detail": "Verification email sent."}, status=status.HTTP_200_OK)
+        return Response({"detail":"Email already verified."}, status=400)
+    threading.Thread(target=_send_async, args=(user, request), daemon=True).start()
+    return Response({"detail":"Verification email is on the way."}, status=200)
