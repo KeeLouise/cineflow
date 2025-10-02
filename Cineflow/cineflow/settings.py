@@ -133,7 +133,7 @@ EMAIL_2FA_CODE_TTL = 300
 EMAIL_2FA_RATE_TTL = 60  
 PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  
 
-# --- Static & Media (Django 5.x style) ---
+# --- Static & Media (Django 5.x) ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
@@ -148,9 +148,10 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# --- Cloudinary media storage) ---
+# --- Cloudinary media storage (optional) ---
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
 if CLOUDINARY_URL:
     INSTALLED_APPS = [
@@ -161,12 +162,15 @@ if CLOUDINARY_URL:
                                                  "django.contrib.staticfiles",
                                                  "cloudinary")],
     ]
-    # Use Cloudinary for media files
-    STORAGES["default"] = {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"}
+    # Use Cloudinary for MEDIA (not static)
+    STORAGES["default"] = {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"
+    }
 else:
-    # Local filesystem for media in absence of Cloudinary
-    STORAGES["default"] = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
-
+    # Local filesystem for media
+    STORAGES["default"] = {
+        "BACKEND": "django.core.files.storage.FileSystemStorage"
+    }
 # --- Caching ---
 CACHES = {
     "default": {
