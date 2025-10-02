@@ -107,13 +107,19 @@ def resend_verification_public(request):
 @permission_classes([IsAuthenticated])
 def resend_verification_authenticated(request):
     """
-    POST (auth required) -> resend to current user if still inactive.
+    POST (auth required) -> resend to current user if still NOT verified.
+    Uses your signed-token flow (send_verification_email).
     """
     user = request.user
-    if user.is_active:
-        return Response({"detail": "Account already verified."}, status=status.HTTP_400_BAD_REQUEST)
+    prof = getattr(user, "userprofile", None) or getattr(user, "profile", None)
+
     if not user.email:
         return Response({"detail": "This account has no email set."}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Only block if the *profile* is already verified
+    if prof and getattr(prof, "email_verified", False):
+        return Response({"detail": "Email already verified."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # OK to resend regardless of user.is_active
     send_verification_email(user, request)
     return Response({"detail": "Verification email sent."}, status=status.HTTP_200_OK)
