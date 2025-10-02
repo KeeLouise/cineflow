@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { getMyProfile, updateMyProfile } from "@/api/profile";
 import api from "@/api/client";
-import { enableEmail2FA, disableEmail2FA } from "@/api/account";
 import "@/styles/security.css";
+
+const isValidEmail = (v = "") =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v).trim());
 
 export default function Profile() {
   const [me, setMe] = useState(null);
@@ -11,16 +13,14 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [resendMsg, setResendMsg] = useState("");
 
-  // 2FA UI state
-  const [twoFaMsg, setTwoFaMsg] = useState("");
-  const [tfaBusy, setTfaBusy] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
         const data = await getMyProfile();
         setMe(data);
-      } catch (err) {
+      } catch {
         setError("Could not load profile.");
       } finally {
         setLoading(false);
@@ -31,12 +31,22 @@ export default function Profile() {
 
   async function handleSave(e) {
     e.preventDefault();
+    if (!me) return;
     setSaving(true);
     setError("");
+
+    // Validate email before save
+    if (me.email && !isValidEmail(me.email)) {
+      setEmailTouched(true);
+      setSaving(false);
+      setError("Please enter a valid email address.");
+      return;
+    }
+
     try {
       const updated = await updateMyProfile(me);
       setMe(updated);
-    } catch (err) {
+    } catch {
       setError("Could not update profile.");
     } finally {
       setSaving(false);
@@ -54,44 +64,9 @@ export default function Profile() {
     }
   }
 
-  async function refreshMe() {
-    try {
-      const data = await getMyProfile();
-      setMe(data);
-    } catch {}
-  }
-
-  async function handleEnable2FA() {
-    setTwoFaMsg("");
-    setError("");
-    setTfaBusy(true);
-    try {
-      await enableEmail2FA();
-      setTwoFaMsg("Email 2FA enabled. Next login will require a 6-digit code sent to your email.");
-      await refreshMe();
-    } catch (err) {
-      setError(err?.response?.data?.detail || "Could not enable 2FA.");
-    } finally {
-      setTfaBusy(false);
-    }
-  }
-
-  async function handleDisable2FA() {
-    setTwoFaMsg("");
-    setError("");
-    setTfaBusy(true);
-    try {
-      await disableEmail2FA();
-      setTwoFaMsg("Email 2FA disabled.");
-      await refreshMe();
-    } catch (err) {
-      setError(err?.response?.data?.detail || "Could not disable 2FA.");
-    } finally {
-      setTfaBusy(false);
-    }
-  }
-
   if (loading) return <div className="container py-4">Loading…</div>;
+
+  const emailInvalid = !!me?.email && emailTouched && !isValidEmail(me.email);
 
   return (
     <div className="container py-4">
@@ -110,8 +85,7 @@ export default function Profile() {
       )}
 
       {me && (
-        <form onSubmit={handleSave} className="glass security-card p-3 mb-4">
-          {/* Basic info */}
+        <form onSubmit={handleSave} className="glass security-card p-3">
           <div className="mb-3">
             <label className="form-label">Username</label>
             <input
@@ -120,15 +94,21 @@ export default function Profile() {
               onChange={(e) => setMe({ ...me, username: e.target.value })}
             />
           </div>
+
           <div className="mb-3">
             <label className="form-label">Email</label>
             <input
               type="email"
-              className="form-control"
+              className={`form-control ${emailInvalid ? "is-invalid" : ""}`}
               value={me.email || ""}
               onChange={(e) => setMe({ ...me, email: e.target.value })}
+              onBlur={() => setEmailTouched(true)}
             />
+            {emailInvalid && (
+              <div className="invalid-feedback">Please enter a valid email address.</div>
+            )}
           </div>
+
           <div className="mb-3">
             <label className="form-label">First Name</label>
             <input
@@ -137,6 +117,7 @@ export default function Profile() {
               onChange={(e) => setMe({ ...me, first_name: e.target.value })}
             />
           </div>
+
           <div className="mb-3">
             <label className="form-label">Last Name</label>
             <input
@@ -168,39 +149,16 @@ export default function Profile() {
             />
           </div>
 
-          <button className="btn btn-gradient" type="submit" disabled={saving}>
+          <button
+            className="btn btn-gradient"
+            type="submit"
+            disabled={saving || (me.email && !isValidEmail(me.email))}
+            title={me.email && !isValidEmail(me.email) ? "Fix email address" : ""}
+          >
             {saving ? "Saving…" : "Save Changes"}
           </button>
         </form>
       )}
-
-      {/* 2FA SECTION */}
-      <div className="glass security-card p-3">
-        <h2 className="h5">Two-Factor Authentication (Email code)</h2>
-        {twoFaMsg && <div className="alert alert-info">{twoFaMsg}</div>}
-
-        {!me?.two_factor_enabled ? (
-          <button
-            className="btn btn-outline-primary mt-2"
-            onClick={handleEnable2FA}
-            disabled={tfaBusy || !me?.email}
-            title={!me?.email ? "Add an email first" : ""}
-          >
-            {tfaBusy ? "Enabling…" : "Enable Email 2FA"}
-          </button>
-        ) : (
-          <button
-            className="btn btn-outline-danger mt-2"
-            onClick={handleDisable2FA}
-            disabled={tfaBusy}
-          >
-            {tfaBusy ? "Disabling…" : "Disable 2FA"}
-          </button>
-        )}
-        <p className="text-muted mt-2 mb-0">
-          When enabled, each sign-in emails you a 6-digit code. Enter that code on the login screen.
-        </p>
-      </div>
     </div>
   );
 }

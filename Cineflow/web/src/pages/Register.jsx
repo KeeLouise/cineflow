@@ -1,26 +1,36 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
-import PasswordStrength from "@/components/PasswordStrength";
+
+const isValidEmail = (v = "") =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v).trim());
 
 export default function Register() {
-  const [username, setUsername] = useState("");
-  const [email, setEmail]     = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm]   = useState("");
-  const [error, setError] = useState("");
-  const [okMsg, setOkMsg] = useState("");
+  const [username, setUsername]   = useState("");
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
+  const [confirm, setConfirm]     = useState("");
+  const [error, setError]         = useState("");
+  const [okMsg, setOkMsg]         = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
 
   const navigate = useNavigate();
 
   const passwordsMatch = password && confirm && password === confirm;
   const pwTooShort = password && password.length < 8;
+  const emailInvalid = emailTouched && email && !isValidEmail(email);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(""); setOkMsg("");
 
+    // Validate email before submit
+    if (!isValidEmail(email)) {
+      setEmailTouched(true);
+      setError("Please enter a valid email address.");
+      return;
+    }
     if (!passwordsMatch) {
       setError("Passwords do not match.");
       return;
@@ -33,7 +43,6 @@ export default function Register() {
     setSubmitting(true);
     try {
       await api.post("/auth/register/", { username, email, password });
-
       setOkMsg("Account created. Check your email to verify, then sign in.");
       setTimeout(() => navigate("/login"), 1200);
     } catch (err) {
@@ -71,12 +80,16 @@ export default function Register() {
           <label className="form-label">Email</label>
           <input
             type="email"
-            className="form-control"
+            className={`form-control ${emailInvalid ? "is-invalid" : ""}`}
             value={email}
             onChange={(e)=>setEmail(e.target.value)}
+            onBlur={() => setEmailTouched(true)}
             required
             autoComplete="email"
           />
+          {emailInvalid && (
+            <div className="invalid-feedback">Please enter a valid email address.</div>
+          )}
         </div>
 
         <div className="mb-3">
@@ -93,7 +106,6 @@ export default function Register() {
           {pwTooShort && (
             <div className="invalid-feedback">At least 8 characters.</div>
           )}
-          <PasswordStrength password={password} />
         </div>
 
         <div className="mb-3">
@@ -101,7 +113,9 @@ export default function Register() {
           <input
             type="password"
             className={`form-control ${
-              confirm && !passwordsMatch ? "is-invalid" : confirm && passwordsMatch ? "is-valid" : ""
+              confirm
+                ? (passwordsMatch ? "is-valid" : "is-invalid")
+                : ""
             }`}
             value={confirm}
             onChange={(e)=>setConfirm(e.target.value)}
@@ -113,7 +127,18 @@ export default function Register() {
           )}
         </div>
 
-        <button className="btn btn-gradient w-100" disabled={submitting}>
+        <button
+          className="btn btn-gradient w-100"
+          disabled={
+            submitting ||
+            !username ||
+            !email ||
+            !isValidEmail(email) ||
+            !password ||
+            pwTooShort ||
+            !passwordsMatch
+          }
+        >
           {submitting ? "Creating…" : "Create account"}
         </button>
       </form>
