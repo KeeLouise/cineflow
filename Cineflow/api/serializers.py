@@ -132,7 +132,7 @@ class RoomMembershipSerializer(serializers.ModelSerializer):
         if not img:
             return None
         try:
-            url = img.url  # Cloudinary returns absolute; local returns /media/...
+            url = img.url
             if isinstance(url, str) and url.startswith("/media/media/"):
                 url = url.replace("/media/media/", "/media/", 1)
             if url.startswith("http://") or url.startswith("https://"):
@@ -246,13 +246,15 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         if not img:
             return None
         try:
-            url = img.url
+            url = getattr(img, "url", None)
+            if not url:
+                return None
             if isinstance(url, str) and url.startswith("/media/media/"):
                 url = url.replace("/media/media/", "/media/", 1)
             if url.startswith("http://") or url.startswith("https://"):
                 return url
             request = self.context.get("request")
-            return request.build_absolute_uri(url) if (request and url) else url
+            return request.build_absolute_uri(url) if request else url
         except Exception:
             return None
 
