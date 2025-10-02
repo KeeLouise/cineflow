@@ -113,22 +113,24 @@ REST_FRAMEWORK = {
 
 # Email (SendGrid via Anymail)
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no.reply.cineflow@outlook.com")
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.sendgrid.net"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "apikey"
+EMAIL_HOST_PASSWORD = os.getenv("SENDGRID_API_KEY", "")
 
-if SENDGRID_API_KEY:
-    if "anymail" not in INSTALLED_APPS:   
-        INSTALLED_APPS.append("anymail")
-    EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
-    ANYMAIL = {"SENDGRID_API_KEY": SENDGRID_API_KEY}
-else:
+if not EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-
 #2FA Codes
 
 EMAIL_2FA_CODE_TTL = 300   # 5 minutes
 EMAIL_2FA_RATE_TTL = 60    # 1 min throttle for re-sends
+
+PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  # seconds
 
 #  Caching
 CACHES = {
