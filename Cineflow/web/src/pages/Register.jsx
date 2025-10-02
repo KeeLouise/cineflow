@@ -1,39 +1,75 @@
 import { useState } from "react";
-import { setTokens } from "@/api/auth";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import api from "@/api/client";
 
-// Registration component for signing up new users - KR 20/08/2025
 export default function Register() {
-    // Local state for form fields - kr 20/08/2025
-    const [username, setUsername] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState(""); // to show error messages if signup fails - KR 20/08/2025
-    
-    const navigate = useNavigate(); // lets user redirect after successful registration - KR 20/08/2025
+  const [username, setUsername] = useState("");
+  const [email, setEmail]     = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError]     = useState("");
+  const [done, setDone]       = useState(false);
+  const [resending, setResending] = useState(false);
+  const [msg, setMsg]         = useState("");
 
-     // Called when form is submitted - KR 20/08/2025
-    const handleSubmit = async (e) => {
-        e.preventDefault(); // prevent page reload
-        setError(""); // clear any previous error
+  const navigate = useNavigate();
 
-        try {
-            await axios.post("/api/register/", { username, email, password});
-            // after signup, log user in automatically - KR 20/08/2025
-            const { data } = await axios.post("/api/token/", { username, password, });
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(""); setMsg("");
 
-            setTokens({ access: data.access, refresh: data.refresh});
+    try {
+      
+      await api.post("/auth/register/", { username, email, password });
 
-            navigate("/dashboard");
-        } catch (err) {
-            console.error(err);
-            setError("Registration failed. Try another username/email.");
-        }
-    };
+      // Do NOT auto-login; user is inactive until email verification
+      setDone(true);
+      setMsg("Account created. Check your email to verify before logging in.");
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setError(detail || "Registration failed. Try another username/email.");
+    }
+  }
 
-    return(
-         <div className="container mt-5" style={{ maxWidth: 420 }}>
+  async function handleResend() {
+    setResending(true);
+    setMsg("");
+    try {
+      // Public resend endpoint (generic 200 response)
+      await api.post("/auth/resend/", { email });
+      setMsg("If your account needs verification, we’ve sent a new email.");
+    } catch {
+      setMsg("Could not resend right now. Try again later.");
+    } finally {
+      setResending(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="container mt-5" style={{ maxWidth: 420 }}>
+        <h2 className="mb-3">Check your email ✉️</h2>
+        {msg && <div className="alert alert-success">{msg}</div>}
+        <p className="text-muted">
+          Didn’t get it? Check spam, or resend below.
+        </p>
+        <div className="d-flex gap-2">
+          <button
+            className="btn btn-outline-dark"
+            onClick={handleResend}
+            disabled={resending}
+          >
+            {resending ? "Resending…" : "Resend verification"}
+          </button>
+          <button className="btn btn-gradient ms-auto" onClick={() => navigate("/login")}>
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mt-5" style={{ maxWidth: 420 }}>
       <h2 className="mb-3">Register</h2>
       {error && <div className="alert alert-danger">{error}</div>}
       <form onSubmit={handleSubmit}>
