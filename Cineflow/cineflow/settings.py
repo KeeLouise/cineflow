@@ -112,7 +112,7 @@ REST_FRAMEWORK = {
 }
 
 # Email (SendGrid via Anymail)
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no.reply.cineflow@gmail.com")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no.reply.cineflow@outlook.com")
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
