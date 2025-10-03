@@ -10,6 +10,7 @@ import {
 import SearchBar from "@/components/SearchBar.jsx"; // hero search - KR 25/08/2025
 import SkeletonRow from "@/components/SkeletonRow.jsx"; // shimmer loaders - KR 25/08/2025
 import "@/styles/home.css";
+import { looksLoggedIn } from "@/api/auth";
 
 // util: format 'YYYY-MM-DD' -> 'DD/MM/YYYY' - KR 25/08/2025
 const formatDate = (iso) => {
@@ -91,6 +92,18 @@ export default function Home() {
     const step = card ? Math.round(card.getBoundingClientRect().width * 3) : 600;
     el.scrollBy({ left: dir * step, behavior: "smooth" });
   };
+
+  // auth state for CTAs
+  const [authed, setAuthed] = useState(looksLoggedIn());
+  useEffect(() => {
+    const onAuth = () => setAuthed(looksLoggedIn());
+    window.addEventListener("auth-changed", onAuth);
+    window.addEventListener("storage", onAuth);
+    return () => {
+      window.removeEventListener("auth-changed", onAuth);
+      window.removeEventListener("storage", onAuth);
+    };
+  }, []);
 
   // Fetch "What's on in Cinemas" on mount - KR 21/08/2025
   useEffect(() => {
@@ -412,11 +425,11 @@ export default function Home() {
                 <span>Save, sort and share your picks.</span>
               </div>
               <Link
-            to={authed ? "/watchlists" : "/register"}
-            className="btn-cta"
-          >
-            {authed ? "Go to Watchlists" : "Create a Watchlist"}
-          </Link>
+                to={authed ? "/watchlists" : "/register"}
+                className="btn-cta"
+              >
+                {authed ? "Go to Watchlists" : "Create a Watchlist"}
+              </Link>
             </div>
             <div className="cta-item">
               <div className="cta-copy">
@@ -424,11 +437,11 @@ export default function Home() {
                 <span>Vote together and plan movie nights.</span>
               </div>
               <Link
-            to={authed ? "/rooms" : "/register"}
-            className="btn-cta"
-          >
-            {authed ? "Open a Room" : "Try Watch Rooms"}
-          </Link>
+                to={authed ? "/rooms" : "/register"}
+                className="btn-cta"
+              >
+                {authed ? "Open a Room" : "Try Watch Rooms"}
+              </Link>
             </div>
           </div>
         </div>
@@ -483,9 +496,6 @@ export default function Home() {
         <section className="section-card rail mb-5">
           <div className="section-head compact d-flex align-items-center justify-content-between">
             <h2 className="m-0">🎟️ What’s on in Cinemas</h2>
-            <Link className="link-ghost" to="#" aria-label="View all now playing">
-              View all
-            </Link>
           </div>
 
           <div className="reel-wrap">
@@ -531,9 +541,6 @@ export default function Home() {
         <section className="section-card rail">
           <div className="section-head compact d-flex align-items-center justify-content-between">
             <h2 className="m-0">📺 Trending on Streaming</h2>
-            <Link className="link-ghost" to="#" aria-label="View all streaming">
-              View all
-            </Link>
           </div>
 
           {/* Provider filter chips - KR 28/08/2025 */}
