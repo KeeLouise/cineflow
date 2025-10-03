@@ -240,6 +240,7 @@
     font-size: clamp(1.4rem, 6vw, 1.75rem);
     line-height: 1.2;
     margin-bottom: 0.5rem;
+    text-align: center;
   }
 
   .movie-overview {
@@ -253,8 +254,13 @@
   .movie-poster.fallback {
     width: min(100%, 320px);
     margin-inline: auto;
+    display: block;
+    margin-inline: auto; 
   }
 
+  .movie-page .col-12.col-md-auto {
+    text-align: center;
+  }
   /* Meta chips */
   .movie-meta .chip {
     padding: 5px 9px;
@@ -299,6 +305,22 @@
     max-height: 34px;
   }
 
+  .movie-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .movie-overview {
+    text-align: center;
+    margin-inline: auto;
+  }
+
+  .actions {
+    justify-content: center !important;
+  }
   /* Cast strip */
   .cast-strip {
     grid-auto-columns: clamp(120px, 60vw, 160px);
