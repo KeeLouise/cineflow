@@ -53,7 +53,7 @@ export default function Home() {
   const [loadingStreaming, setLoadingStreaming] = useState(true);
   const [err, setErr] = useState("");
 
-  // Region defaults (make user-selectable later) - KR 21/08/2025
+  // Region defaults - KR 21/08/2025
   const REGION = "GB";
 
   // Provider filter (chips) - KR 28/08/2025
@@ -273,7 +273,7 @@ export default function Home() {
 
     // skip if query hasn't actually changed (prevents dup calls on same text) - KR 25/08/2025
     if (lastQueryRef.current === q) return;
-    lastQueryRef.current = q;
+    lastQueryRef = { current: q };
 
     const controller = new AbortController();
 
@@ -403,6 +403,23 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="cta-band">
+        <div className="container-xxl">
+          <div className="cta-grid">
+            <div className="cta-card">
+              <div className="cta-title">Build smart Watchlists</div>
+              <p className="cta-sub">Save films, drag to reorder, and track what you’ve watched.</p>
+              <Link to="/signup" className="btn-cta" aria-label="Sign up to create watchlists">Create your first list</Link>
+            </div>
+            <div className="cta-card">
+              <div className="cta-title">Host a Watch Room</div>
+              <p className="cta-sub">Invite friends, suggest titles, and vote on what to watch.</p>
+              <Link to="/signup" className="btn-cta" aria-label="Sign up to create watch rooms">Start a room</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div className="container-xxl pb-5">
         {err && <div className="alert alert-danger my-3">{err}</div>}
 
@@ -476,7 +493,6 @@ export default function Home() {
                 <div className="text-muted p-2">No cinema listings.</div>
               )}
 
-              {/* Infinite scroll sentinel for cinemas - KR 29/08/2025 */}
               <div
                 ref={cinemaSentinelRef}
                 className="infinite-sentinel"
@@ -505,7 +521,6 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Provider filter chips - KR 28/08/2025 */}
           <div className="px-3 pt-3">
             <div className="provider-filter mb-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
               <div className="pf-row">
@@ -534,7 +549,6 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* Monetization chip to widen results - KR 28/08/2025 */}
               <button
                 type="button"
                 className={`pf-chip ${includeRentBuy ? "active" : ""}`}
@@ -572,7 +586,6 @@ export default function Home() {
                 <div className="text-muted p-2">No streaming results.</div>
               )}
 
-              {/* Infinite scroll for streaming - KR 29/08/2025 */}
               <div
                 ref={streamingSentinelRef}
                 className="infinite-sentinel"
