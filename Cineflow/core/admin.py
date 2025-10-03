@@ -1,12 +1,7 @@
 from django.contrib import admin
-from django.db.models import Count
-from django.utils.html import format_html
-
 from .models import (
-    UserProfile,
-    MoodKeyword,
-    Watchlist, WatchlistItem, WatchlistCollaborator,
-    Room, RoomMembership, RoomMovie, WatchRoomVote,
+    UserProfile, MoodKeyword, Watchlist, WatchlistItem,
+    Room, RoomMembership, RoomMovie, WatchlistCollaborator, WatchRoomVote
 )
 
 # User Profile
