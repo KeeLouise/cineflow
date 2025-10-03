@@ -483,9 +483,6 @@ export default function Home() {
         <section className="section-card rail mb-5">
           <div className="section-head compact d-flex align-items-center justify-content-between">
             <h2 className="m-0">🎟️ What’s on in Cinemas</h2>
-            <Link className="link-ghost" to="#" aria-label="View all now playing">
-              View all
-            </Link>
           </div>
 
           <div className="reel-wrap">
@@ -531,9 +528,6 @@ export default function Home() {
         <section className="section-card rail">
           <div className="section-head compact d-flex align-items-center justify-content-between">
             <h2 className="m-0">📺 Trending on Streaming</h2>
-            <Link className="link-ghost" to="#" aria-label="View all streaming">
-              View all
-            </Link>
           </div>
 
           {/* Provider filter chips - KR 28/08/2025 */}
