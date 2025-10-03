@@ -21,7 +21,6 @@ const providerLink = (name, title, region = "IE") => {
   if (n.includes("disney")) return "https://www.disneyplus.com/";
   if (n.includes("prime")) return "https://www.primevideo.com/";
   if (n.includes("paramount")) return "https://www.paramountplus.com/";
-  // fallback: JustWatch search for this title in the user region - KR 26/08/2025
   const q = encodeURIComponent(title || "");
   return `https://www.justwatch.com/${region.toLowerCase()}/search?q=${q}`;
 };
@@ -127,22 +126,39 @@ async function handleAddToWatchlist() {
     (async () => {
       try {
         if (!path) return;
-        const res = await fetch(`/api/movies/poster_palette/?path=/t/p/w500${path}`);
-        if (!res.ok) return;
-        const { palette = [] } = await res.json();
-        const start  = palette[0] ? `rgb(${palette[0].join(",")})` : "rgb(20,20,20)";
-        const end    = palette[1] ? `rgb(${palette[1].join(",")})` : "rgb(0,0,0)";
-        const accent = palette[2] ? `rgb(${palette[2].join(",")})` : "rgb(35,35,35)";
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = `https://image.tmdb.org/t/p/w500${path}`;
+        if (img.decode) { try { await img.decode(); } catch {} }
+        let start = "rgb(20,20,20)";
+        let end = "rgb(0,0,0)";
+        let accent = "rgb(35,35,35)";
+        try {
+          const { default: ColorThief } = await import("colorthief");
+          const ct = new ColorThief();
+          const palette = ct.getPalette(img, 3) || [];
+          if (palette[0]) start = `rgb(${palette[0].join(",")})`;
+          if (palette[1]) end = `rgb(${palette[1].join(",")})`;
+          if (palette[2]) accent = `rgb(${palette[2].join(",")})`;
+        } catch {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = img.naturalWidth || 1;
+          canvas.height = img.naturalHeight || 1;
+          ctx.drawImage(img, 0, 0);
+          const arr = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          let r = 0, g = 0, b = 0, c = 0;
+          for (let i = 0; i < arr.length; i += 40) { r += arr[i]; g += arr[i + 1]; b += arr[i + 2]; c++; }
+          const avg = [Math.round(r / c), Math.round(g / c), Math.round(b / c)];
+          start = `rgb(${avg.join(",")})`;
+        }
         if (active) {
-          // set on :root so the full-page gradient and chips can use these values - KR 26/08/2025
           const rootStyle = document.documentElement.style;
           rootStyle.setProperty("--movie-bg-start", start);
           rootStyle.setProperty("--movie-bg-end", end);
           rootStyle.setProperty("--movie-accent", accent);
         }
-      } catch {
-        // swallow; CSS has safe defaults - KR 26/08/2025
-      }
+      } catch {}
     })();
     return () => { active = false; };
   }, [data]);
@@ -238,7 +254,7 @@ async function handleAddToWatchlist() {
 
   {/* Inline “Add to Watchlist” beside Back button, dropdown appears on click - KR 28/09/2025 */}
   {authed ? (
-    <div className="position-relative d-inline-block"> {/* <-- keep the picker anchored to the button */}
+    <div className="position-relative d-inline-block">
       <button
         type="button"
         className="btn btn-primary"
@@ -257,7 +273,6 @@ async function handleAddToWatchlist() {
         <div
           id="watchlist-picker"
           className="card p-2 position-absolute z-3 shadow"
-          // Position to the RIGHT of the button instead of below
           style={{ minWidth: 280, top: 0, left: "100%", marginLeft: 12 }}
         >
           {listsLoading && <div className="text-muted">Loading your lists…</div>}
@@ -311,7 +326,6 @@ async function handleAddToWatchlist() {
             </>
           )}
 
-          {/* Success / error messages (inline in the popover) */}
           {saveMsg && <div className="text-success mt-2">{saveMsg}</div>}
           {saveError && <div className="text-danger mt-2">{saveError}</div>}
         </div>

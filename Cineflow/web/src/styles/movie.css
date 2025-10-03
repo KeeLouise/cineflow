@@ -140,7 +140,7 @@
   composes: glass-block;
 }
 
-/* Providers + Trailer keep your existing styling - KR 26/08/2025 */
+/* Providers + Trailer - KR 26/08/2025 */
 .providers-block .provider-row {
   display: grid;
   grid-template-columns: 110px 1fr;
@@ -168,7 +168,7 @@
   padding: 6px 8px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   transition: transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
-  text-decoration: none; /* anchor reset */
+  text-decoration: none;
 }
 .provider-chip img {
   max-height: 40px;
@@ -221,4 +221,164 @@
   border: none;
   border-radius: 12px;
   box-shadow: 0 12px 24px rgba(0,0,0,0.45);
+}
+
+
+/* Mobile */
+@media (max-width: 575.98px) {
+  .movie-page {
+    background: linear-gradient(
+      185deg,
+      var(--movie-bg-start) 0%,
+      var(--movie-bg-end) 100%
+    );
+  }
+
+  .container.py-5 { padding-top: 1.25rem !important; padding-bottom: 1.25rem !important; }
+
+  .movie-title {
+    font-size: clamp(1.4rem, 6vw, 1.75rem);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+  }
+
+  .movie-overview {
+    font-size: 0.98rem;
+    line-height: 1.55;
+    max-width: 100%;
+  }
+
+  /* Poster */
+  .movie-poster,
+  .movie-poster.fallback {
+    width: min(100%, 320px);
+    margin-inline: auto;
+  }
+
+  /* Meta chips */
+  .movie-meta .chip {
+    padding: 5px 9px;
+    font-size: 0.82rem;
+    margin: 0 .4rem .4rem 0;
+  }
+
+  /* Primary actions stack */
+  .actions {
+    gap: .5rem !important;
+  }
+  .actions .btn {
+    min-width: 44%;
+  }
+
+  /* Inline watchlist picker should drop under the button on phones */
+  #watchlist-picker {
+    position: absolute;
+    top: calc(100% + 8px) !important;
+    left: 0 !important;
+    right: auto;
+    margin-left: 0 !important;
+    min-width: min(92vw, 360px) !important;
+  }
+
+  /* Providers */
+  .providers-block .provider-row {
+    grid-template-columns: 1fr;
+    row-gap: .35rem;
+  }
+  .providers-block .label {
+    font-size: .85rem;
+    opacity: .9;
+  }
+  .provider-chip {
+    height: 44px;
+    min-width: 64px;
+    border-radius: 9px;
+    padding: 4px 6px;
+  }
+  .provider-chip img {
+    max-height: 34px;
+  }
+
+  /* Cast strip */
+  .cast-strip {
+    grid-auto-columns: clamp(120px, 60vw, 160px);
+    gap: 10px;
+  }
+  .cast-img {
+    height: clamp(160px, 48vw, 220px);
+  }
+  .cast-meta .name { font-size: 0.9rem; }
+  .cast-meta .role { font-size: 0.78rem; }
+
+  .trailer-wrapper { margin: 1.25rem 0; }
+  .trailer-wrapper iframe {
+    max-width: 100%;
+    border-radius: 10px;
+  }
+
+  /* Section spacing */
+  .section-stack { padding: 18px 0 28px; }
+  .card-block { padding: 12px; border-radius: 12px; }
+}
+
+/* Tablet */
+@media (min-width: 576px) and (max-width: 991.98px) {
+  .movie-title {
+    font-size: clamp(1.6rem, 3.2vw, 2.2rem);
+  }
+  .movie-overview {
+    font-size: 1rem;
+    max-width: 80ch;
+  }
+
+  .movie-poster,
+  .movie-poster.fallback {
+    width: clamp(220px, 28vw, 300px);
+  }
+
+  .movie-meta .chip {
+    padding: 6px 10px;
+    font-size: 0.86rem;
+  }
+
+  #watchlist-picker {
+    min-width: 300px;
+    inset: auto auto auto 100%;
+    margin-left: 12px;
+    max-width: 46vw;
+  }
+
+  /* Providers */
+  .providers-block .provider-row {
+    grid-template-columns: 130px 1fr;
+  }
+  .provider-chip {
+    height: 48px;
+    min-width: 70px;
+  }
+  .provider-chip img { max-height: 38px; }
+
+  .cast-strip {
+    grid-auto-columns: clamp(140px, 22vw, 180px);
+    gap: 12px;
+  }
+  .cast-img {
+    height: clamp(180px, 28vw, 230px);
+  }
+
+  .trailer-wrapper iframe {
+    max-width: 860px;
+  }
+
+  .section-stack { padding: 24px 0 38px; }
+}
+
+/* Pointer/Accessibility */
+@media (pointer: coarse) {
+  .provider-chip { transition: none; }
+  .cast-strip { scroll-snap-type: x proximity; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
