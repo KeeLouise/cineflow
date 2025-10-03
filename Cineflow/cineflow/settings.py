@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
+    "api",
+
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
@@ -53,7 +55,6 @@ INSTALLED_APPS = [
     "anymail",
 
     "core",
-    "api",
 ]
 
 # --- Middleware ---
@@ -139,10 +140,10 @@ PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  #
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Only include STATICFILES_DIRS if you actually have a local "static" dir
-if (BASE_DIR / "static").exists():
-    STATICFILES_DIRS = [BASE_DIR / "static"]
-
+STATICFILES_DIRS = [
+    BASE_DIR / "api" / "static",  
+    BASE_DIR / "static",        
+]
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
