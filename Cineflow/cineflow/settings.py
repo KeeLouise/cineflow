@@ -133,29 +133,32 @@ EMAIL_2FA_CODE_TTL = 300
 EMAIL_2FA_RATE_TTL = 60  
 PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  
 
-# --- Static & Media (Django 5.x) ---
+# --- Static & Media (TEMP: non-manifest to unblock) ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Only include if folder actually exists
 if (BASE_DIR / "static").exists():
     STATICFILES_DIRS = [BASE_DIR / "static"]
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# ⬇️ Define STORAGES before using it
 STORAGES = {
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
+    # TEMPORARY: skip manifest hashing so collectstatic doesn't fail on css url() rewriting
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+    # "default" (MEDIA) will be set below depending on Cloudinary
 }
 
+# Compat shim for libs that still read the legacy setting
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
+
+# Make sure Django searches app static dirs (includes admin)
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
 ]
-
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-WHITENOISE_MANIFEST_STRICT = False
 
 # --- Cloudinary media storage (optional) ---
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
@@ -168,12 +171,10 @@ if CLOUDINARY_URL:
                                                  "django.contrib.staticfiles",
                                                  "cloudinary")],
     ]
-    # Use Cloudinary for MEDIA (not static)
     STORAGES["default"] = {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"
     }
 else:
-    # Local filesystem for media
     STORAGES["default"] = {
         "BACKEND": "django.core.files.storage.FileSystemStorage"
     }
