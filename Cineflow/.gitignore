@@ -1,43 +1,25 @@
-<<<<<<< HEAD
-/Weekly Briefs
-# macOS junk
+# --- OS ---
 .DS_Store
 
-# Python junk
+# --- Python ---
 __pycache__/
 *.pyc
 
-# Node junk
+# --- Node ---
 node_modules/
 
-# Vite build
-dist/.DS_Store
-__pycache__/
-*.pyc
-node_modules/
+# --- Vite build output ---
 dist/
 
+# --- Static (ignore everything by default) ---
 staticfiles/
 static/
-=======
-[plugin:vite:import-analysis] Failed to resolve import "./components/Navbar.jsx" from "src/App.jsx". Does the file exist?
-/Users/kierareidy/Documents/Full Stack Software Development Course/6. Final Project/Assignment/Cineflow/web/src/App.jsx:2:19
-16 |  }
-17 |  import { Routes, Route } from "react-router-dom";
-18 |  import Navbar from "./components/Navbar.jsx";
-   |                      ^
-19 |  import Footer from "./components/Footer.jsx";
-20 |  import Home from "./pages/Home.jsx";
-    at TransformPluginContext._formatLog (file:///Users/kierareidy/Documents/Full%20Stack%20Software%20Development%20Course/6.%20Final%20Project/Assignment/Cineflow/web/node_modules/vite/dist/node/chunks/dep-CMEinpL-.js:31553:43)
-    at TransformPluginContext.error (file:///Users/kierareidy/Documents/Full%20Stack%20Software%20Development%20Course/6.%20Final%20Project/Assignment/Cineflow/web/node_modules/vite/dist/node/chunks/dep-CMEinpL-.js:31550:14)
-    at normalizeUrl (file:///Users/kierareidy/Documents/Full%20Stack%20Software%20Development%20Course/6.%20Final%20Project/Assignment/Cineflow/web/node_modules/vite/dist/node/chunks/dep-CMEinpL-.js:30022:18)
-    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async file:///Users/kierareidy/Documents/Full%20Stack%20Software%20Development%20Course/6.%20Final%20Project/Assignment/Cineflow/web/node_modules/vite/dist/node/chunks/dep-CMEinpL-.js:30080:32
-    at async Promise.all (index 4)
-    at async TransformPluginContext.transform (file:///Users/kierareidy/Documents/Full%20Stack%20Software%20Development%20Course/6.%20Final%20Project/Assignment/Cineflow/web/node_modules/vite/dist/node/chunks/dep-CMEinpL-.js:30048:4)
-    at async EnvironmentPluginContainer.transform (file:///Users/kierareidy/Documents/Full%20Stack%20Software%20Development%20Course/6.%20Final%20Project/Assignment/Cineflow/web/node_modules/vite/dist/node/chunks/dep-CMEinpL-.js:31351:14)
-    at async loadAndTransform (file:///Users/kierareidy/Documents/Full%20Stack%20Software%20Development%20Course/6.%20Final%20Project/Assignment/Cineflow/web/node_modules/vite/dist/node/chunks/dep-CMEinpL-.js:26438:26)
-    at async viteTransformMiddleware (file:///Users/kierareidy/Documents/Full%20Stack%20Software%20Development%20Course/6.%20Final%20Project/Assignment/Cineflow/web/node_modules/vite/dist/node/chunks/dep-CMEinpL-.js:27523:20)
-Click outside, press Esc key, or fix the code to dismiss.
-You can also disable this overlay by setting server.hmr.overlay to false in vite.config.js.
->>>>>>> 9562eeb (merge: resolved conflicts keeping cleaned files)
+
+# Allow the specific DRF font files we vendor
+!Cineflow/static/
+!Cineflow/static/rest_framework/
+!Cineflow/static/rest_framework/fonts/
+!Cineflow/static/rest_framework/fonts/fontawesome-webfont.eot
+!Cineflow/static/rest_framework/fonts/fontawesome-webfont.woff
+!Cineflow/static/rest_framework/fonts/fontawesome-webfont.ttf
+!Cineflow/static/rest_framework/fonts/fontawesome-webfont.svg
