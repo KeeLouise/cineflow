@@ -11,6 +11,10 @@ __pycache__/
 node_modules/
 
 # Vite build
+dist/.DS_Store
+__pycache__/
+*.pyc
+node_modules/
 dist/
 
 /staticfiles/
