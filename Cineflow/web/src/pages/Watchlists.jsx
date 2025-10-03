@@ -57,7 +57,7 @@ export default function Watchlists() {
     setError("");
     setSubmitting(true);
     try {
-      const wl = await createWatchlist(name); // POST /api/watchlists/
+      const wl = await createWatchlist(name);
       setLists((prev) => [wl, ...prev]);
       setNewName("");
     } catch (err) {
@@ -68,13 +68,11 @@ export default function Watchlists() {
     }
   }
 
-  // Start inline rename
   function beginRename(wl) {
     setEditingId(wl.id);
     setEditingName(wl.name);
   }
 
-  // Save rename
   async function saveRename(id) {
     const name = editingName.trim();
     if (!name) return;
@@ -93,7 +91,6 @@ export default function Watchlists() {
     setEditingName("");
   }
 
-  // Toggle public/private with optimistic UI
   async function togglePublic(wl) {
     const prev = lists;
     const nextPublic = !wl.is_public;
@@ -106,7 +103,6 @@ export default function Watchlists() {
     }
   }
 
-  // Delete list
   async function handleDelete(id) {
     if (!confirm("Delete this watchlist? This cannot be undone.")) return;
     const prev = lists;
@@ -154,6 +150,7 @@ export default function Watchlists() {
             onChange={(e) => setNewName(e.target.value)}
             required
             maxLength={120}
+            aria-label="New watchlist name"
           />
           <button
             className="btn btn-gradient btn-gradient--v2"
@@ -172,10 +169,10 @@ export default function Watchlists() {
             <p className="text-muted mb-3">Start by creating your first list above.</p>
           </div>
         ) : (
-          <div className="row g-3 mt-2">
+          <div className="wl-grid mt-2">
             {lists.map((wl) => (
-              <div key={wl.id} className="col-12 col-sm-6 col-lg-4">
-                <div className="wl-card glass h-100 d-flex flex-column">
+              <article key={wl.id} className="wl-card glass">
+                <div className="wl-card-top">
                   <div className="wl-cover">
                     {(wl.items || []).length ? (
                       <div className="wl-thumbs" aria-label="Poster thumbnails">
@@ -194,23 +191,23 @@ export default function Watchlists() {
                     ) : (
                       <div className="wl-thumbs-empty">No posters yet</div>
                     )}
-
                     <div className="wl-count-chip">
                       {(wl.items?.length || 0)} {(wl.items?.length === 1 ? "movie" : "movies")}
                     </div>
                   </div>
+                </div>
 
-                  <div className="wl-titlebar mt-3">
-                    <div aria-hidden="true" />
-                    {editingId === wl.id ? (
-                      <div className="d-flex gap-2">
-                        <input
-                          className="form-control wl-input"
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          maxLength={120}
-                          autoFocus
-                        />
+                <div className="wl-card-mid">
+                  {editingId === wl.id ? (
+                    <div className="wl-rename">
+                      <input
+                        className="form-control wl-input"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        maxLength={120}
+                        autoFocus
+                      />
+                      <div className="wl-rename-actions">
                         <button
                           type="button"
                           className="btn btn-success btn-compact"
@@ -229,56 +226,55 @@ export default function Watchlists() {
                           Cancel
                         </button>
                       </div>
-                    ) : (
-                      <div className="d-flex align-items-center gap-2 justify-content-center">
-                        <h3 className="wl-name mb-0">{wl.name}</h3>
-                        <span className={`wl-badge ${wl.is_public ? "wl-badge-success" : "wl-badge-dark"}`}>
-                          {wl.is_public ? "Public" : "Private"}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* right-side actions */}
-                    {editingId !== wl.id ? (
-                      <div className="d-flex align-items-center gap-1 wl-actions">
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-compact"
-                          onClick={() => togglePublic(wl)}
-                          title={wl.is_public ? "Make Private" : "Make Public"}
-                        >
-                          {wl.is_public ? "Make Private" : "Make Public"}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-compact"
-                          onClick={() => beginRename(wl)}
-                          title="Rename"
-                        >
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-danger btn-compact"
-                          onClick={() => handleDelete(wl.id)}
-                          title="Delete"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ) : (
-                      <div />
-                    )}
-                  </div>
-
-                  {/* Card footer */}
-                  <div className="mt-3 d-flex justify-content-end">
-                    <Link to={`/watchlists/${wl.id}`} className="btn btn-outline-ghost">
-                      Open
-                    </Link>
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="wl-titlewrap">
+                      <h3 className="wl-name mb-0" title={wl.name}>{wl.name}</h3>
+                      <span className={`wl-badge ${wl.is_public ? "wl-badge-success" : "wl-badge-dark"}`}>
+                        {wl.is_public ? "Public" : "Private"}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              </div>
+
+                {editingId !== wl.id ? (
+                  <div className="wl-card-actions">
+                    <div className="wl-actions-left">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-compact"
+                        onClick={() => togglePublic(wl)}
+                        title={wl.is_public ? "Make Private" : "Make Public"}
+                      >
+                        {wl.is_public ? "Make Private" : "Make Public"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-compact"
+                        onClick={() => beginRename(wl)}
+                        title="Rename"
+                      >
+                        Rename
+                      </button>
+                    </div>
+                    <div className="wl-actions-right">
+                      <Link to={`/watchlists/${wl.id}`} className="btn btn-outline-ghost">
+                        Open
+                      </Link>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-compact"
+                        onClick={() => handleDelete(wl.id)}
+                        title="Delete"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="wl-card-actions" />
+                )}
+              </article>
             ))}
           </div>
         )}
