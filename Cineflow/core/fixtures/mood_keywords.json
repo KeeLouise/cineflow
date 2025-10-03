@@ -1,41 +1,41 @@
 [
-  {"model": "core.moodkeyword", "fields": {"mood": "feelgood", "keyword_id": 180547, "keyword_name": "feelgood", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "feelgood", "keyword_id": 3370, "keyword_name": "feelgood", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "feelgood", "keyword_id": 211029, "keyword_name": "feelgood", "weight": 3}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Feel Good", "keyword_id": 180547, "keyword_name": "Feel Good", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Feel Good", "keyword_id": 3370, "keyword_name": "Feel Good", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Feel Good", "keyword_id": 211029, "keyword_name": "Feel Good", "weight": 3}},
 
-  {"model": "core.moodkeyword", "fields": {"mood": "heartwarming", "keyword_id": 180547, "keyword_name": "heartwarming", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "heartwarming", "keyword_id": 9826, "keyword_name": "heartwarming", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "heartwarming", "keyword_id": 207317, "keyword_name": "heartwarming", "weight": 3}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Heartwarming", "keyword_id": 180547, "keyword_name": "Heartwarming", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Heartwarming", "keyword_id": 9826, "keyword_name": "Heartwarming", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Heartwarming", "keyword_id": 207317, "keyword_name": "Heartwarming", "weight": 3}},
 
-  {"model": "core.moodkeyword", "fields": {"mood": "high_energy", "keyword_id": 9715, "keyword_name": "high_energy", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "high_energy", "keyword_id": 616, "keyword_name": "high_energy", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "high_energy", "keyword_id": 15060, "keyword_name": "high_energy", "weight": 3}},
+  {"model": "core.moodkeyword", "fields": {"mood": "High Energy", "keyword_id": 9715, "keyword_name": "High Energy", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "High Energy", "keyword_id": 616, "keyword_name": "High Energy", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "High Energy", "keyword_id": 15060, "keyword_name": "High Energy", "weight": 3}},
 
-  {"model": "core.moodkeyword", "fields": {"mood": "chill", "keyword_id": 158718, "keyword_name": "chill", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "chill", "keyword_id": 179431, "keyword_name": "chill", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "chill", "keyword_id": 195970, "keyword_name": "chill", "weight": 3}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Chill", "keyword_id": 158718, "keyword_name": "Chill", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Chill", "keyword_id": 179431, "keyword_name": "Chill", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Chill", "keyword_id": 195970, "keyword_name": "Chill", "weight": 3}},
 
-  {"model": "core.moodkeyword", "fields": {"mood": "mind_bending", "keyword_id": 4565, "keyword_name": "mind_bending", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "mind_bending", "keyword_id": 804, "keyword_name": "mind_bending", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "mind_bending", "keyword_id": 11109, "keyword_name": "mind_bending", "weight": 3}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Mind Bending", "keyword_id": 4565, "keyword_name": "Mind Bending", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Mind Bending", "keyword_id": 804, "keyword_name": "Mind Bending", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Mind Bending", "keyword_id": 11109, "keyword_name": "Mind Bending", "weight": 3}},
 
-  {"model": "core.moodkeyword", "fields": {"mood": "romantic", "keyword_id": 9856, "keyword_name": "romantic", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "romantic", "keyword_id": 1599, "keyword_name": "romantic", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "romantic", "keyword_id": 210024, "keyword_name": "romantic", "weight": 3}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Romantic", "keyword_id": 9856, "keyword_name": "Romantic", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Romantic", "keyword_id": 1599, "keyword_name": "Romantic", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Romantic", "keyword_id": 210024, "keyword_name": "Romantic", "weight": 3}},
 
-  {"model": "core.moodkeyword", "fields": {"mood": "family", "keyword_id": 9713, "keyword_name": "family", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "family", "keyword_id": 9714, "keyword_name": "family", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "family", "keyword_id": 158718, "keyword_name": "family", "weight": 3}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Family", "keyword_id": 9713, "keyword_name": "Family", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Family", "keyword_id": 9714, "keyword_name": "Family", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Family", "keyword_id": 158718, "keyword_name": "Family", "weight": 3}},
 
-  {"model": "core.moodkeyword", "fields": {"mood": "scary", "keyword_id": 9719, "keyword_name": "scary", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "scary", "keyword_id": 9718, "keyword_name": "scary", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "scary", "keyword_id": 9717, "keyword_name": "scary", "weight": 3}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Scary", "keyword_id": 9719, "keyword_name": "Scary", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Scary", "keyword_id": 9718, "keyword_name": "Scary", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Scary", "keyword_id": 9717, "keyword_name": "Scary", "weight": 3}},
 
-  {"model": "core.moodkeyword", "fields": {"mood": "tearjerker", "keyword_id": 4344, "keyword_name": "tearjerker", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "tearjerker", "keyword_id": 179430, "keyword_name": "tearjerker", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "tearjerker", "keyword_id": 287501, "keyword_name": "tearjerker", "weight": 3}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Tearjerker", "keyword_id": 4344, "keyword_name": "Tearjerker", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Tearjerker", "keyword_id": 179430, "keyword_name": "Tearjerker", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Tearjerker", "keyword_id": 287501, "keyword_name": "Tearjerker", "weight": 3}},
 
-  {"model": "core.moodkeyword", "fields": {"mood": "dark_gritty", "keyword_id": 9716, "keyword_name": "dark_gritty", "weight": 1}},
-  {"model": "core.moodkeyword", "fields": {"mood": "dark_gritty", "keyword_id": 9710, "keyword_name": "dark_gritty", "weight": 2}},
-  {"model": "core.moodkeyword", "fields": {"mood": "dark_gritty", "keyword_id": 9824, "keyword_name": "dark_gritty", "weight": 3}}
+  {"model": "core.moodkeyword", "fields": {"mood": "Dark & Gritty", "keyword_id": 9716, "keyword_name": "Dark & Gritty", "weight": 1}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Dark & Gritty", "keyword_id": 9710, "keyword_name": "Dark & Gritty", "weight": 2}},
+  {"model": "core.moodkeyword", "fields": {"mood": "Dark & Gritty", "keyword_id": 9824, "keyword_name": "Dark & Gritty", "weight": 3}}
 ]
