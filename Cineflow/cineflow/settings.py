@@ -138,22 +138,17 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Only include project-level "static" if it exists; app "static" dirs (e.g. api/static) are auto-found
-STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
+STATICFILES_DIRS = [BASE_DIR / "api" / "static"]
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# WhiteNoise + Django 5 STORAGES API
 STORAGES = {
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
-    # "default" (media) is set below depending on Cloudinary
 }
 
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-WHITENOISE_MANIFEST_STRICT = False
 
 # --- Cloudinary media storage (optional) ---
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
