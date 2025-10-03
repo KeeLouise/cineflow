@@ -21,7 +21,7 @@ django-cors-headers==4.7.0
 django-crispy-forms==2.4
 django-formtools==2.5.1
 django-otp==1.6.0
-djangorestframework==3.16.1
+djangorestframework==3.14.0
 djangorestframework_simplejwt==5.5.1
 executing==2.2.0
 Flask==3.1.0
