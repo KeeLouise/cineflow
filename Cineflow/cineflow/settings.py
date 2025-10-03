@@ -2,7 +2,6 @@
 Django settings for cineflow project.
 """
 from pathlib import Path
-from datetime import timedelta
 import os
 import dj_database_url
 
@@ -19,14 +18,14 @@ ALLOWED_HOSTS = [
     os.getenv("APP_DOMAIN", ""),
 ]
 
-#  App constants / external APIs
+# App constants / external APIs
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 SITE_NAME = "Cineflow"
 
 # Single, canonical FRONTEND_URL (used for email links, CORS/CSRF below)
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 
-# --- CORS / CSRF ---
+#  CORS / CSRF
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "https://*.onrender.com",
@@ -38,6 +37,7 @@ CORS_ALLOWED_ORIGINS = [
 
 # --- Apps ---
 INSTALLED_APPS = [
+    # Django
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -46,21 +46,18 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
 
     "api",
+    "core",
 
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
-
-    # Email via HTTP providers (SendGrid/Mailgun/Postmark/etc.)
     "anymail",
-
-    "core",
 ]
 
 # --- Middleware ---
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # must come right after SecurityMiddleware
+    "whitenoise.middleware.WhiteNoiseMiddleware", 
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -136,10 +133,11 @@ EMAIL_2FA_CODE_TTL = 300   # 5 minutes
 EMAIL_2FA_RATE_TTL = 60    # 1 min throttle for re-sends
 PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  # seconds
 
-# --- Static & Media (Django 5.x style) ---
+# --- Static & Media (Django 5 style) ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Only include project-level "static" if it exists; app "static" dirs (e.g. api/static) are auto-found
 STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
 
 MEDIA_URL = "/media/"
@@ -150,8 +148,13 @@ STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
-    # default (media) is set below depending on Cloudinary
+    # "default" (media) is set below depending on Cloudinary
 }
+
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+WHITENOISE_MANIFEST_STRICT = False
+
 # --- Cloudinary media storage (optional) ---
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
 if CLOUDINARY_URL:
@@ -163,10 +166,9 @@ if CLOUDINARY_URL:
                                                  "django.contrib.staticfiles",
                                                  "cloudinary")],
     ]
-    # Use Cloudinary for media files
     STORAGES["default"] = {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"}
 else:
-    # Local filesystem for media in absence of Cloudinary
+    # Local filesystem for media
     STORAGES["default"] = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
 
 # --- Caching ---
