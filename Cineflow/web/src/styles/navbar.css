@@ -114,7 +114,6 @@ body {
 /* Mobile/Tablet */
 @media (max-width: 991.98px) {
   .big-navbar.navbar-thin {
-    background: rgba(16,16,18,0.65);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(255,255,255,0.06);
