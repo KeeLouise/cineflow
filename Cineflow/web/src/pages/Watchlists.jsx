@@ -230,6 +230,9 @@ export default function Watchlists() {
                   ) : (
                     <div className="wl-titlewrap">
                       <h3 className="wl-name mb-0" title={wl.name}>{wl.name}</h3>
+                      <span className={`wl-badge ${wl.is_public ? "wl-badge-success" : "wl-badge-dark"}`}>
+                        {wl.is_public ? "Public" : "Private"}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -237,6 +240,14 @@ export default function Watchlists() {
                 {editingId !== wl.id ? (
                   <div className="wl-card-actions">
                     <div className="wl-actions-left">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-compact"
+                        onClick={() => togglePublic(wl)}
+                        title={wl.is_public ? "Make Private" : "Make Public"}
+                      >
+                        {wl.is_public ? "Make Private" : "Make Public"}
+                      </button>
                       <button
                         type="button"
                         className="btn btn-ghost btn-compact"
