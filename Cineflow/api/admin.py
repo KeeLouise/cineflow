@@ -1,20 +1,14 @@
+# api/admin.py
 from django.contrib import admin
+from django.db.models import Count
+from django.utils.html import format_html
+
 from .models import (
     UserProfile, MoodKeyword, Watchlist, WatchlistItem,
     Room, RoomMembership, RoomMovie, WatchlistCollaborator, WatchRoomVote
 )
 
-admin.site.register(UserProfile)
-admin.site.register(MoodKeyword)
-admin.site.register(Watchlist)
-admin.site.register(WatchlistItem)
-admin.site.register(Room)
-admin.site.register(RoomMembership)
-admin.site.register(RoomMovie)
-admin.site.register(WatchlistCollaborator)
-admin.site.register(WatchRoomVote)
-
-# User Profile
+# --- User Profile ---
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "avatar_thumb", "email_verified",
@@ -39,18 +33,24 @@ class UserProfileAdmin(admin.ModelAdmin):
 
     def avatar_thumb(self, obj):
         if obj.avatar:
-            return format_html('<img src="{}" style="height:32px;width:32px;border-radius:50%;" />', obj.avatar.url)
+            return format_html(
+                '<img src="{}" style="height:32px;width:32px;border-radius:50%;" />',
+                obj.avatar.url
+            )
         return "—"
     avatar_thumb.short_description = "Avatar"
 
     def avatar_preview(self, obj):
         if obj.avatar:
-            return format_html('<img src="{}" style="max-height:120px;border-radius:12px;" />', obj.avatar.url)
+            return format_html(
+                '<img src="{}" style="max-height:120px;border-radius:12px;" />',
+                obj.avatar.url
+            )
         return "—"
     avatar_preview.short_description = "Preview"
 
 
-# Watchlists & Items
+# --- Watchlists & Items ---
 class WatchlistItemInline(admin.TabularInline):
     model = WatchlistItem
     extra = 0
@@ -89,7 +89,6 @@ class WatchlistItemAdmin(admin.ModelAdmin):
     search_fields = ("title", "tmdb_id", "watchlist__name", "watchlist__user__username")
     ordering = ("watchlist", "position", "-added_at")
 
-
 @admin.register(WatchlistCollaborator)
 class WatchlistCollaboratorAdmin(admin.ModelAdmin):
     list_display = ("id", "watchlist", "user", "can_edit", "invited_at")
@@ -97,7 +96,7 @@ class WatchlistCollaboratorAdmin(admin.ModelAdmin):
     search_fields = ("watchlist__name", "user__username", "user__email")
 
 
-# Rooms, Memberships, Movies, Votes
+# --- Rooms, Memberships, Movies, Votes ---
 class RoomMembershipInline(admin.TabularInline):
     model = RoomMembership
     extra = 0
@@ -150,7 +149,7 @@ class WatchRoomVoteAdmin(admin.ModelAdmin):
     search_fields = ("room_movie__title", "room_movie__room__name", "user__username")
 
 
-# Moods / Keywords
+# --- Moods / Keywords ---
 @admin.register(MoodKeyword)
 class MoodKeywordAdmin(admin.ModelAdmin):
     list_display = ("mood", "keyword_id", "keyword_name", "weight")
