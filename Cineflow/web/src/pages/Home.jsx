@@ -411,14 +411,24 @@ export default function Home() {
                 <strong>Build watchlists</strong>
                 <span>Save, sort and share your picks.</span>
               </div>
-              <Link to="/register" className="btn-cta">Create a Watchlist</Link>
+              <Link
+            to={authed ? "/watchlists" : "/register"}
+            className="btn-cta"
+          >
+            {authed ? "Go to Watchlists" : "Create a Watchlist"}
+          </Link>
             </div>
             <div className="cta-item">
               <div className="cta-copy">
                 <strong>Start a watch room</strong>
                 <span>Vote together and plan movie nights.</span>
               </div>
-              <Link to="/register" className="btn-cta">Open a Watch Room</Link>
+              <Link
+            to={authed ? "/rooms" : "/register"}
+            className="btn-cta"
+          >
+            {authed ? "Open a Room" : "Try Watch Rooms"}
+          </Link>
             </div>
           </div>
         </div>
