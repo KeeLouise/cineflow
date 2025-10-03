@@ -12,6 +12,8 @@ cloudinary==1.44.0
 django-cloudinary-storage==0.3.0
 pillow==11.3.0
 
+colorthief==0.2.1
+
 # Postgres
 psycopg2-binary==2.9.10
 
