@@ -155,7 +155,7 @@ STORAGES = {
 }
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-
+WHITENOISE_MANIFEST_STRICT = False
 # --- Cloudinary media storage (optional) ---
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
 if CLOUDINARY_URL:
