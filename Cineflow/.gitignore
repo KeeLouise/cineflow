@@ -11,11 +11,13 @@ node_modules/
 # --- Vite build output ---
 dist/
 
-# --- Static (ignore everything by default) ---
+# --- Static (ignore generated/staticfiles only) ---
 staticfiles/
-static/
 
-# Allow the specific DRF font files we vendor
+# Ignore only project-root "static" folder (not Cineflow/static or app-level static)
+#/static/
+
+# Allow vendored DRF fonts inside Cineflow/static
 !Cineflow/static/
 !Cineflow/static/rest_framework/
 !Cineflow/static/rest_framework/fonts/

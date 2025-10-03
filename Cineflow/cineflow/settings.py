@@ -133,41 +133,38 @@ EMAIL_2FA_CODE_TTL = 300   # 5 minutes
 EMAIL_2FA_RATE_TTL = 60    # 1 min throttle for re-sends
 PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  # seconds
 
-# --- Static & Media ---
+# --- Static & Media (Django 5.x style) ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-STATICFILES_DIRS = [BASE_DIR / "api" / "static"]
+# Only include the project-root "static" dir if it exists
+STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# WhiteNoise + Django 5 STORAGES API
 STORAGES = {
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
-    # default (media) is configured below via Cloudinary or FileSystem
+    # "default" (media) is decided below
 }
 
-# Keep legacy setting for libs that still read it (e.g., django-cloudinary-storage)
-STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
+# Back-compat for libs which still read STATICFILES_STORAGE
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Be tolerant if a CSS references a missing asset
+WHITENOISE_MANIFEST_STRICT = False
 
 # --- Cloudinary media storage (optional) ---
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
+
+# Use Cloudinary for MEDIA *without* adding its Django apps, to avoid pulling in their static files
 if CLOUDINARY_URL:
-    INSTALLED_APPS = [
-        "cloudinary_storage",
-        "django.contrib.staticfiles",
-        "cloudinary",
-        *[a for a in INSTALLED_APPS if a not in ("cloudinary_storage",
-                                                 "django.contrib.staticfiles",
-                                                 "cloudinary")],
-    ]
     STORAGES["default"] = {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"}
 else:
-    # Local filesystem for media
     STORAGES["default"] = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
-
 # --- Caching ---
 CACHES = {
     "default": {
