@@ -5,10 +5,13 @@ import {
   updateWatchlistItem,
   removeMovieFromWatchlist,
   updateWatchlist,
+  addMovieToWatchlist,       
 } from "@/api/watchlists";
+import { searchMovies } from "@/api/movies"; 
 import "@/styles/watchlists.css";
 
-const TMDB_IMG = "https://image.tmdb.org/t/p/w154";
+const TMDB_IMG_SMALL = "https://image.tmdb.org/t/p/w154";
+const TMDB_IMG_TINY  = "https://image.tmdb.org/t/p/w92";
 
 const STATUS = {
   PLANNED: "planned",
@@ -24,31 +27,11 @@ const STATUS_LABEL = {
   dropped: "Dropped",
 };
 
-function authHeaders() {
-  const token = localStorage.getItem("access");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function persistOrder(listId, orderedIds) {
-  try {
-    const res = await fetch(`/api/watchlists/${listId}/reorder/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ order: orderedIds }),
-    });
-    if (res.ok) {
-      const data = await res.json().catch(() => null);
-      return data || null;
-    }
-  } catch {}
-  return null;
-}
-
-function posterUrl(path) {
+function posterUrl(path, tiny = false) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
   const clean = path.startsWith("/") ? path : `/${path}`;
-  return `${TMDB_IMG}${clean}`;
+  return `${tiny ? TMDB_IMG_TINY : TMDB_IMG_SMALL}${clean}`;
 }
 
 function formatDate(iso) {
@@ -66,55 +49,44 @@ function formatDate(iso) {
 export default function WatchlistDetail() {
   const { id } = useParams();
   const listId = Number(id);
+
   const [wl, setWl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Filter/search within this list
   const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
+
+  // Rename list
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState("");
 
-  // drag handling
+  // Drag to reorder
   const [draggingId, setDraggingId] = useState(null);
   const lastOverRef = useRef(null);
 
-  function reorderLocal(srcId, targetId) {
-    setWl((prev) => {
-      if (!prev) return prev;
-      const items = Array.isArray(prev.items) ? [...prev.items] : [];
-      const fromIdx = items.findIndex((i) => i.id === srcId);
-      const toIdx = items.findIndex((i) => i.id === targetId);
-      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
-      const [moved] = items.splice(fromIdx, 1);
-      items.splice(toIdx, 0, moved);
-      return { ...prev, items };
-    });
-  }
+  // --- Live Add: external search (TMDB) ---
+  const [addQuery, setAddQuery] = useState("");
+  const [addDebounced, setAddDebounced] = useState("");
+  const [addResults, setAddResults] = useState([]);
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState("");
 
-  async function commitOrder() {
-    if (!wl) return;
-    const ids = (Array.isArray(wl.items) ? wl.items : []).map((i) => i.id);
-    if (!ids.length) return;
-    const data = await persistOrder(wl.id, ids);
-    if (data && data.items) setWl(data);
-  }
+  // Debounce local filter
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim().toLowerCase()), 250);
+    return () => clearTimeout(t);
+  }, [query]);
 
-  function onDragStart(itemId) {
-    setDraggingId(itemId);
-    lastOverRef.current = null;
-  }
-  function onDragOver(e, overId) {
-    e.preventDefault();
-    if (!draggingId || draggingId === overId) return;
-    if (lastOverRef.current === overId) return;
-    lastOverRef.current = overId;
-    reorderLocal(draggingId, overId);
-  }
-  async function onDrop() {
-    setDraggingId(null);
-    lastOverRef.current = null;
-    await commitOrder();
-  }
+  // Debounce external search
+  useEffect(() => {
+    const t = setTimeout(() => setAddDebounced(addQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [addQuery]);
 
+  // Fetch list
   useEffect(() => {
     let alive = true;
 
@@ -147,6 +119,39 @@ export default function WatchlistDetail() {
     };
   }, [listId]);
 
+  // Live TMDB search when typing "Add movies…"
+  useEffect(() => {
+    let active = true;
+    setAddError("");
+
+    const q = addDebounced;
+    if (!q || q.length < 2) {
+      setAddResults([]);
+      setAddLoading(false);
+      return () => {};
+    }
+
+    (async () => {
+      setAddLoading(true);
+      try {
+        const data = await searchMovies(q);
+        if (!active) return;
+        setAddResults(Array.isArray(data?.results) ? data.results.slice(0, 10) : []);
+      } catch (e) {
+        if (!active) return;
+        setAddResults([]);
+        setAddError("Search failed. Try again.");
+      } finally {
+        if (active) setAddLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [addDebounced]);
+
+  // Counts for pills
   const counts = useMemo(() => {
     const items = Array.isArray(wl?.items) ? wl.items : [];
     const by = { all: items.length, planned: 0, watching: 0, watched: 0, dropped: 0 };
@@ -157,6 +162,7 @@ export default function WatchlistDetail() {
     return by;
   }, [wl]);
 
+  // Change status
   async function changeStatus(item, next) {
     if (!wl) return;
     const current = item?.status || STATUS.PLANNED;
@@ -171,11 +177,12 @@ export default function WatchlistDetail() {
     try {
       await updateWatchlistItem(wl.id, item.id, { status: next });
     } catch (err) {
-      setWl(prev); // rollback
+      setWl(prev);
       setError(err?.message || "Failed to update movie status.");
     }
   }
 
+  // Remove item
   async function removeItem(itemId) {
     if (!wl) return;
     if (!confirm("Remove this movie from the list?")) return;
@@ -192,6 +199,7 @@ export default function WatchlistDetail() {
     }
   }
 
+  // Rename list
   async function saveRename() {
     const name = newName.trim();
     if (!name || !wl) return;
@@ -204,11 +212,96 @@ export default function WatchlistDetail() {
     }
   }
 
+  // Reorder helpers
+  function onDragStart(itemId) {
+    setDraggingId(itemId);
+    lastOverRef.current = null;
+  }
+  function onDragOver(e, overId) {
+    e.preventDefault();
+    if (!draggingId || draggingId === overId) return;
+    if (lastOverRef.current === overId) return;
+    lastOverRef.current = overId;
+    setWl((prev) => {
+      if (!prev) return prev;
+      const items = Array.isArray(prev.items) ? [...prev.items] : [];
+      const fromIdx = items.findIndex((i) => i.id === draggingId);
+      const toIdx = items.findIndex((i) => i.id === overId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+      const [moved] = items.splice(fromIdx, 1);
+      items.splice(toIdx, 0, moved);
+      return { ...prev, items };
+    });
+  }
+  async function onDrop() {
+    setDraggingId(null);
+    lastOverRef.current = null;
+    if (!wl) return;
+    const ids = (Array.isArray(wl.items) ? wl.items : []).map((i) => i.id);
+    try {
+      await fetch(`/api/watchlists/${wl.id}/reorder/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: ids }),
+      });
+    } catch {
+    }
+  }
+
+  // filter + in-list search
   const visibleItems = useMemo(() => {
     const items = Array.isArray(wl?.items) ? wl.items : [];
-    if (filter === "all") return items;
-    return items.filter((it) => (it?.status || STATUS.PLANNED) === filter);
-  }, [wl, filter]);
+    const statusFiltered =
+      filter === "all" ? items : items.filter((it) => (it?.status || STATUS.PLANNED) === filter);
+    if (!debounced) return statusFiltered;
+    return statusFiltered.filter((it) => (it?.title || "").toLowerCase().includes(debounced));
+  }, [wl, filter, debounced]);
+
+  // Add a movie from search results
+  async function handleAddMovie(m) {
+    if (!wl || !m?.id) return;
+    setAddError("");
+
+
+    const exists = (wl.items || []).some((it) => it.id === m.id);
+    if (exists) {
+      setAddError("That title is already in this list.");
+      return;
+    }
+
+    const payload = {
+      id: Number(m.id),
+      title: m.title || "",
+      poster_path: m.poster_path || "",
+    };
+
+    try {
+
+      setWl((prev) => ({
+        ...prev,
+        items: [
+          {
+            id: payload.id,
+            title: payload.title,
+            poster_path: payload.poster_path,
+            status: STATUS.PLANNED,
+            added_at: new Date().toISOString(),
+          },
+          ...(prev.items || []),
+        ],
+      }));
+
+      await addMovieToWatchlist(wl.id, payload);
+      setAddQuery("");
+      setAddResults([]);
+    } catch (e) {
+      setWl((prev) => ({
+        ...prev,
+        items: (prev.items || []).filter((it) => it.id !== payload.id),
+      }));
+      setAddError(e?.message || "Could not add movie.");
+    }
+  }
 
   if (loading) {
     return (
@@ -227,8 +320,6 @@ export default function WatchlistDetail() {
     );
   }
 
-  const showReorderHint = (Array.isArray(wl.items) ? wl.items.length : 0) > 1;
-
   return (
     <div className="watchlists-page">
       {/* Header */}
@@ -239,13 +330,11 @@ export default function WatchlistDetail() {
               <>
                 <h1 className="wl-title mb-1">{wl.name}</h1>
                 <p className="wl-subtitle mb-0">
-                  {counts.all} {counts.all === 1 ? "movie" : "movies"} · {wl.is_public ? "Public" : "Private"}
+                  {wl.items?.length || 0} {(wl.items?.length === 1 ? "movie" : "movies")}
                 </p>
-                {showReorderHint && (
-                  <p className="wl-hint text-muted small mt-2">
-                    Tip: You can drag and drop movies in this list to reorder them.
-                  </p>
-                )}
+                <p className="wl-hint mt-2 mb-0">
+                  Tip: drag and drop rows to reorder your list (desktop).
+                </p>
               </>
             ) : (
               <div className="d-flex gap-2 align-items-center">
@@ -290,21 +379,122 @@ export default function WatchlistDetail() {
       <div className="container py-4 pb-5">
         {error && <div className="alert alert-danger glass mb-3">{error}</div>}
 
-        {/* Filter bar */}
-        <div className="glass p-2 d-flex align-items-center gap-2 flex-wrap">
-          <FilterPill label={`All (${counts.all})`} active={filter === "all"} onClick={() => setFilter("all")} />
-          <FilterPill label={`Will Watch (${counts.planned})`} active={filter === STATUS.PLANNED} onClick={() => setFilter(STATUS.PLANNED)} />
-          <FilterPill label={`Watching (${counts.watching})`} active={filter === STATUS.WATCHING} onClick={() => setFilter(STATUS.WATCHING)} />
-          <FilterPill label={`Watched (${counts.watched})`} active={filter === STATUS.WATCHED} onClick={() => setFilter(STATUS.WATCHED)} />
-          <FilterPill label={`Dropped (${counts.dropped})`} active={filter === STATUS.DROPPED} onClick={() => setFilter(STATUS.DROPPED)} />
+        {/* in-list search + filters + live add */}
+        <div className="glass wl-toolbar">
+          {/*  in-list search */}
+          <div className="wl-search">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.471 6.471 0 001.57-4.23C15.99 6.01 12.98 3 9.5 3S3 6.01 3 9.5 6.01 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l4.25 4.25 1.49-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            <input
+              type="search"
+              className="wl-input"
+              placeholder="Search in this list…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search titles in this watchlist"
+            />
+            {query && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-compact wl-search-clear"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                title="Clear"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* filter pills */}
+          <div className="wl-filter-pills">
+            <FilterPill label={`All (${counts.all})`} active={filter === "all"} onClick={() => setFilter("all")} />
+            <FilterPill label={`Will Watch (${counts.planned})`} active={filter === STATUS.PLANNED} onClick={() => setFilter(STATUS.PLANNED)} />
+            <FilterPill label={`Watching (${counts.watching})`} active={filter === STATUS.WATCHING} onClick={() => setFilter(STATUS.WATCHING)} />
+            <FilterPill label={`Watched (${counts.watched})`} active={filter === STATUS.WATCHED} onClick={() => setFilter(STATUS.WATCHED)} />
+            <FilterPill label={`Dropped (${counts.dropped})`} active={filter === STATUS.DROPPED} onClick={() => setFilter(STATUS.DROPPED)} />
+          </div>
+
+          {/*Add movies live search */}
+          <div className="wl-add">
+            <div className="wl-add-inputwrap">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"/>
+              </svg>
+              <input
+                type="search"
+                className="wl-input wl-add-input"
+                placeholder="Add movies… type to search"
+                value={addQuery}
+                onChange={(e) => setAddQuery(e.target.value)}
+                aria-label="Search movies to add"
+              />
+              {addQuery && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-compact wl-search-clear"
+                  onClick={() => { setAddQuery(""); setAddResults([]); setAddError(""); }}
+                  title="Clear"
+                  aria-label="Clear add search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            {/* Results dropdown */}
+            {(addQuery.length >= 2) && (
+              <div className="wl-add-results">
+                {addLoading && <div className="wl-add-row muted">Searching…</div>}
+                {addError && !addLoading && <div className="wl-add-row error">{addError}</div>}
+                {!addLoading && !addError && addResults.length === 0 && (
+                  <div className="wl-add-row muted">No results</div>
+                )}
+
+                {addResults.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="wl-add-row"
+                    onClick={() => handleAddMovie(m)}
+                    title="Add to this watchlist"
+                  >
+                    {m.poster_path ? (
+                      <img
+                        className="wl-add-thumb"
+                        src={posterUrl(m.poster_path, true)}
+                        alt=""
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="wl-add-thumb empty">—</div>
+                    )}
+                    <div className="wl-add-meta">
+                      <div className="wl-add-title">{m.title}</div>
+                      <div className="wl-add-sub">
+                        {(m.release_date || "").slice(0, 4) || "—"}
+                        {typeof m.vote_average === "number" ? ` · ★ ${m.vote_average.toFixed(1)}` : ""}
+                      </div>
+                    </div>
+                    <span className="wl-add-action">Add</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Items list */}
         {visibleItems.length === 0 ? (
           <div className="wl-empty glass text-center mt-3">
             <div className="wl-empty-emoji">🎬</div>
-            <h3 className="mt-2 mb-1">Nothing here yet</h3>
-            <p className="text-muted mb-0">Try switching filters, or add some films to this list.</p>
+            <h3 className="mt-2 mb-1">Nothing here</h3>
+            <p className="text-muted mb-0">
+              {debounced
+                ? "No titles match your search."
+                : "Try switching filters, or add some films to this list."}
+            </p>
           </div>
         ) : (
           <div className="mt-3">
@@ -313,7 +503,7 @@ export default function WatchlistDetail() {
                 <li
                   key={it.id}
                   className={`wl-item glass ${draggingId === it.id ? "dragging" : ""}`}
-                  draggable={filter === "all"}
+                  draggable={filter === "all"}             
                   onDragStart={() => onDragStart(it.id)}
                   onDragOver={(e) => (filter === "all" ? onDragOver(e, it.id) : null)}
                   onDrop={() => (filter === "all" ? onDrop() : null)}
@@ -344,7 +534,7 @@ export default function WatchlistDetail() {
                     <div className="text-muted small mt-1">Added {formatDate(it.added_at)}</div>
                   </div>
 
-                  {/* right: status control + actions */}
+                  {/*status control + actions */}
                   <div className="wl-item-actions">
                     <select
                       className="form-select wl-input wl-status-select"
@@ -358,29 +548,23 @@ export default function WatchlistDetail() {
                       <option value={STATUS.DROPPED}>{STATUS_LABEL.dropped}</option>
                     </select>
 
-                    {/* Watched */}
                     <button
                       className="btn btn-ghost btn-compact btn-icon"
                       onClick={() => changeStatus(it, STATUS.WATCHED)}
                       title="Mark as Watched"
                       aria-label="Mark as Watched"
                     >
-                      <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
-                        <path fill="currentColor" d="M12 5c5 0 9 4.5 10 7-1 2.5-5 7-10 7S3 14.5 2 12c1-2.5 5-7 10-7zm0 2C8.1 7 4.9 9.8 4 12c.9 2.2 4.1 5 8 5s7.1-2.8 8-5c-.9-2.2-4.1-5-8-5zm0 2a3 3 0 110 6 3 3 0 010-6z"/>
-                      </svg>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c5 0 9 4.5 10 7-1 2.5-5 7-10 7S3 14.5 2 12c1-2.5 5-7 10-7zm0 2C8.1 7 4.9 9.8 4 12c.9 2.2 4.1 5 8 5s7.1-2.8 8-5c-.9-2.2-4.1-5-8-5zm0 2a3 3 0 110 6 3 3 0 010-6z"/></svg>
                       <span className="btn-label">Watched</span>
                     </button>
 
-                    {/* Delete */}
                     <button
                       className="btn btn-danger btn-compact btn-icon"
                       onClick={() => removeItem(it.id)}
                       title="Delete"
                       aria-label="Delete"
                     >
-                      <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
-                        <path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"/>
-                      </svg>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"/></svg>
                       <span className="btn-label">Delete</span>
                     </button>
                   </div>
