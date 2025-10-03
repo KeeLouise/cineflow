@@ -133,15 +133,9 @@ EMAIL_2FA_CODE_TTL = 300
 EMAIL_2FA_RATE_TTL = 60  
 PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  
 
-# --- Static & Media 
+# --- Static files (TEMP: no hashing) ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
-if (BASE_DIR / "static").exists():
-    STATICFILES_DIRS = [BASE_DIR / "static"]
-
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
 
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
@@ -150,17 +144,14 @@ STATICFILES_FINDERS = [
 
 STORAGES = {
     "staticfiles": {
-       
-        "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
-   
+    # keep your existing "default" (MEDIA) entry below as you already had it:
+    # STORAGES["default"] = {"BACKEND": "..."}  # Cloudinary or FileSystem
 }
 
-
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
-
-
-WHITENOISE_MANIFEST_STRICT = False
+# Back-compat shim for libs that still read the legacy setting
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
 # --- Cloudinary media storage
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
