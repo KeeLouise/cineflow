@@ -24,13 +24,11 @@ const STATUS_LABEL = {
   dropped: "Dropped",
 };
 
-// Build auth header for local fetches on this page
 function authHeaders() {
   const token = localStorage.getItem("access");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// Persist a new item order
 async function persistOrder(listId, orderedIds) {
   try {
     const res = await fetch(`/api/watchlists/${listId}/reorder/`, {
@@ -75,7 +73,6 @@ export default function WatchlistDetail() {
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState("");
 
-  // drag handling
   const [draggingId, setDraggingId] = useState(null);
   const lastOverRef = useRef(null);
 
@@ -173,7 +170,7 @@ export default function WatchlistDetail() {
     try {
       await updateWatchlistItem(wl.id, item.id, { status: next });
     } catch (err) {
-      setWl(prev); // rollback
+      setWl(prev);
       setError(err?.message || "Failed to update movie status.");
     }
   }
@@ -231,7 +228,6 @@ export default function WatchlistDetail() {
 
   return (
     <div className="watchlists-page">
-      {/* Header */}
       <header className="wl-hero">
         <div className="container d-flex flex-wrap align-items-end justify-content-between gap-2">
           <div>
@@ -285,7 +281,6 @@ export default function WatchlistDetail() {
       <div className="container py-4 pb-5">
         {error && <div className="alert alert-danger glass mb-3">{error}</div>}
 
-        {/* Filter bar */}
         <div className="glass p-2 d-flex align-items-center gap-2 flex-wrap">
           <FilterPill label={`All (${counts.all})`} active={filter === "all"} onClick={() => setFilter("all")} />
           <FilterPill label={`Will Watch (${counts.planned})`} active={filter === STATUS.PLANNED} onClick={() => setFilter(STATUS.PLANNED)} />
@@ -294,7 +289,6 @@ export default function WatchlistDetail() {
           <FilterPill label={`Dropped (${counts.dropped})`} active={filter === STATUS.DROPPED} onClick={() => setFilter(STATUS.DROPPED)} />
         </div>
 
-        {/* Items list */}
         {visibleItems.length === 0 ? (
           <div className="wl-empty glass text-center mt-3">
             <div className="wl-empty-emoji">🎬</div>
@@ -307,14 +301,13 @@ export default function WatchlistDetail() {
               {visibleItems.map((it) => (
                 <li
                   key={it.id}
-                  className="wl-item glass"
+                  className={`wl-item glass ${draggingId === it.id ? "dragging" : ""}`}
                   draggable={filter === "all"}
                   onDragStart={() => onDragStart(it.id)}
                   onDragOver={(e) => (filter === "all" ? onDragOver(e, it.id) : null)}
                   onDrop={() => (filter === "all" ? onDrop() : null)}
                   onDragEnd={() => (filter === "all" ? onDrop() : null)}
                 >
-                  {/* poster */}
                   <div className="wl-item-poster">
                     {it.poster_path ? (
                       <img src={posterUrl(it.poster_path)} alt={it.title || "Poster"} loading="lazy" />
@@ -323,10 +316,9 @@ export default function WatchlistDetail() {
                     )}
                   </div>
 
-                  {/* middle: title + meta */}
                   <div className="wl-item-main">
                     {filter === "all" && (
-                      <div className="wl-item-handle text-muted small mb-1" title="Drag to reorder" aria-hidden="true">
+                      <div className="wl-item-handle" title="Drag to reorder" aria-hidden="true">
                         ⋮⋮
                       </div>
                     )}
@@ -339,33 +331,47 @@ export default function WatchlistDetail() {
                     <div className="text-muted small mt-1">Added {formatDate(it.added_at)}</div>
                   </div>
 
-                  {/* right: status control + remove */}
                   <div className="wl-item-actions">
-                    <select
-                      className="form-select wl-input wl-status-select"
-                      value={it.status || STATUS.PLANNED}
-                      onChange={(e) => changeStatus(it, e.target.value)}
-                    >
-                      <option value={STATUS.PLANNED}>{STATUS_LABEL.planned}</option>
-                      <option value={STATUS.WATCHING}>{STATUS_LABEL.watching}</option>
-                      <option value={STATUS.WATCHED}>{STATUS_LABEL.watched}</option>
-                      <option value={STATUS.DROPPED}>{STATUS_LABEL.dropped}</option>
-                    </select>
-                    <button
-                      className="btn btn-ghost btn-compact"
-                      onClick={() => changeStatus(it, STATUS.WATCHED)}
-                      title="Mark as Watched"
-                    >
-                      Watched
-                    </button>
-                    <button
-                      className="btn btn-danger btn-compact"
-                      onClick={() => removeItem(it.id)}
-                      title="Remove from list"
-                    >
-                      Delete
-                    </button>
-                  </div>
+  <select
+    className="form-select wl-input wl-status-select"
+    value={it.status || STATUS.PLANNED}
+    onChange={(e) => changeStatus(it, e.target.value)}
+    aria-label="Change movie status"
+  >
+    <option value={STATUS.PLANNED}>{STATUS_LABEL.planned}</option>
+    <option value={STATUS.WATCHING}>{STATUS_LABEL.watching}</option>
+    <option value={STATUS.WATCHED}>{STATUS_LABEL.watched}</option>
+    <option value={STATUS.DROPPED}>{STATUS_LABEL.dropped}</option>
+  </select>
+
+  {/* Watched */}
+  <button
+    className="btn btn-ghost btn-compact btn-icon"
+    onClick={() => changeStatus(it, STATUS.WATCHED)}
+    title="Mark as Watched"
+    aria-label="Mark as Watched"
+  >
+    {/* Eye icon */}
+    <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+      <path fill="currentColor" d="M12 5c5 0 9 4.5 10 7-1 2.5-5 7-10 7S3 14.5 2 12c1-2.5 5-7 10-7zm0 2C8.1 7 4.9 9.8 4 12c.9 2.2 4.1 5 8 5s7.1-2.8 8-5c-.9-2.2-4.1-5-8-5zm0 2a3 3 0 110 6 3 3 0 010-6z"/>
+    </svg>
+    <span className="btn-label">Watched</span>
+  </button>
+
+  {/* Delete */}
+  <button
+    className="btn btn-danger btn-compact btn-icon"
+    onClick={() => removeItem(it.id)}
+    title="Delete"
+    aria-label="Delete"
+  >
+    {/* Trash icon */}
+    <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+      <path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"/>
+    </svg>
+    <span className="btn-label">Delete</span>
+  </button>
+</div>
                 </li>
               ))}
             </ul>
