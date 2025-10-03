@@ -16,8 +16,6 @@ __pycache__/
 *.pyc
 node_modules/
 dist/
-
-/staticfiles/
 =======
 [plugin:vite:import-analysis] Failed to resolve import "./components/Navbar.jsx" from "src/App.jsx". Does the file exist?
 /Users/kierareidy/Documents/Full Stack Software Development Course/6. Final Project/Assignment/Cineflow/web/src/App.jsx:2:19

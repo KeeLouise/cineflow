@@ -153,6 +153,7 @@ STORAGES = {
     },
     # default (media) is set below depending on Cloudinary
 }
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # --- Cloudinary media storage (optional) ---
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
