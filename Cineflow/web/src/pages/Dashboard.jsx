@@ -343,7 +343,7 @@ export default function Dashboard() {
       <div className="page-bg" aria-hidden="true" />
 
       <div className="glass-dashboard">
-        <div className="container-fluid py-5">
+        <div className="container-xxl--wide py-5">
           {/* Email verification banner (only if profile loaded and says unverified) */}
           {me && me.email_verified === false && (
             <div className="alert alert-warning d-flex align-items-center justify-content-between">
@@ -383,7 +383,6 @@ export default function Dashboard() {
             </div>
           </header>
 
-          {/** Desktop filter toolbar */}
           <div className="card bg-dark border-0 shadow-sm mb-4 d-none d-md-block">
             <div className="card-body">
               <div className="row g-3 align-items-end">
@@ -504,13 +503,15 @@ export default function Dashboard() {
             <SkeletonRow count={8} />
           ) : items.length ? (
             <>
-              <div className="reel-wrap">
-                <div className="h-scroll">
-                  {items.map((mv) => (
-                    <PosterCard key={`mood-${mv.id}`} m={mv} />
-                  ))}
+              <section className="section-card rail">
+                <div className="reel-wrap">
+                  <div className="h-scroll">
+                    {items.map((mv) => (
+                      <PosterCard key={`mood-${mv.id}`} m={mv} />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </section>
 
               <div ref={sentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
               {loading && <div className="text-muted mt-2">Loading more…</div>}
