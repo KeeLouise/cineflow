@@ -133,11 +133,10 @@ EMAIL_2FA_CODE_TTL = 300   # 5 minutes
 EMAIL_2FA_RATE_TTL = 60    # 1 min throttle for re-sends
 PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  # seconds
 
-# --- Static & Media (Django 5 style) ---
+# --- Static & Media ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Only include project-level "static" if it exists; app "static" dirs (e.g. api/static) are auto-found
 STATICFILES_DIRS = [BASE_DIR / "api" / "static"]
 
 MEDIA_URL = "/media/"
@@ -147,8 +146,11 @@ STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
+    # default (media) is configured below via Cloudinary or FileSystem
 }
 
+# Keep legacy setting for libs that still read it (e.g., django-cloudinary-storage)
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 # --- Cloudinary media storage (optional) ---
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "").strip()
