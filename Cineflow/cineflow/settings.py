@@ -72,7 +72,9 @@ ROOT_URLCONF = "cineflow.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            BASE_DIR / "api" / "templates",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -100,6 +102,9 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 REST_FRAMEWORK = {
+
+    "EXCEPTION_HANDLER": "api.exception_handler.api_exception_handler",
+
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
@@ -129,32 +134,29 @@ if not EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # 2FA / Password resets
-EMAIL_2FA_CODE_TTL = 300   # 5 minutes
-EMAIL_2FA_RATE_TTL = 60    # 1 min throttle for re-sends
-PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))  # seconds
+EMAIL_2FA_CODE_TTL = 300 
+EMAIL_2FA_RATE_TTL = 60    
+PASSWORD_RESET_TOKEN_TTL = int(os.getenv("PASSWORD_RESET_TOKEN_TTL", "1800"))
 
-# --- Static & Media (Django 5.x style) ---
+# --- Static & Media ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Only include the project-root "static" dir if it exists
-STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
+STATICFILES_DIRS = [
+    BASE_DIR / "api" / "static",     
+]
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# WhiteNoise + Django 5 STORAGES API
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
-    # "default" (media) is decided below
+    "default": STORAGES.get("default") or {
+        "BACKEND": "django.core.files.storage.FileSystemStorage"
+    },
 }
-
-# Back-compat for libs which still read STATICFILES_STORAGE
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-# Be tolerant if a CSS references a missing asset
 WHITENOISE_MANIFEST_STRICT = False
 
 # --- Cloudinary media storage (optional) ---

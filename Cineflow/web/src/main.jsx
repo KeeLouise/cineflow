@@ -16,14 +16,17 @@ import MovieDetail from "@/pages/MovieDetail";
 import SeeAllPage from "@/pages/SeeAllPage";
 import VerifyEmail from "@/pages/VerifyEmail";
 import PrivateRoute from "@/components/PrivateRoute";
-import AuthProvider from "@/auth/AuthContext"; 
+import AuthProvider from "@/auth/AuthContext";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 
-// Define route tree
+import NotFound from "@/pages/NotFound";
+import ServerError from "@/pages/ServerError";
+
 const router = createBrowserRouter([
   {
-    element: <App />,   
+    element: <App />,
+    errorElement: <ServerError />,
     children: [
       { path: "/", element: <Home /> },
       { path: "/login", element: <Login /> },
@@ -31,11 +34,10 @@ const router = createBrowserRouter([
       { path: "/movie/:id", element: <MovieDetail /> },
       { path: "/verify-email", element: <VerifyEmail /> },
       { path: "/forgot-password", element: <ForgotPassword /> },
-      { path: "/reset-password",  element: <ResetPassword /> },
+      { path: "/reset-password", element: <ResetPassword /> },
 
-      // Protected routes
       {
-        element: <PrivateRoute />, 
+        element: <PrivateRoute />,
         children: [
           { path: "/dashboard", element: <Dashboard /> },
           { path: "/mood/:mood/see-all", element: <SeeAllPage /> },
@@ -46,6 +48,8 @@ const router = createBrowserRouter([
           { path: "/profile", element: <Profile /> },
         ],
       },
+
+      { path: "*", element: <NotFound /> },
     ],
   },
 ]);

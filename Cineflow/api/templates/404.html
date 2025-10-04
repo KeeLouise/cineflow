@@ -1,0 +1,26 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Not found • Cineflow" content="width=device-width,initial-scale=1">
+  <link href="{% static 'css/errors.css' %}" rel="stylesheet">
+</head>
+<body class="err-bg">
+  <div class="err-card">
+    <div class="err-head">
+      <span class="brand"><span class="brand-dot"></span>cinechill</span>
+      <h1 class="err-title">Page not found</h1>
+      <p class="err-sub">We couldn’t find what you were looking for.</p>
+    </div>
+    <div class="err-body">
+      <div class="err-code">404</div>
+      <p class="err-help">The page may have been moved or the link is incorrect.</p>
+      <div class="err-actions">
+        <a class="btn btn-primary" href="/">Go home</a>
+        <a class="btn btn-ghost" href="javascript:history.back()">Go back</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
