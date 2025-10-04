@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchMoodDiscover } from "@/api/movies";
@@ -7,6 +6,7 @@ import { resendVerificationEmail } from "@/api/account";
 import SkeletonRow from "@/components/SkeletonRow.jsx";
 import "@/styles/home.css";
 
+/* Poster card */
 function PosterCard({ m }) {
   return (
     <article className="poster-card">
@@ -30,7 +30,9 @@ function PosterCard({ m }) {
           <div className="poster-overlay" />
         </div>
         <div className="poster-meta">
-          <div className="title" title={m.title}>{m.title}</div>
+          <div className="title" title={m.title}>
+            {m.title}
+          </div>
           <div className="sub text-muted">
             <span className="chip-year">{(m.release_date || "").slice(0, 4) || "—"}</span>
           </div>
@@ -66,10 +68,10 @@ const TMDB_MIN_OPTIONS = [
 const REGION = "GB";
 
 export default function Dashboard() {
-  // signed-in user (banner)
+  // signed-in user (for email verify banner)
   const [me, setMe] = useState(null);
 
-  // mood/list
+  // list state
   const [mood, setMood] = useState("feelgood");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // applied filters (providers removed)
+  // applied filters
   const [appliedTmdbMin, setAppliedTmdbMin] = useState(0);
   const [appliedIncludeRentBuy, setAppliedIncludeRentBuy] = useState(false);
 
@@ -86,7 +88,7 @@ export default function Dashboard() {
   const [stagedTmdbMin, setStagedTmdbMin] = useState(0);
   const [stagedIncludeRentBuy, setStagedIncludeRentBuy] = useState(false);
 
-  // apply/reset
+  // apply/reset triggers
   const [filterStamp, setFilterStamp] = useState(0);
   const applyFilters = () => {
     setMood(stagedMood);
@@ -123,18 +125,16 @@ export default function Dashboard() {
     return () => { alive = false; };
   }, []);
 
-  // request params (providers removed)
+  // request params (no providers)
   const commonParams = useMemo(() => {
     return {
       region: REGION,
       vote_average_gte: appliedTmdbMin || undefined,
       types: appliedIncludeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free",
-      broad: appliedIncludeRentBuy ? 1 : 0,
-      force_providers: 0,
     };
   }, [appliedTmdbMin, appliedIncludeRentBuy]);
 
-  // initial+apply fetch
+  // initial + on apply fetch
   useEffect(() => {
     if (inFlightRef.current) inFlightRef.current.abort();
     const controller = new AbortController();
@@ -235,150 +235,171 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* Ensure full viewport height & centered */}
       <div className="page-bg" aria-hidden="true" />
-      <div className="glass-dashboard" style={{ minHeight: "100vh" }}>
-        <div className="container-fluid px-3 py-5">
-          <div className="mx-auto" style={{ maxWidth: 1280 }}>
-            {me && me.email_verified === false && (
-              <div className="alert alert-warning d-flex align-items-center justify-content-between">
-                <div>
-                  <strong>Verify your email.</strong> We’ve sent a link to {me.email}. You’ll need to verify before enabling 2FA.
-                </div>
-                <button
-                  className="btn btn-outline-ghost"
-                  onClick={async () => {
-                    try {
-                      await resendVerificationEmail();
-                      alert("Verification email sent.");
-                    } catch (e) {
-                      alert(e?.response?.data?.detail || "Could not send verification email.");
-                    }
-                  }}
-                >
-                  Resend
-                </button>
-              </div>
-            )}
 
-            <header className="d-flex align-items-center justify-content-between mb-4">
-              <h1 className="m-0">Your Dashboard</h1>
-              <div className="d-flex align-items-center gap-2">
-                <Link to="/" className="link-ghost">← Home</Link>
-                <Link to={seeAllHref} className="btn btn-sm btn-outline-light">See all</Link>
+      <div className="glass-dashboard">
+        <div className="container-xxl--wide py-5">
+          {/* Email verification banner */}
+          {me && me.email_verified === false && (
+            <div className="alert alert-warning d-flex align-items-center justify-content-between">
+              <div>
+                <strong>Verify your email.</strong> We’ve sent a link to {me.email}. You’ll need to verify before enabling 2FA.
+              </div>
+              <button
+                className="btn btn-outline-ghost"
+                onClick={async () => {
+                  try {
+                    await resendVerificationEmail();
+                    alert("Verification email sent.");
+                  } catch (e) {
+                    alert(e?.response?.data?.detail || "Could not send verification email.");
+                  }
+                }}
+              >
+                Resend
+              </button>
+            </div>
+          )}
+
+          <header className="d-flex align-items-center justify-content-between mb-4">
+            <h1 className="m-0">Your Dashboard</h1>
+            <div className="d-flex align-items-center gap-2">
+              <Link to="/" className="link-ghost">← Home</Link>
+              <Link to={seeAllHref} className="btn btn-sm btn-outline-light">See all</Link>
+              <button
+                className="btn btn-sm btn-primary d-md-none"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#filtersOffcanvas"
+                aria-controls="filtersOffcanvas"
+              >
+                {filtersLabel}
+              </button>
+            </div>
+          </header>
+
+          {/* Filter toolbar (no provider filters) */}
+          <div className="card bg-dark border-0 shadow-sm mb-4 d-none d-md-block">
+            <div className="card-body">
+              <div className="row g-3 align-items-end">
+                <div className="col-md-4">
+                  <label className="form-label text-secondary small">Mood</label>
+                  <select
+                    className="form-select form-select-sm bg-dark text-light border-secondary"
+                    value={stagedMood}
+                    onChange={(e) => setStagedMood(e.target.value)}
+                    disabled={loading}
+                  >
+                    {MOODS.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-md-4">
+                  <label className="form-label text-secondary small">TMDB rating</label>
+                  <select
+                    className="form-select form-select-sm bg-dark text-light border-secondary"
+                    value={String(stagedTmdbMin)}
+                    onChange={(e) => setStagedTmdbMin(Number(e.target.value))}
+                    disabled={loading}
+                  >
+                    {TMDB_MIN_OPTIONS.map((o) => (
+                      <option key={String(o.value)} value={String(o.value)}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-md-4">
+                  <label className="form-label text-secondary small d-block">Options</label>
+                  <div className="form-check form-switch">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="includeBuyRentSwitch"
+                      checked={stagedIncludeRentBuy}
+                      onChange={(e) => setStagedIncludeRentBuy(e.target.checked)}
+                      disabled={loading}
+                    />
+                    <label className="form-check-label small text-white" htmlFor="includeBuyRentSwitch">
+                      Include buy/rent results
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="d-flex justify-content-end gap-2 mt-3">
                 <button
-                  className="btn btn-sm btn-primary d-md-none"
                   type="button"
-                  data-bs-toggle="offcanvas"
-                  data-bs-target="#filtersOffcanvas"
-                  aria-controls="filtersOffcanvas"
+                  className="btn btn-outline-warning btn-sm"
+                  onClick={resetFilters}
+                  disabled={loading}
+                  title="Reset all filters"
                 >
-                  {filtersLabel}
+                  Reset
                 </button>
-              </div>
-            </header>
-
-            {/* Filters (providers removed) */}
-            <div className="card bg-dark border-0 shadow-sm mb-4 d-none d-md-block">
-              <div className="card-body">
-                <div className="row g-3 align-items-end">
-                  <div className="col-md-4">
-                    <label className="form-label text-secondary small">Mood</label>
-                    <select
-                      className="form-select form-select-sm bg-dark text-light border-secondary"
-                      value={stagedMood}
-                      onChange={(e) => setStagedMood(e.target.value)}
-                      disabled={loading}
-                    >
-                      {MOODS.map((m) => (
-                        <option key={m.key} value={m.key}>{m.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="col-md-4">
-                    <label className="form-label text-secondary small">TMDB rating</label>
-                    <select
-                      className="form-select form-select-sm bg-dark text-light border-secondary"
-                      value={String(stagedTmdbMin)}
-                      onChange={(e) => setStagedTmdbMin(Number(e.target.value))}
-                      disabled={loading}
-                    >
-                      {TMDB_MIN_OPTIONS.map((o) => (
-                        <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="col-md-4">
-                    <label className="form-label text-secondary small d-block">Options</label>
-                    <div className="form-check form-switch">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="includeBuyRentSwitch"
-                        checked={stagedIncludeRentBuy}
-                        onChange={(e) => setStagedIncludeRentBuy(e.target.checked)}
-                        disabled={loading}
-                      />
-                      <label className="form-check-label small text-white" htmlFor="includeBuyRentSwitch">
-                        Include buy/rent results
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="d-flex justify-content-end gap-2 mt-3">
-                  <button type="button" className="btn btn-outline-warning btn-sm" onClick={resetFilters} disabled={loading}>
-                    Reset
-                  </button>
-                  <button type="button" className="btn btn-primary btn-sm" onClick={applyFilters} disabled={loading}>
-                    Apply
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={applyFilters}
+                  disabled={loading}
+                  title="Apply filters"
+                >
+                  Apply
+                </button>
               </div>
             </div>
+          </div>
 
-            {err && <div className="alert alert-danger mb-3">{err}</div>}
+          {err && <div className="alert alert-danger mb-3">{err}</div>}
 
-            {loading && items.length === 0 ? (
-              <SkeletonRow count={8} />
-            ) : items.length ? (
-              <>
-                <section className="section-card rail">
-                  <div className="reel-wrap">
-                    <div className="h-scroll">
-                      {items.map((mv) => (
-                        <PosterCard key={`mood-${mv.id}`} m={mv} />
-                      ))}
-                    </div>
+          {loading && items.length === 0 ? (
+            <SkeletonRow count={8} />
+          ) : items.length ? (
+            <>
+              <section className="section-card rail">
+                <div className="reel-wrap">
+                  <div className="h-scroll">
+                    {items.map((mv) => (
+                      <PosterCard key={`mood-${mv.id}`} m={mv} />
+                    ))}
                   </div>
-                </section>
-
-                <div ref={sentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
-                <div style={{ minHeight: 24 }} aria-live="polite" className="d-flex justify-content-center">
-                  {loading && hasMore ? <span className="text-muted small">Loading more…</span> : null}
                 </div>
+              </section>
 
-                <div className="d-flex justify-content-center mt-3">
+              <div
+                ref={sentinelRef}
+                className="infinite-sentinel"
+                aria-hidden="true"
+                style={{ height: 1 }}
+              />
+              {/* reserve space to avoid layout shift when the line appears/disappears */}
+              <div style={{ minHeight: 24 }} aria-live="polite" className="d-flex justify-content-center">
+                {loading && hasMore ? <span className="text-muted small">Loading more…</span> : null}
+              </div>
+
+              <div className="d-flex justify-content-center mt-3">
+                <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
+                  See all {MOODS.find((x) => x.key === mood)?.label || "results"}
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="text-muted">
+              No picks for this mood. Try another mood or widen rating/options.
+              {!!seeAllHref && (
+                <div className="mt-3">
                   <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
-                    See all {MOODS.find((x) => x.key === mood)?.label || "results"}
+                    Open full list
                   </Link>
                 </div>
-              </>
-            ) : (
-              <div className="text-muted">
-                No picks for this mood. Try another mood or widen filters.
-                {!!seeAllHref && (
-                  <div className="mt-3">
-                    <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
-                      Open full list
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* MOBILE FILTERS */}
@@ -390,7 +411,9 @@ export default function Dashboard() {
           style={{ height: "75vh" }}
         >
           <div className="offcanvas-header">
-            <h5 className="offcanvas-title" id="filtersOffcanvasLabel">Filters</h5>
+            <h5 className="offcanvas-title" id="filtersOffcanvasLabel">
+              Filters
+            </h5>
             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close" />
           </div>
           <div className="offcanvas-body">
@@ -403,7 +426,9 @@ export default function Dashboard() {
                 disabled={loading}
               >
                 {MOODS.map((m) => (
-                  <option key={m.key} value={m.key}>{m.label}</option>
+                  <option key={m.key} value={m.key}>
+                    {m.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -418,7 +443,9 @@ export default function Dashboard() {
                   disabled={loading}
                 >
                   {TMDB_MIN_OPTIONS.map((o) => (
-                    <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
+                    <option key={String(o.value)} value={String(o.value)}>
+                      {o.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -441,7 +468,9 @@ export default function Dashboard() {
             </div>
 
             <div className="d-flex justify-content-between align-items-center mt-4">
-              <button type="button" className="btn btn-outline-light" onClick={resetFilters}>Reset</button>
+              <button type="button" className="btn btn-outline-light" onClick={resetFilters}>
+                Reset
+              </button>
               <button
                 type="button"
                 className="btn btn-primary"
