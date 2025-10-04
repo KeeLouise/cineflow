@@ -103,7 +103,7 @@ SIMPLE_JWT = {
 }
 REST_FRAMEWORK = {
 
-    "EXCEPTION_HANDLER": "api.exception_handler.api_exception_handler",
+    #"EXCEPTION_HANDLER": "api.exception_handler.api_exception_handler",#
 
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",

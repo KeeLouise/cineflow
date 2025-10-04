@@ -167,7 +167,7 @@ export default function Dashboard() {
         setProvErr("");
 
         const base = `${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`;
-        const alt  = `${API_BASE}/movie/providers/?region=${encodeURIComponent(REGION)}`;
+        const alt  = `${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`;
 
         let data;
         try { data = await getJson(base); }
