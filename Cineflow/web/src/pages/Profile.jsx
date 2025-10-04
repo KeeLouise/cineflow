@@ -1,6 +1,8 @@
+// src/pages/Profile.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { getMyProfile, updateMyProfile } from "@/api/profile";
 import api from "@/api/client";
+import { extractErr } from "@/utils/errors"; // <-- tiny helper that unpacks API errors
 import "@/styles/security.css";
 
 // Email validation
@@ -26,16 +28,16 @@ export default function Profile() {
 
   // Email validation
   const [emailTouched, setEmailTouched] = useState(false);
-  const emailInvalid = emailTouched && me?.email && !emailRegex.test(me.email);
+  const emailInvalid = emailTouched && me?.email && !emailRegex.test(me.email || "");
 
-  // Use profile.updated_at to version the image URL and break caches
+  // Bust avatar caches using updated_at
   const version = useMemo(() => {
     if (!me?.updated_at) return Date.now();
     const t = Date.parse(me.updated_at);
     return Number.isFinite(t) ? t : Date.now();
   }, [me?.updated_at]);
 
-  // URL the server returned (absolute Cloudinary or /media/...), plus a ?v= param
+  // Server avatar URL (absolute or /media/...) with ?v=
   const avatarUrl = useMemo(() => {
     if (!me?.avatar) return "";
     try {
@@ -43,37 +45,37 @@ export default function Profile() {
       u.searchParams.set("v", String(version));
       return u.toString();
     } catch {
-      // if me.avatar is a bare path (rare), just append ?v
       const sep = me.avatar.includes("?") ? "&" : "?";
       return `${me.avatar}${sep}v=${version}`;
     }
   }, [me?.avatar, version]);
 
-  // Local preview while an upload is in progress
+  // Local preview during upload
   const localPreview = useMemo(
     () => (avatarFile ? URL.createObjectURL(avatarFile) : ""),
     [avatarFile]
   );
 
-  // Fetch current profile
+  // Load current profile
   useEffect(() => {
     (async () => {
       try {
         const data = await getMyProfile();
         setMe(data);
-      } catch {
-        setError("Could not load profile.");
+      } catch (e) {
+        setError(extractErr(e) || "Could not load profile.");
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
+  // Revoke preview URL when file changes/unmounts
   useEffect(() => {
     return () => {
-      if (avatarFile) URL.revokeObjectURL(localPreview);
+      if (localPreview) URL.revokeObjectURL(localPreview);
     };
-  }, [avatarFile, localPreview]);
+  }, [localPreview]);
 
   async function handleSave(e) {
     e.preventDefault();
@@ -90,59 +92,49 @@ export default function Profile() {
     setOkMsg("");
 
     try {
-      const patch = {
-        username: me.username,
-        first_name: me.first_name,
-        last_name: me.last_name,
-        email: me.email,
-      };
-      if (removeAvatar) patch.remove_avatar = true;
+      // Only send fields that are strings / present
+      const patch = {};
+      if (typeof me.username === "string")    patch.username = me.username;
+      if (typeof me.first_name === "string")  patch.first_name = me.first_name;
+      if (typeof me.last_name === "string")   patch.last_name = me.last_name;
+      if (typeof me.email === "string")       patch.email = (me.email || "").trim().toLowerCase();
+      if (removeAvatar)                       patch.remove_avatar = true;
 
       const updated = await updateMyProfile(patch);
       setMe(updated);
       setOkMsg("Profile updated.");
       setRemoveAvatar(false);
     } catch (err) {
-      const detail =
-        err?.response?.data?.detail ||
-        Object.values(err?.response?.data || {})?.[0]?.[0] ||
-        "Could not update profile.";
-      setError(String(detail));
+      setError(extractErr(err) || "Could not update profile.");
     } finally {
       setSaving(false);
     }
   }
 
   async function onFileChange(e) {
-  const file = e.target.files?.[0] || null;
-  if (!file) return;
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
 
-  setError("");
-  setOkMsg("");
-  setTwoFaError("");
-  setTwoFaMsg("");
+    setError("");
+    setOkMsg("");
+    setTwoFaError("");
+    setTwoFaMsg("");
 
-  setAvatarFile(file);
-  setRemoveAvatar(false);
+    setAvatarFile(file);      // show local preview immediately
+    setRemoveAvatar(false);
 
-  try {
-    const updated = await updateMyProfile({ avatar: file });
-    setMe(updated);
-    setOkMsg("Avatar updated.");
-    // clear the local preview only on success
-    setAvatarFile(null);
-  } catch (err) {
-    const resp = err?.response?.data;
-    let detail =
-      (resp && (resp.detail || resp.error || resp.message)) ||
-      (resp && typeof resp === "object"
-        ? Object.values(resp).flat().find(Boolean)
-        : null) ||
-      "Could not upload avatar.";
-    setError(String(detail));
-    // keep the preview so the user can retry
+    try {
+      const updated = await updateMyProfile({ avatar: file });
+      setMe(updated);
+      setOkMsg("Avatar updated.");
+
+      // Clear local preview only on success
+      setAvatarFile(null);
+    } catch (err) {
+      setError(extractErr(err) || "Could not upload avatar.");
+      // keep preview so the user can retry
+    }
   }
-}
 
   async function handleResendVerify() {
     setResendMsg("");
@@ -150,8 +142,8 @@ export default function Profile() {
     try {
       await api.post("/auth/resend_me/", {});
       setResendMsg("Verification email sent! Check your inbox.");
-    } catch {
-      setError("Could not resend verification email.");
+    } catch (e) {
+      setError(extractErr(e) || "Could not resend verification email.");
     }
   }
 
@@ -162,8 +154,7 @@ export default function Profile() {
       setTwoFaMsg("Email 2FA enabled. You’ll be asked for a code on next sign-in.");
       setMe((m) => ({ ...m, two_factor_enabled: true }));
     } catch (e) {
-      const d = e?.response?.data?.detail || "Could not enable 2FA.";
-      setTwoFaError(d);
+      setTwoFaError(extractErr(e) || "Could not enable 2FA.");
     }
   }
 
@@ -174,14 +165,14 @@ export default function Profile() {
       setTwoFaMsg("Email 2FA disabled.");
       setMe((m) => ({ ...m, two_factor_enabled: false }));
     } catch (e) {
-      const d = e?.response?.data?.detail || "Could not disable 2FA.";
-      setTwoFaError(d);
+      setTwoFaError(extractErr(e) || "Could not disable 2FA.");
     }
   }
 
   if (loading) return <div className="container py-4">Loading…</div>;
 
   const imgSrc = localPreview || avatarUrl;
+  const initials = (me?.username?.trim()?.charAt(0)?.toUpperCase() || "U");
 
   return (
     <div className="container py-4">
@@ -215,7 +206,7 @@ export default function Profile() {
               />
             </div>
 
-            {/* Email with client validation */}
+            {/* Email */}
             <div className="mb-3">
               <label className="form-label">Email</label>
               <input
@@ -259,14 +250,14 @@ export default function Profile() {
               <label className="form-label d-block">Avatar</label>
               {imgSrc ? (
                 <img
-    src={imgSrc}
-    alt="Avatar"
-    className="avatar avatar-lg"
-    onError={(e) => {
-      e.currentTarget.onerror = null;
-      e.currentTarget.src =
-        "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
-        encodeURIComponent(me.username || "User");
+                  src={imgSrc}
+                  alt="Avatar"
+                  className="rounded-circle" // Bootstrap round
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src =
+                      "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
+                      encodeURIComponent(me.username || "User");
                   }}
                   style={{
                     width: 88,
@@ -277,10 +268,13 @@ export default function Profile() {
                   }}
                 />
               ) : (
-                <div className="avatar avatar-lg avatar-fallback">
-    {(me?.username?.trim()?.charAt(0)?.toUpperCase() || "U")}
-  </div>
-              
+                <div
+                  className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center"
+                  style={{ width: 88, height: 88 }}
+                  aria-label="Avatar"
+                >
+                  {initials}
+                </div>
               )}
             </div>
 
@@ -310,11 +304,7 @@ export default function Profile() {
                           setMe(updated);
                           setOkMsg("Avatar removed.");
                         } catch (err) {
-                          const detail =
-                            err?.response?.data?.detail ||
-                            Object.values(err?.response?.data || {})?.[0]?.[0] ||
-                            "Could not remove avatar.";
-                          setError(String(detail));
+                          setError(extractErr(err) || "Could not remove avatar.");
                           setRemoveAvatar(false);
                         }
                       }
