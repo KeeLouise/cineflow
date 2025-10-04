@@ -126,15 +126,12 @@ class RoomMembershipSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "joined_at", "username", "avatar"]
 
     def _build_avatar_url(self, request, url: str) -> Optional[str]:
-        # fix accidental double media
+        if not url:
+            return None
         if isinstance(url, str) and url.startswith("/media/media/"):
             url = url.replace("/media/media/", "/media/", 1)
-
-        # absolute (Cloudinary) — return as-is
         if url.startswith("http://") or url.startswith("https://"):
             return url
-
-        # ensure leading slash for local storage
         if not url.startswith("/"):
             url = f"/media/{url.lstrip('/')}"
         return request.build_absolute_uri(url) if request else url
@@ -143,10 +140,19 @@ class RoomMembershipSerializer(serializers.ModelSerializer):
         prof = getattr(obj.user, "profile", None) or getattr(obj.user, "userprofile", None)
         if not prof:
             return None
+
         img = getattr(prof, "avatar", None)
-        url = getattr(img, "url", None)
+        url = ""
+        try:
+            # Only read .url if a file exists (prevents ValueError)
+            if img and getattr(img, "name", ""):
+                url = img.url
+        except Exception:
+            url = ""
+
         if not url:
             return None
+
         try:
             request = self.context.get("request")
             return self._build_avatar_url(request, url)
@@ -246,6 +252,8 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         read_only_fields = ["full_name", "email_verified", "two_factor_enabled", "avatar", "updated_at"]
 
     def _build_avatar_url(self, request, url: str) -> Optional[str]:
+        if not url:
+            return None
         if isinstance(url, str) and url.startswith("/media/media/"):
             url = url.replace("/media/media/", "/media/", 1)
         if url.startswith("http://") or url.startswith("https://"):
@@ -265,10 +273,19 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
         prof = getattr(obj, "profile", None) or getattr(obj, "userprofile", None)
         if not prof:
             return None
+
         img = getattr(prof, "avatar", None)
-        url = getattr(img, "url", None)
+        url = ""
+        try:
+            # Only read .url if a file exists (prevents ValueError)
+            if img and getattr(img, "name", ""):
+                url = img.url
+        except Exception:
+            url = ""
+
         if not url:
             return None
+
         try:
             request = self.context.get("request")
             return self._build_avatar_url(request, url)
