@@ -6,7 +6,6 @@ import "@/styles/home.css";
 const API_BASE = "/api";
 const REGION = "GB";
 
-// Change mood option - KR 20/09/2025
 const MOODS = [
   { key: "feelgood",     label: "Feel-Good" },
   { key: "heartwarming", label: "Heartwarming" },
@@ -18,25 +17,6 @@ const MOODS = [
   { key: "scary",        label: "Scary" },
   { key: "tearjerker",   label: "Tearjerker" },
   { key: "dark_gritty",  label: "Dark & Gritty" },
-];
-
-// UI provider options (mapped to TMDB IDs via /movies/providers/) - KR 19/09/2025
-const ALLOWED_PROVIDERS = [
-  { key: "netflix",        labels: ["Netflix"] },
-  { key: "disney_plus",    labels: ["Disney+", "Disney Plus", "Disney Plus UK", "Star on Disney+"] },
-  { key: "prime_video",    labels: ["Amazon Prime Video", "Prime Video"] },
-  { key: "paramount_plus", labels: ["Paramount+", "Paramount Plus"] },
-];
-
-const DECADES = [
-  { value: "",      label: "Any decade" },
-  { value: "2020s", label: "2020s" },
-  { value: "2010s", label: "2010s" },
-  { value: "2000s", label: "2000s" },
-  { value: "1990s", label: "1990s" },
-  { value: "1980s", label: "1980s" },
-  { value: "1970s", label: "1970s" },
-  { value: "1960s", label: "1960s" },
 ];
 
 const TMDB_MIN_OPTIONS = [
@@ -102,20 +82,15 @@ export default function SeeAllPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // Providers catalog (fetch once) - map ALLOWED_PROVIDERS to TMDB IDs - KR 19/09/2025
-  const [providersMap, setProvidersMap] = useState({});
-  const [provLoading, setProvLoading] = useState(true);
+  // Filters (providers & decades removed)
+  const [tmdbMin, setTmdbMin] = useState(
+    Number(searchParams.get("vote_average_gte") || searchParams.get("tmdbMin") || 0)
+  );
+  const [includeRentBuy, setIncludeRentBuy] = useState(
+    searchParams.get("broad") === "1" || searchParams.get("includeRentBuy") === "1"
+  );
 
-  // Filters (seed from query) - KR 19/09/2025
-  const [decade, setDecade] = useState(searchParams.get("decade") || "");
-  const [tmdbMin, setTmdbMin] = useState(Number(searchParams.get("vote_average_gte") || searchParams.get("tmdbMin") || 0));
-  const [pickedProviders, setPickedProviders] = useState(() => {
-    
-    return [];
-  });
-  const [includeRentBuy, setIncludeRentBuy] = useState(searchParams.get("broad") === "1" || searchParams.get("includeRentBuy") === "1");
-
-  // Data - KR 19/09/2025
+  // Data
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -125,49 +100,7 @@ export default function SeeAllPage() {
   const sentinelRef = useRef(null);
   const inFlightRef = useRef(null);
 
-  const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").replace(/[’'"]/g, "").trim();
-
-  // Providers map - KR 19/09/2025
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setProvLoading(true);
-        const res = await fetch(`${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const list = data?.results || [];
-
-        const map = {};
-        ALLOWED_PROVIDERS.forEach((p) => {
-          const match = list.find((row) => {
-            const n = norm(row?.provider_name);
-            return p.labels.some((lbl) => norm(lbl) === n);
-          });
-          if (match?.provider_id) map[p.key] = String(match.provider_id);
-        });
-
-        if (mounted) setProvidersMap(map);
-      } catch (e) {
-        console.warn("providers load failed", e);
-        if (mounted) setProvidersMap({});
-      } finally {
-        if (mounted) setProvLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Build TMDB providers param - KR 19/09/2025
-  const providersParam = useMemo(() => {
-    const ids = pickedProviders.map((k) => providersMap[k]).filter(Boolean);
-    if (!ids.length) return "";
-    return Array.from(new Set(ids)).join("|");
-  }, [pickedProviders, providersMap]);
-
-  // Build query for backend - KR 19/09/2025
+  // Build query (no providers/decade)
   const buildQuery = useCallback(
     (nextPage) => {
       const params = {
@@ -175,21 +108,14 @@ export default function SeeAllPage() {
         page: nextPage,
         types: includeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free",
       };
-      if (providersParam) {
-        params.providers = providersParam;
-        params.broad = includeRentBuy ? 1 : 1;
-        params.force_providers = 1;            
-      } else if (includeRentBuy) {
-        params.broad = 1;
-      }
-      if (decade) params.decade = decade;
+      if (includeRentBuy) params.broad = 1;
       if (tmdbMin && !Number.isNaN(tmdbMin)) {
         params.vote_average_gte = tmdbMin;
         if (tmdbMin >= 7) params.min_votes = 50;
       }
       return params;
     },
-    [providersParam, decade, tmdbMin, includeRentBuy]
+    [tmdbMin, includeRentBuy]
   );
 
   const fetchPage = useCallback(
@@ -203,11 +129,10 @@ export default function SeeAllPage() {
         setErr("");
 
         const qs = new URLSearchParams(buildQuery(nextPage)).toString();
-
-        const res = await authFetch(`${API_BASE}/movies/mood/${encodeURIComponent(mood)}/?${qs}`, {
-          method: "GET",
-          signal: controller.signal,
-        });
+        const res = await authFetch(
+          `${API_BASE}/movies/mood/${encodeURIComponent(mood)}/?${qs}`,
+          { method: "GET", signal: controller.signal }
+        );
 
         if (!res.ok) {
           if (res.status === 401) throw new Error("Please log in to see mood results.");
@@ -223,7 +148,9 @@ export default function SeeAllPage() {
           setPage(1);
         } else {
           const seen = new Set((replace ? [] : items).map((m) => m.id));
-          const merged = (replace ? [] : items).concat(list.filter((m) => m?.id && !seen.has(m.id)));
+          const merged = (replace ? [] : items).concat(
+            list.filter((m) => m?.id && !seen.has(m.id))
+          );
           setItems(merged);
           setPage(nextPage);
         }
@@ -241,12 +168,13 @@ export default function SeeAllPage() {
     [mood, items, buildQuery]
   );
 
-  // First load + when filters change - KR 19/09/2025
+  // First load + when filters change
   useEffect(() => {
     fetchPage(1, true);
-  }, [providersParam, decade, tmdbMin, includeRentBuy, mood]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tmdbMin, includeRentBuy, mood]);
 
-  // Infinite scroll - KR 19/09/2025
+  // Infinite scroll
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || !hasMore) return;
@@ -268,47 +196,30 @@ export default function SeeAllPage() {
     return () => io.disconnect();
   }, [sentinelRef, hasMore, loading, page, fetchPage]);
 
-  // UI handlers - KR 19/09/2025
-  const toggleProvider = (key) => {
-    setPickedProviders((prev) => {
-      const s = new Set(prev);
-      s.has(key) ? s.delete(key) : s.add(key);
-      return Array.from(s);
-    });
-  };
-
   const resetFilters = () => {
-    setDecade("");
     setTmdbMin(0);
-    setPickedProviders([]);
     setIncludeRentBuy(false);
   };
 
-  // Mood change (navigates but preserves current query filters) - KR 20/09/2025
   const handleMoodChange = (newMood) => {
     if (!newMood || newMood === mood) return;
     const next = new URLSearchParams(buildQuery(1));
     navigate(`/mood/${encodeURIComponent(newMood)}/see-all?${next.toString()}`);
   };
 
-  // Selected filters summary (chips)
+  // Selected filters summary (chips) – only rating + buy/rent now
   const chips = useMemo(() => {
     const c = [];
-    if (pickedProviders.length) c.push(`${pickedProviders.length} provider${pickedProviders.length > 1 ? "s" : ""}`);
-    if (decade) c.push(decade);
     if (tmdbMin) c.push(`TMDB ≥ ${tmdbMin}`);
     if (includeRentBuy) c.push("Include buy/rent");
     return c;
-  }, [pickedProviders, decade, tmdbMin, includeRentBuy]);
+  }, [tmdbMin, includeRentBuy]);
 
   const loadingInitial = loading && items.length === 0;
 
   return (
     <>
-      {/* Fixed background that the glass layer will blur */}
       <div className="page-bg" aria-hidden="true" />
-
-      {/* Glass wrapper for the whole page */}
       <div className="glass-dashboard">
         <div className="container-fluid py-5">
           {/* Header */}
@@ -350,12 +261,12 @@ export default function SeeAllPage() {
             </div>
           </div>
 
-          {/* Desktop filter toolbar */}
+          {/* Desktop filter toolbar (providers/decades removed) */}
           <div className="card bg-dark border-0 shadow-sm mb-4 d-none d-md-block">
             <div className="card-body">
               <div className="row g-3 align-items-end">
                 {/* Mood */}
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <label className="form-label text-secondary small">Mood</label>
                   <select
                     className="form-select form-select-sm bg-dark text-light border-secondary"
@@ -371,48 +282,8 @@ export default function SeeAllPage() {
                   </select>
                 </div>
 
-                {/* Providers */}
-                <div className="col-md-5">
-                  <label className="form-label text-secondary small d-block">Providers</label>
-                  <div className="d-flex flex-wrap gap-2">
-                    {ALLOWED_PROVIDERS.map((p) => {
-                      const disabled = provLoading || !providersMap[p.key];
-                      const active = pickedProviders.includes(p.key);
-                      return (
-                        <button
-                          key={p.key}
-                          type="button"
-                          className={`btn btn-sm ${active ? "btn-info text-dark" : "btn-outline-info"}`}
-                          onClick={() => toggleProvider(p.key)}
-                          disabled={disabled || loading}
-                          title={disabled ? "Not available in this region" : p.labels[0]}
-                        >
-                          {p.labels[0]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Decade */}
-                <div className="col-md-2">
-                  <label className="form-label text-secondary small">Decade</label>
-                  <select
-                    className="form-select form-select-sm bg-dark text-light border-secondary"
-                    value={decade}
-                    onChange={(e) => setDecade(e.target.value)}
-                    disabled={loading}
-                  >
-                    {DECADES.map((d) => (
-                      <option key={d.value || "any"} value={d.value}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* TMDB rating */}
-                <div className="col-md-2">
+                <div className="col-md-4">
                   <label className="form-label text-secondary small">TMDB rating</label>
                   <select
                     className="form-select form-select-sm bg-dark text-light border-secondary"
@@ -429,7 +300,7 @@ export default function SeeAllPage() {
                 </div>
 
                 {/* Include buy/rent */}
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <label className="form-label text-secondary small d-block">Options</label>
                   <div className="form-check form-switch">
                     <input
@@ -521,11 +392,11 @@ export default function SeeAllPage() {
               <div ref={sentinelRef} style={{ height: 1 }} aria-hidden="true" />
             </>
           ) : (
-            <div className="text-secondary">No results. Try widening filters or removing a provider.</div>
+            <div className="text-secondary">No results. Try widening filters.</div>
           )}
         </div>
 
-        {/* MOBILE FILTERS: Off-canvas sheet (mirrors Dashboard) */}
+        {/* MOBILE FILTERS */}
         <div
           className="offcanvas offcanvas-bottom bg-dark text-light d-md-none"
           tabIndex="-1"
@@ -534,13 +405,11 @@ export default function SeeAllPage() {
           style={{ height: "75vh" }}
         >
           <div className="offcanvas-header">
-            <h5 className="offcanvas-title" id="filtersOffcanvasLabel">
-              Filters
-            </h5>
+            <h5 className="offcanvas-title" id="filtersOffcanvasLabel">Filters</h5>
             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close" />
           </div>
           <div className="offcanvas-body">
-            {/* Mood selector (mobile) */}
+            {/* Mood */}
             <div className="mb-3">
               <label className="form-label small text-secondary d-block">Mood</label>
               <select
@@ -557,46 +426,8 @@ export default function SeeAllPage() {
               </select>
             </div>
 
-            {/* Providers */}
-            <div className="mb-3">
-              <label className="form-label small text-secondary d-block">Providers</label>
-              <div className="d-flex flex-wrap gap-2">
-                {ALLOWED_PROVIDERS.map((p) => {
-                  const disabled = provLoading || !providersMap[p.key];
-                  const active = pickedProviders.includes(p.key);
-                  return (
-                    <button
-                      key={p.key}
-                      type="button"
-                      className={`btn btn-sm ${active ? "btn-info text-dark" : "btn-outline-info"}`}
-                      onClick={() => toggleProvider(p.key)}
-                      disabled={disabled || loading}
-                      title={disabled ? "Not available in this region" : p.labels[0]}
-                    >
-                      {p.labels[0]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Decade + Rating */}
+            {/* Rating */}
             <div className="row g-3">
-              <div className="col-6">
-                <label className="form-label small text-secondary">Decade</label>
-                <select
-                  className="form-select form-select-sm bg-dark text-light border-secondary"
-                  value={decade}
-                  onChange={(e) => setDecade(e.target.value)}
-                  disabled={loading}
-                >
-                  {DECADES.map((d) => (
-                    <option key={d.value || "any"} value={d.value}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="col-6">
                 <label className="form-label small text-secondary">TMDB rating</label>
                 <select
@@ -612,22 +443,21 @@ export default function SeeAllPage() {
                   ))}
                 </select>
               </div>
-            </div>
-
-            {/* Include buy/rent (mobile) */}
-            <div className="mt-3 d-flex gap-4">
-              <div className="form-check form-switch">
-                <input
-                  className="form-check-input"
-                  type="checkbox"
-                  id="mobileBuyRent"
-                  checked={includeRentBuy}
-                  onChange={(e) => setIncludeRentBuy(e.target.checked)}
-                  disabled={loading}
-                />
-                <label className="form-check-label" htmlFor="mobileBuyRent">
-                  Include buy/rent results
-                </label>
+              <div className="col-6">
+                <label className="form-label small text-secondary d-block">Options</label>
+                <div className="form-check form-switch mt-1">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="mobileBuyRent"
+                    checked={includeRentBuy}
+                    onChange={(e) => setIncludeRentBuy(e.target.checked)}
+                    disabled={loading}
+                  />
+                  <label className="form-check-label" htmlFor="mobileBuyRent">
+                    Include buy/rent results
+                  </label>
+                </div>
               </div>
             </div>
 
