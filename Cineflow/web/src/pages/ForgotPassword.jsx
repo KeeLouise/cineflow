@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { requestPasswordReset } from "@/api/account";
 
 const isValidEmail = (v = "") =>
@@ -18,7 +19,6 @@ export default function ForgotPassword() {
     e.preventDefault();
     setMsg(""); setErr("");
 
-    // Validate before submit
     if (!isValidEmail(email)) {
       setEmailTouched(true);
       setErr("Please enter a valid email address.");
@@ -30,7 +30,6 @@ export default function ForgotPassword() {
       await requestPasswordReset(email);
       setMsg("If the address exists, we’ve emailed reset instructions.");
     } catch {
-      // Keep generic to avoid enumeration
       setMsg("If the address exists, we’ve emailed reset instructions.");
     } finally {
       setLoading(false);
@@ -38,35 +37,61 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="container py-4" style={{ maxWidth: 420 }}>
-      <h1 className="h4 mb-3">Forgot your password?</h1>
-      {msg && <div className="alert alert-info">{msg}</div>}
-      {err && <div className="alert alert-danger">{err}</div>}
+    <div className="auth-bg">
+      <div className="auth-grid">
+        <div className="auth-card">
+          <div className="auth-header">
+            <Link to="/" className="brand">
+              <span className="brand-dot" />
+              FilmFind
+            </Link>
+            <h1 className="auth-title">Forgot your password?</h1>
+            <p className="auth-subtitle">We’ll send a reset link to your email.</p>
+          </div>
 
-      <form onSubmit={onSubmit} noValidate>
-        <label className="form-label">Email address</label>
-        <input
-          type="email"
-          className={`form-control ${emailInvalid ? "is-invalid" : ""}`}
-          value={email}
-          onChange={(e)=>setEmail(e.target.value)}
-          onBlur={() => setEmailTouched(true)}
-          required
-          autoFocus
-          autoComplete="email"
-        />
-        {emailInvalid && (
-          <div className="invalid-feedback">Please enter a valid email address.</div>
-        )}
+          <div className="auth-body">
+            {msg && <div className="callout info" role="status">{msg}</div>}
+            {err && !msg && <div className="callout error" role="alert">{err}</div>}
 
-        <button
-          className="btn btn-dark mt-3 w-100"
-          disabled={loading || !email || !isValidEmail(email)}
-          title={!email || isValidEmail(email) ? "" : "Fix email address"}
-        >
-          {loading ? "Sending…" : "Send reset link"}
-        </button>
-      </form>
+            <form className="vstack gap-12" onSubmit={onSubmit} noValidate>
+              <div className="field">
+                <label htmlFor="fp-email" className="field-label">Email address</label>
+                <input
+                  id="fp-email"
+                  type="email"
+                  className={`field-input ${emailInvalid ? "is-error" : ""}`}
+                  value={email}
+                  onChange={(e)=>setEmail(e.target.value)}
+                  onBlur={() => setEmailTouched(true)}
+                  autoComplete="email"
+                  required
+                  autoFocus
+                />
+                {emailInvalid && (
+                  <small className="field-help error">Please enter a valid email address.</small>
+                )}
+              </div>
+
+              <button
+                className="btn btn-primary"
+                disabled={loading || !email || !isValidEmail(email)}
+                title={!email || isValidEmail(email) ? "" : "Fix email address"}
+              >
+                {loading ? <span className="spinner" aria-hidden /> : null}
+                {loading ? "Sending…" : "Send reset link"}
+              </button>
+            </form>
+          </div>
+
+          <div className="auth-footer">
+            <div className="auth-links">
+              <Link to="/login">Back to sign in</Link>
+              <span>•</span>
+              <Link to="/register">Create account</Link>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
