@@ -117,7 +117,7 @@ export default function Register() {
           <div className="auth-header">
             <Link to="/" className="brand">
               <span className="brand-dot" />
-              FilmFind
+              Cineflow
             </Link>
             <h1 className="auth-title">Create your account</h1>
             <p className="auth-subtitle">Join and start building your watchlists.</p>
