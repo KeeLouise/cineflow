@@ -1,8 +1,12 @@
-import React from "react";
-if (typeof window !== "undefined") {
-window.React = window.React || React;
-}
+// src/main.jsx
+import * as React from "react";
 import ReactDOM from "react-dom/client";
+
+// Expose React for any legacy chunks compiled with the classic runtime
+if (typeof window !== "undefined") {
+  window.React = window.React || React;
+}
+
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import App from "@/App";
