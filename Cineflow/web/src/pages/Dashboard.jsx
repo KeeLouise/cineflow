@@ -166,8 +166,8 @@ export default function Dashboard() {
 
     const endpoints = [
       `${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`,
-      `${API_BASE}/providers/?region=${encodeURIComponent(REGION)}`,   // fallback
-      `${API_BASE}/movie/providers/?region=${encodeURIComponent(REGION)}`, // fallback
+      `${API_BASE}/providers/?region=${encodeURIComponent(REGION)}`,   
+      `${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`,
     ];
 
     (async () => {
