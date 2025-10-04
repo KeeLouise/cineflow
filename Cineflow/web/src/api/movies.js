@@ -5,6 +5,32 @@ export function buildProvidersParam(ids) {
   return Array.isArray(ids) && ids.length ? ids.join("|") : "";
 }
 
+export async function fetchProviders(region = "GB", { signal } = {}) {
+  const tryPath = async (path) => {
+    const res = await api.get(path, { params: { region }, signal, responseType: "text" });
+    const text = typeof res.data === "string" ? res.data : JSON.stringify(res.data || {});
+    const looksHTML = /^\s*<(?:!DOCTYPE|html)/i.test(text);
+    if (looksHTML) {
+      throw new Error(`Non-JSON response at ${path}`);
+    }
+
+    const data = typeof res.data === "string" ? JSON.parse(text) : res.data;
+
+    const results = Array.isArray(data?.results)
+      ? data.results
+      : Array.isArray(data)
+      ? data
+      : [];
+    return { results };
+  };
+
+  try {
+    return await tryPath("/movies/providers/");
+  } catch {
+    return await tryPath("/movie/providers/");
+  }
+}
+
 // --- Movie API wrappers (Django backend proxies TMDB) --- KR 21/08/2025
 
 // Fetch trending movies of the week (from Django backend). - KR 21/08/2025
@@ -55,8 +81,8 @@ export async function fetchStreamingTrending(
     providers = "",
     types = "flatrate,ads,free",
     page = 1,
-    debug = false,  
-    broad = false,  
+    debug = false,
+    broad = false,
   },
   { signal } = {}
 ) {
@@ -72,9 +98,7 @@ export async function fetchStreamingTrending(
   const { data } = await api.get("/movies/streaming_trending/", { params, signal });
 
   if (import.meta?.env?.DEV) {
-    
     console.log("[DISCOVER DEBUG] sent-to-server:", params);
-  
     console.log("[DISCOVER DEBUG] results:", (data?.results || []).length);
   }
 
@@ -90,7 +114,7 @@ export async function fetchMovieDetail(id, region = "GB", { signal } = {}) {
   return data;
 }
 
-// Mood-based discover (requires auth) - KR 02/09/2025
+
 export async function fetchMoodDiscover(
   {
     mood,
@@ -101,29 +125,33 @@ export async function fetchMoodDiscover(
     debug = false,
     broad = false,
     fast = false,
-    decade = "",          
-    tmdbMin = "",         
-    cfMin = "",           
+
+    tmdbMin = "",
+    vote_average_gte,
+    cfMin,
+    force_providers,
   } = {},
   { signal } = {}
 ) {
   if (!mood) throw new Error("mood is required");
 
+  const rating =
+    vote_average_gte != null
+      ? Number(vote_average_gte)
+      : tmdbMin !== "" && tmdbMin != null
+      ? Number(tmdbMin)
+      : undefined;
+
   const params = {
-  region,
-  page,
-  types,
-
-  ...(providers ? { providers, broad: 1 } : {}), 
-
-  ...(decade ? { decade } : {}),
-  ...(tmdbMin !== "" && tmdbMin != null ? { vote_average_gte: Number(tmdbMin) } : {}),
-
-  ...(cfMin ? { mood_strength: cfMin } : {}), 
-
-  ...(debug ? { debug: 1 } : {}),
-  ...(fast ? { fast: 1 } : {}),
-};
+    region,
+    page,
+    types,
+    ...(providers ? { providers, broad: 1 } : {}),
+    ...(rating != null && !Number.isNaN(rating) ? { vote_average_gte: rating } : {}),
+    ...(debug ? { debug: 1 } : {}),
+    ...(fast ? { fast: 1 } : {}),
+    ...(force_providers ? { force_providers: 1 } : {}),
+  };
 
   const { data } = await api.get(`/movies/mood/${mood}/`, { params, signal });
   return data;
