@@ -15,15 +15,19 @@ from api.services.mood import (
     build_discover_params,
     effective_pins_for,
     filter_by_providers,
-    rerank_for_mood,        
+    rerank_for_mood,
 )
 
-# Filters — KR 17/09/2025
+# Filters — KR 17/09/2025 (decade removed; year_from/year_to left optional)
 def _parse_filters_from_request(request):
     """
-    Parse optional filters from query params
+    Parse optional filters from query params (no decade).
     """
     q = request.query_params
+
+    # Explicit year range (optional; keep keys present for compatibility)
+    year_from = None
+    year_to   = None
 
     # TMDB rating
     vote_avg_gte = q.get("tmdb_min", q.get("vote_average_gte"))
@@ -43,11 +47,14 @@ def _parse_filters_from_request(request):
 
     def _int(name, lo=None, hi=None):
         val = q.get(name)
-        if val is None or val == "": return None
+        if val is None or val == "":
+            return None
         try:
             iv = int(val)
-            if lo is not None: iv = max(lo, iv)
-            if hi is not None: iv = min(hi, iv)
+            if lo is not None:
+                iv = max(lo, iv)
+            if hi is not None:
+                iv = min(hi, iv)
             return iv
         except Exception:
             return None
@@ -102,7 +109,12 @@ def mood_discover(request, mood_key: str):
     # Snapshots (strict + widened monetization variant)
     def _snapshot_key(bucket_name: str, par: dict):
         f = filters
-        ftag = f"y{f.get('year_from','-')}-{f.get('year_to','-')}-rt{f.get('runtime_gte','-')}-{f.get('runtime_lte','-')}-mv{f.get('min_votes','-')}-lg{f.get('lang','-')}-sb{f.get('sort_by','-')}-va{f.get('vote_average_gte','-')}"
+        ftag = (
+            f"y{f.get('year_from','-')}-{f.get('year_to','-')}"
+            f"-rt{f.get('runtime_gte','-')}-{f.get('runtime_lte','-')}"
+            f"-mv{f.get('min_votes','-')}-lg{f.get('lang','-')}"
+            f"-sb{f.get('sort_by','-')}-va{f.get('vote_average_gte','-')}"
+        )
         return (
             f"snap4:{bucket_name}:{mood_key}:{region}:"
             f"{par.get('with_watch_providers','-')}:"
@@ -136,6 +148,7 @@ def mood_discover(request, mood_key: str):
         seen.add(mid)
         candidates.append(m)
 
+    # Enrich first N for provider/cert fairness in re-rank
     ENRICH_N = 60
     if candidates:
         for i, m in enumerate(candidates[:ENRICH_N]):
@@ -152,7 +165,7 @@ def mood_discover(request, mood_key: str):
                 }
                 m["watch_providers"] = (detail.get("watch/providers") or {}).get("results", {})
 
-    # Provider hard gate
+    # Provider hard gate (optional)
     if providers and force_providers:
         candidates = filter_by_providers(candidates, region=region, providers_csv=providers, limit_checks=60)
 
@@ -169,7 +182,6 @@ def mood_discover(request, mood_key: str):
     pins = effective_pins_for(mood_key)
     order = {mid: i for i, mid in enumerate(pins)}
     existing_ids = {m.get("id") for m in candidates if m.get("id")}
-    # Backfill missing pins that exist for region
     appended = []
     for mid in [mid for mid in pins if mid not in existing_ids][:5]:
         detail, err = tmdb_get(f"/movie/{mid}", {"append_to_response": "watch/providers"})
@@ -179,6 +191,7 @@ def mood_discover(request, mood_key: str):
                 appended.append(detail)
 
     merged2 = candidates + appended
+
     def pin_key(m): return (order.get(m.get("id"), 10_000),)
     merged2.sort(key=pin_key)
 
