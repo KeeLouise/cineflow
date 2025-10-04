@@ -25,18 +25,6 @@ def _parse_filters_from_request(request):
     """
     q = request.query_params
 
-    # decade
-    decade = (q.get("with_decade") or q.get("decade") or "").strip()
-    y_from = q.get("year_from"); y_to = q.get("year_to")
-    decade_map = {
-        "2020s": (2020, 2029), "2010s": (2010, 2019), "2000s": (2000, 2009),
-        "1990s": (1990, 1999), "1980s": (1980, 1989), "1970s": (1970, 1979), "1960s": (1960, 1969),
-    }
-    year_from = int(y_from) if y_from and y_from.isdigit() else None
-    year_to   = int(y_to)   if y_to   and y_to.isdigit()   else None
-    if decade in decade_map and (year_from is None and year_to is None):
-        year_from, year_to = decade_map[decade]
-
     # TMDB rating
     vote_avg_gte = q.get("tmdb_min", q.get("vote_average_gte"))
     try:
