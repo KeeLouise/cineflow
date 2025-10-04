@@ -42,6 +42,8 @@ function PosterCard({ m }) {
   );
 }
 
+const [providersError, setProvidersError] = useState("");
+
 const MOODS = [
   { key: "feelgood", label: "Feel-Good" },
   { key: "heartwarming", label: "Heartwarming" },
@@ -146,71 +148,86 @@ export default function Dashboard() {
   // --- Providers (fetch once; map names to ids) with robust JSON guard + fallbacks
   const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").replace(/[’'"]/g, "").trim();
 
-  useEffect(() => {
-    let mounted = true;
+useEffect(() => {
+  let mounted = true;
 
-    async function fetchJsonGuard(url) {
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) {
-        // Try to surface server-provided text for easier debugging
-        const txt = await res.text();
-        throw new Error(`HTTP ${res.status} at ${url}: ${txt.slice(0, 160)}`);
-      }
-      const ct = res.headers.get("content-type") || "";
-      if (!ct.toLowerCase().includes("application/json")) {
-        const txt = await res.text();
-        throw new Error(`Non-JSON response at ${url}: ${txt.slice(0, 160)}`);
-      }
-      return res.json();
+  const norm = (s) =>
+    (s || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[’'"]/g, "")
+      .trim();
+
+  async function tryFetchProviders(url) {
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status} at ${url}`);
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (!ct.includes("application/json")) {
+      const txt = await res.text();
+      throw new Error(
+        `Non-JSON response at ${url.split("?")[0]}: ${txt.slice(0, 120)}…`
+      );
     }
+    return res.json();
+  }
 
-    const endpoints = [
-      `${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`,
-      `${API_BASE}/providers/?region=${encodeURIComponent(REGION)}`,   
-      `${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`,
-    ];
+  (async () => {
+    try {
+      setProvLoading(true);
+      setProvidersError("");
 
-    (async () => {
+      // 1) Preferred, plural route
+      const base = `${API_BASE}/movies/providers/?region=${encodeURIComponent(
+        REGION
+      )}`;
+
+      // 2) Fallback, singular (in case backend is wired that way)
+      const alt = `${API_BASE}/movie/providers/?region=${encodeURIComponent(
+        REGION
+      )}`;
+
+      let data = null;
       try {
-        setProvErr("");
-        setProvLoading(true);
-
-        let data = null;
-        let lastErr = null;
-        for (const url of endpoints) {
-          try {
-            data = await fetchJsonGuard(url);
-            break;
-          } catch (e) {
-            lastErr = e;
-          }
-        }
-        if (!data) throw lastErr || new Error("No providers endpoint returned JSON.");
-
-        const list = data?.results || data?.providers || [];
-        const map = {};
-        ALLOWED_PROVIDERS.forEach((p) => {
-          const match = list.find((row) => p.labels.some((lbl) => norm(lbl) === norm(row?.provider_name)));
-          if (match?.provider_id != null) map[p.key] = String(match.provider_id);
-        });
-
-        if (mounted) {
-          setProvidersMap(map);
-          setProvErr(Object.keys(map).length ? "" : "No known providers found for this region.");
-        }
-      } catch (e) {
-        if (mounted) {
-          setProvidersMap({});
-          setProvErr(String(e?.message || e));
-          // Keep UI usable even if providers fail; users can still browse mood without provider lock.
-        }
-      } finally {
-        if (mounted) setProvLoading(false);
+        data = await tryFetchProviders(base);
+      } catch (e1) {
+        // try fallback once
+        data = await tryFetchProviders(alt);
       }
-    })();
 
-    return () => { mounted = false; };
-  }, []);
+      const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+        ? data
+        : [];
+
+      const map = {};
+      ALLOWED_PROVIDERS.forEach((p) => {
+        const match = list.find((row) =>
+          p.labels.some((lbl) => norm(lbl) === norm(row?.provider_name))
+        );
+        if (match?.provider_id != null) map[p.key] = String(match.provider_id);
+      });
+
+      if (mounted) {
+        setProvidersMap(map);
+      }
+    } catch (err) {
+      if (mounted) {
+        setProvidersMap({});
+        setProvidersError(
+          (err && err.message) ||
+            "Could not load providers. Filtering will be limited."
+        );
+      }
+    } finally {
+      if (mounted) setProvLoading(false);
+    }
+  })();
+
+  return () => {
+    mounted = false;
+  };
+}, []);
 
   // Build providers param
   const providersParam = useMemo(() => {
