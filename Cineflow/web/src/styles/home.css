@@ -1,4 +1,3 @@
-/* Hero */
 .hero {
   padding: 24px 0;
   min-height: auto;
@@ -33,7 +32,7 @@
 
 .hero-search .hero-glass.hero-narrow {
   width: 100%;
-  max-width: 680px;          
+  max-width: 680px;
   margin-inline: auto;
   border-radius: 18px;
   background: rgba(24,24,26,0.45);
@@ -52,11 +51,10 @@
 
 .searchbar-wrapper {
   position: relative;
-  isolation: isolate;      
-  z-index: 10;           
+  z-index: 5000;           
+  overflow: visible;
 }
 
-/* Headline & subheading inside hero */
 .hero-search .display-6 {
   font-size: clamp(1.35rem, 2.6vw, 1.85rem);
   letter-spacing: .2px;
@@ -70,16 +68,13 @@
   margin-bottom: 1rem !important;
 }
 
-/* Search wrapper width */
 .searchbar-wrapper {
   max-width: 520px;
   margin-inline: auto;
 }
 
-/* Row that contains the input */
 .search-input-row { position: relative; }
 
-/* Search input */
 .search-input {
   width: 100%;
   height: 42px;
@@ -95,7 +90,6 @@
 }
 .search-input::placeholder { color: rgba(255,255,255,0.75); }
 
-/* Clear “×” button */
 .search-clear {
   position: absolute;
   right: 2.1rem;
@@ -134,7 +128,7 @@
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  z-index: 3000;          
+  z-index: 6000;
   background: rgba(18,18,22,.98);
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 12px;
@@ -143,12 +137,7 @@
   -webkit-backdrop-filter: blur(8px);
 }
 
-/* Suggestions dropdown (attached to input) */
 .search-suggestions {
-  position: absolute;
-  top: calc(42px + 8px);
-  left: 0;
-  right: 0;
   margin-top: 8px;
   border-radius: 12px;
   font-size: .92rem;
@@ -157,7 +146,6 @@
   box-shadow: 0 14px 32px rgba(0,0,0,0.45);
   list-style: none;
   padding: 6px;
-  z-index: 1000;
   max-height: 320px;
   overflow: auto;
   transform: translateZ(0);
@@ -178,13 +166,11 @@
 .cta-band {
   padding: 1.1rem 0 .75rem;
 }
-
 .cta-inline {
   display: grid;
   grid-template-columns: 1fr;
   gap: .75rem;
 }
-
 .cta-item {
   display: flex;
   align-items: center;
@@ -198,8 +184,8 @@
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
   color: #fff;
+  z-index: auto;
 }
-
 .cta-copy { display: flex; flex-direction: column; gap: 2px; }
 .cta-copy strong { font-weight: 800; letter-spacing: .2px; font-size: 1rem; }
 .cta-copy span { color: rgba(255,255,255,0.82); font-size: .92rem; }
@@ -239,19 +225,19 @@
   .hero-search .lead { font-size: .92rem; }
   .searchbar-wrapper { max-width: 100%; }
   .search-input { height: 40px; padding: 0 2.2rem 0 2rem; }
-  .search-suggestions { top: calc(40px + 8px); }
 
   .searchbar-wrapper .typeahead-menu,
   .searchbar-wrapper .search-suggestions,
   .searchbar-wrapper .autocomplete-menu {
     max-height: 65vh;
-    overflow: auto;}
+    overflow: auto;
+  }
+
   .cta-band { padding: 1rem 0 .5rem; }
   .cta-inline { grid-template-columns: 1fr; gap: .6rem; }
   .cta-item { padding: .8rem .9rem; border-radius: 12px; }
   .cta-copy strong { font-size: .98rem; }
   .cta-copy span { font-size: .88rem; }
-  .btn-cta { padding: .5rem .85rem; font-size: .92rem; }
 
   .section-card.rail .reel-wrap { padding: 6px 36px; }
   .reel-btn { width: 34px; height: 52px; font-size: 22px; }
@@ -291,5 +277,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  * {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
