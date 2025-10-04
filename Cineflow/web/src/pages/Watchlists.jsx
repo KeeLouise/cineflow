@@ -44,9 +44,7 @@ export default function Watchlists() {
         if (alive) setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
   async function handleCreate(e) {
@@ -68,11 +66,13 @@ export default function Watchlists() {
     }
   }
 
+  // Start inline rename
   function beginRename(wl) {
     setEditingId(wl.id);
     setEditingName(wl.name);
   }
 
+  // Save rename
   async function saveRename(id) {
     const name = editingName.trim();
     if (!name) return;
@@ -91,18 +91,7 @@ export default function Watchlists() {
     setEditingName("");
   }
 
-  async function togglePublic(wl) {
-    const prev = lists;
-    const nextPublic = !wl.is_public;
-    setLists((p) => p.map((l) => (l.id === wl.id ? { ...l, is_public: nextPublic } : l)));
-    try {
-      await updateWatchlist(wl.id, { is_public: nextPublic });
-    } catch (err) {
-      setLists(prev); // rollback
-      setError(err.message || "Update visibility failed.");
-    }
-  }
-
+  // Delete list
   async function handleDelete(id) {
     if (!confirm("Delete this watchlist? This cannot be undone.")) return;
     const prev = lists;
@@ -110,7 +99,7 @@ export default function Watchlists() {
     try {
       await deleteWatchlist(id);
     } catch (err) {
-      setLists(prev); // rollback
+      setLists(prev);
       setError(err.message || "Delete failed.");
     }
   }
@@ -129,7 +118,7 @@ export default function Watchlists() {
       <header className="wl-hero">
         <div className="container">
           <h1 className="wl-title mb-2">My Watchlists</h1>
-          <p className="wl-subtitle">Group your movies into lists you can share or keep private.</p>
+          <p className="wl-subtitle">Group your movies into lists you can manage and share.</p>
         </div>
       </header>
 
@@ -150,7 +139,6 @@ export default function Watchlists() {
             onChange={(e) => setNewName(e.target.value)}
             required
             maxLength={120}
-            aria-label="New watchlist name"
           />
           <button
             className="btn btn-gradient btn-gradient--v2"
@@ -169,35 +157,36 @@ export default function Watchlists() {
             <p className="text-muted mb-3">Start by creating your first list above.</p>
           </div>
         ) : (
-          <div className="wl-grid mt-2">
+          <div className="wl-grid mt-3">
             {lists.map((wl) => (
               <article key={wl.id} className="wl-card glass">
-                <div className="wl-card-top">
-                  <div className="wl-cover">
-                    {(wl.items || []).length ? (
-                      <div className="wl-thumbs" aria-label="Poster thumbnails">
-                        {(wl.items || []).slice(0, 12).map((m, i) =>
-                          m?.poster_path ? (
-                            <img
-                              key={`${wl.id}-thumb-${i}`}
-                              className="wl-thumb"
-                              src={posterUrl(m.poster_path)}
-                              alt={m?.title || "Poster"}
-                              loading="lazy"
-                            />
-                          ) : null
-                        )}
-                      </div>
-                    ) : (
-                      <div className="wl-thumbs-empty">No posters yet</div>
-                    )}
-                    <div className="wl-count-chip">
-                      {(wl.items?.length || 0)} {(wl.items?.length === 1 ? "movie" : "movies")}
+                {/* Cover / posters */}
+                <div className="wl-cover">
+                  {(wl.items || []).length ? (
+                    <div className="wl-thumbs" aria-label="Poster thumbnails">
+                      {(wl.items || []).slice(0, 12).map((m, i) =>
+                        m?.poster_path ? (
+                          <img
+                            key={`${wl.id}-thumb-${i}`}
+                            className="wl-thumb"
+                            src={posterUrl(m.poster_path)}
+                            alt={m?.title || "Poster"}
+                            loading="lazy"
+                          />
+                        ) : null
+                      )}
                     </div>
+                  ) : (
+                    <div className="wl-thumbs-empty">No posters yet</div>
+                  )}
+
+                  <div className="wl-count-chip">
+                    {(wl.items?.length || 0)} {(wl.items?.length === 1 ? "movie" : "movies")}
                   </div>
                 </div>
 
-                <div className="wl-card-mid">
+                {/* Title / rename */}
+                <div className="wl-titlewrap">
                   {editingId === wl.id ? (
                     <div className="wl-rename">
                       <input
@@ -228,26 +217,14 @@ export default function Watchlists() {
                       </div>
                     </div>
                   ) : (
-                    <div className="wl-titlewrap">
-                      <h3 className="wl-name mb-0" title={wl.name}>{wl.name}</h3>
-                      <span className={`wl-badge ${wl.is_public ? "wl-badge-success" : "wl-badge-dark"}`}>
-                        {wl.is_public ? "Public" : "Private"}
-                      </span>
-                    </div>
+                    <h3 className="wl-name mb-0">{wl.name}</h3>
                   )}
                 </div>
 
-                {editingId !== wl.id ? (
+                {/* Actions */}
+                {editingId !== wl.id && (
                   <div className="wl-card-actions">
                     <div className="wl-actions-left">
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-compact"
-                        onClick={() => togglePublic(wl)}
-                        title={wl.is_public ? "Make Private" : "Make Public"}
-                      >
-                        {wl.is_public ? "Make Private" : "Make Public"}
-                      </button>
                       <button
                         type="button"
                         className="btn btn-ghost btn-compact"
@@ -257,6 +234,7 @@ export default function Watchlists() {
                         Rename
                       </button>
                     </div>
+
                     <div className="wl-actions-right">
                       <Link to={`/watchlists/${wl.id}`} className="btn btn-outline-ghost">
                         Open
@@ -271,8 +249,6 @@ export default function Watchlists() {
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="wl-card-actions" />
                 )}
               </article>
             ))}
