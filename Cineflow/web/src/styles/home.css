@@ -203,6 +203,48 @@
 }
 .btn-cta:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(0,0,0,0.35); opacity: .98; }
 
+
+.searchbar-wrapper {
+  position: relative;
+  isolation: isolate;    
+  z-index: 5000;          
+}
+
+
+.searchbar-wrapper .typeahead-menu,
+.searchbar-wrapper .search-suggestions,
+.searchbar-wrapper .autocomplete-menu {
+  z-index: 6000;         
+}
+
+
+.page-bg { 
+  position: relative;
+  z-index: 0;
+}
+
+
+.hero-glass,
+.cta-band,
+.section-card,
+.section-card .card,
+.cta-item {
+  position: relative;
+  z-index: 1;             
+}
+
+
+.btn-cta:hover,
+.cta-item:hover {
+  z-index: 1;
+}
+
+
+.header, .navbar, .site-header {
+  position: relative;
+  z-index: 2;
+}
+
 @media (min-width: 768px) {
   .cta-inline { grid-template-columns: 1fr 1fr; }
 }
