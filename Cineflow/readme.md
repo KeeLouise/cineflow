@@ -49,3 +49,5 @@ This API growth would make CineFlow even more flexible—opening it up to mobile
 ## List of Sources
 
 	•	desktop-logo.webp — Reidy, Kiera (2025). “CineFlow” [image]. Available at: https://github.com/KeeLouise/cineflow (Accessed: 18th August 2025).
+    •   TMDB API - https://developer.themoviedb.org/docs/getting-started
+
