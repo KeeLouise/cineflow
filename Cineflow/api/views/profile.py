@@ -16,25 +16,31 @@ UserModel = get_user_model()
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def me_profile(request):
     user = request.user
-
     prof, _ = UserProfile.objects.get_or_create(user=user)
 
     if request.method == "GET":
         ser = UserProfileMeSerializer(user, context={"request": request})
         return Response(ser.data, status=status.HTTP_200_OK)
 
-    # PATCH
     data = request.data.copy()
+
+    # Only pass allowed user fields into the serializer
+    user_fields = {}
+    for k in ("username", "first_name", "last_name", "email"):
+        if k in data:
+            user_fields[k] = data.get(k)
+
     remove_flag = str(data.get("remove_avatar", "")).lower() in ("1", "true", "yes", "on")
     avatar_file = request.FILES.get("avatar") if "avatar" in request.FILES else None
 
     with transaction.atomic():
-        # Update basic user fields (username/first_name/last_name/email)
-        ser = UserProfileMeSerializer(user, data=data, partial=True, context={"request": request})
-        ser.is_valid(raise_exception=True)
-        ser.save()
+        if user_fields:
+            ser = UserProfileMeSerializer(
+                user, data=user_fields, partial=True, context={"request": request}
+            )
+            ser.is_valid(raise_exception=True)
+            ser.save()
 
-        # Update / remove avatar on the profile
         if remove_flag:
             if prof.avatar:
                 try:
@@ -43,6 +49,7 @@ def me_profile(request):
                     pass
             prof.avatar = None
             prof.save(update_fields=["avatar", "updated_at"])
+
         elif avatar_file is not None:
             prof.avatar = avatar_file
             prof.save(update_fields=["avatar", "updated_at"])

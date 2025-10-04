@@ -114,30 +114,35 @@ export default function Profile() {
   }
 
   async function onFileChange(e) {
-    const file = e.target.files?.[0] || null;
-    if (!file) return;
-    setError("");
-    setOkMsg("");
-    setTwoFaError("");
-    setTwoFaMsg("");
+  const file = e.target.files?.[0] || null;
+  if (!file) return;
 
-    setAvatarFile(file);
-    setRemoveAvatar(false);
+  setError("");
+  setOkMsg("");
+  setTwoFaError("");
+  setTwoFaMsg("");
 
-    try {
-      const updated = await updateMyProfile({ avatar: file });
-      setMe(updated); // updated.avatar should now be Cloudinary (abs) or /media/... + updated_at changed
-      setOkMsg("Avatar updated.");
-    } catch (err) {
-      const detail =
-        err?.response?.data?.detail ||
-        Object.values(err?.response?.data || {})?.[0]?.[0] ||
-        "Could not upload avatar.";
-      setError(String(detail));
-    } finally {
-      setAvatarFile(null);
-    }
+  setAvatarFile(file);
+  setRemoveAvatar(false);
+
+  try {
+    const updated = await updateMyProfile({ avatar: file });
+    setMe(updated);
+    setOkMsg("Avatar updated.");
+    // clear the local preview only on success
+    setAvatarFile(null);
+  } catch (err) {
+    const resp = err?.response?.data;
+    let detail =
+      (resp && (resp.detail || resp.error || resp.message)) ||
+      (resp && typeof resp === "object"
+        ? Object.values(resp).flat().find(Boolean)
+        : null) ||
+      "Could not upload avatar.";
+    setError(String(detail));
+    // keep the preview so the user can retry
   }
+}
 
   async function handleResendVerify() {
     setResendMsg("");
