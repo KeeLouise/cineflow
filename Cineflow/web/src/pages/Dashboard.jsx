@@ -55,7 +55,6 @@ const MOODS = [
   { key: "dark_gritty", label: "Dark & Gritty" },
 ];
 
-
 const TMDB_MIN_OPTIONS = [
   { value: 0, label: "Any rating" },
   { value: 5.0, label: "≥ 5.0" },
@@ -107,7 +106,6 @@ export default function Dashboard() {
   const [filterStamp, setFilterStamp] = useState(0);
   const applyFilters = () => {
     setMood(stagedMood);
-    setAppliedDecade(stagedDecade);
     setAppliedTmdbMin(stagedTmdbMin);
     setAppliedPickedProviders(stagedPickedProviders);
     setAppliedIncludeRentBuy(stagedIncludeRentBuy);
@@ -115,13 +113,11 @@ export default function Dashboard() {
   };
   const resetFilters = () => {
     setStagedMood("feelgood");
-    setStagedDecade("");
     setStagedTmdbMin(0);
     setStagedPickedProviders([]);
     setStagedIncludeRentBuy(false);
 
     setMood("feelgood");
-    setAppliedDecade("");
     setAppliedTmdbMin(0);
     setAppliedPickedProviders([]);
     setAppliedIncludeRentBuy(false);
@@ -196,13 +192,7 @@ export default function Dashboard() {
     };
     if (providersParam) base.providers = providersParam;
     return base;
-  }, [
-    appliedDecade,
-    appliedTmdbMin,
-    providersParam,
-    appliedIncludeRentBuy,
-    appliedPickedProviders.length,
-  ]);
+  }, [appliedTmdbMin, providersParam, appliedIncludeRentBuy, appliedPickedProviders.length]);
 
   // Fetch initial + on apply
   useEffect(() => {
@@ -298,7 +288,6 @@ export default function Dashboard() {
 
   const selectedCount =
     (stagedPickedProviders.length ? 1 : 0) +
-    (stagedDecade ? 1 : 0) +
     (stagedTmdbMin ? 1 : 0) +
     (stagedIncludeRentBuy ? 1 : 0) +
     (stagedMood !== mood ? 1 : 0);
@@ -322,7 +311,7 @@ export default function Dashboard() {
     }
     qs.set("types", appliedIncludeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free");
     return `/mood/${encodeURIComponent(mood)}/see-all?${qs.toString()}`;
-  }, [REGION, mood, appliedDecade, appliedTmdbMin, providersParamForSeeAll, appliedIncludeRentBuy]);
+  }, [REGION, mood, appliedTmdbMin, providersParamForSeeAll, appliedIncludeRentBuy]);
 
   return (
     <>
@@ -426,7 +415,7 @@ export default function Dashboard() {
                   </select>
                 </div>
 
-                <div className="col-md-3">
+                <div className="col-md-2">
                   <label className="form-label text-secondary small d-block">Options</label>
                   <div className="form-check form-switch">
                     <input
@@ -560,22 +549,7 @@ export default function Dashboard() {
             </div>
 
             <div className="row g-3">
-              <div className="col-6">
-                <label className="form-label small text-secondary">Decade</label>
-                <select
-                  className="form-select form-select-sm bg-dark text-light border-secondary"
-                  value={stagedDecade}
-                  onChange={(e) => setStagedDecade(e.target.value)}
-                  disabled={loading}
-                >
-                  {DECADES.map((d) => (
-                    <option key={d.value || "any"} value={d.value}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-6">
+              <div className="col-12">
                 <label className="form-label small text-secondary">TMDB rating</label>
                 <select
                   className="form-select form-select-sm bg-dark text-light border-secondary"
