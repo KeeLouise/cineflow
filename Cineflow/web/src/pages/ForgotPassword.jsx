@@ -43,7 +43,7 @@ export default function ForgotPassword() {
           <div className="auth-header">
             <Link to="/" className="brand">
               <span className="brand-dot" />
-              FilmFind
+              Cineflow
             </Link>
             <h1 className="auth-title">Forgot your password?</h1>
             <p className="auth-subtitle">We’ll send a reset link to your email.</p>
