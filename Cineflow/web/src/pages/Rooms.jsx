@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchMyRooms, createRoom, joinRoom } from "@/api/rooms";
 import { mediaUrl } from "@/utils/media";
+import "@/styles/room.css";
 
 export default function Rooms() {
   const [rooms, setRooms] = useState([]);
@@ -17,6 +18,12 @@ export default function Rooms() {
   const [joining, setJoining] = useState(false);
   const [code, setCode] = useState("");
 
+  // apply themed body class
+  useEffect(() => {
+    document.body.classList.add("rooms-screen");
+    return () => document.body.classList.remove("rooms-screen");
+  }, []);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -27,7 +34,6 @@ export default function Rooms() {
         if (!alive) return;
 
         const list = Array.isArray(data) ? data : [];
-        // keep only active rooms (treat missing is_active as true)
         setRooms(list.filter(r => r?.is_active !== false));
       } catch (e) {
         if (alive) setErr(e?.message || "Failed to load rooms.");
@@ -91,14 +97,14 @@ export default function Rooms() {
   return (
     <div className="container py-4">
       <header className="d-flex align-items-center justify-content-between mb-3">
-        <h1 className="h3 m-0">Rooms</h1>
+        <h1 className="h1 m-0">Rooms</h1>
       </header>
 
       {err && <div className="alert alert-danger glass">{err}</div>}
 
-      <div className="glass p-3 mb-3 d-flex flex-wrap gap-2">
+      <div className="glass p-3 mb-4 rooms-actions">
         {/* Create room */}
-        <form className="d-flex gap-2 align-items-center flex-wrap" onSubmit={handleCreate}>
+        <form className="rooms-form d-flex gap-2 align-items-center flex-wrap" onSubmit={handleCreate}>
           <input
             className="form-control wl-input"
             placeholder="New room name…"
@@ -119,7 +125,7 @@ export default function Rooms() {
         </form>
 
         {/* Join room */}
-        <form className="ms-auto d-flex gap-2 align-items-center" onSubmit={handleJoin}>
+        <form className="rooms-form d-flex gap-2 align-items-center" onSubmit={handleJoin}>
           <input
             className="form-control wl-input"
             placeholder="Invite code"
@@ -135,7 +141,7 @@ export default function Rooms() {
       {loading ? (
         <div className="glass p-4 text-center">Loading…</div>
       ) : (Array.isArray(rooms) ? rooms : []).length === 0 ? (
-        <div className="glass p-4 text-center text-muted">
+        <div className="glass p-4 text-center subtitle">
           No rooms yet. Create one above or join with an invite code.
         </div>
       ) : (
@@ -146,60 +152,42 @@ export default function Rooms() {
             return (
               <div key={Number.isFinite(rid) ? rid : `room-${Math.random()}`} className="col-12 col-md-6 col-xl-4">
                 <div className="room-card glass h-100 d-flex flex-column">
-                  <div className="d-flex align-items-center justify-content-between">
-                    <h3 className="mb-0">{r?.name || "Room"}</h3>
-                    <div className="d-flex align-items-center" style={{ gap: 6 }}>
-                      <div className="d-flex" style={{ position: "relative", height: 28 }}>
-                        {members.slice(0, 5).map((m, idx) => {
-                          const src = m?.avatar ? `${mediaUrl(m.avatar)}?v=${Date.now()}` : null;
-                          return src ? (
-                            <img
-                              key={m?.id ?? `${m?.username ?? "u"}-${idx}`}
-                              src={src}
-                              alt={m?.username || "member"}
-                              title={m?.username || ""}
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: "50%",
-                                objectFit: "cover",
-                                border: "1px solid rgba(255,255,255,.3)",
-                                position: "relative",
-                                left: idx ? -idx * 10 : 0,
-                                background: "rgba(255,255,255,.08)",
-                              }}
-                              onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
-                            />
-                          ) : (
-                            <div
-                              key={m?.id ?? `${m?.username ?? "u"}-${idx}`}
-                              title={m?.username || ""}
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: "50%",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                position: "relative",
-                                left: idx ? -idx * 10 : 0,
-                                border: "1px solid rgba(255,255,255,.3)",
-                                background: "rgba(255,255,255,.08)",
-                                fontSize: 12,
-                              }}
-                            >
-                              {(m?.username?.[0] || "?").toUpperCase()}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <span className="badge text-bg-dark">{members.length} members</span>
+                  <div className="d-flex align-items-start justify-content-between">
+                    <div>
+                      <h3 className="mb-1">{r?.name || "Room"}</h3>
+                      {r?.description ? (
+                        <p className="text-muted m-0">{r.description}</p>
+                      ) : (
+                        <p className="text-muted m-0">Movie night planning</p>
+                      )}
+                    </div>
+
+                    <div className="members-stack" aria-label={`${members.length} members`}>
+                      {members.slice(0, 5).map((m, idx) => {
+                        const src = m?.avatar ? `${mediaUrl(m.avatar)}?v=${Date.now()}` : null;
+                        return src ? (
+                          <img
+                            key={m?.id ?? `${m?.username ?? "u"}-${idx}`}
+                            src={src}
+                            alt={m?.username || "member"}
+                            title={m?.username || ""}
+                            className="stack-avatar"
+                          />
+                        ) : (
+                          <div
+                            key={m?.id ?? `${m?.username ?? "u"}-${idx}`}
+                            className="stack-avatar stack-initial"
+                            title={m?.username || ""}
+                          >
+                            {(m?.username?.[0] || "?").toUpperCase()}
+                          </div>
+                        );
+                      })}
+                      {members.length > 5 && (
+                        <div className="stack-avatar stack-more">+{members.length - 5}</div>
+                      )}
                     </div>
                   </div>
-
-                  {r?.description ? (
-                    <p className="text-muted mt-2 mb-3">{r.description}</p>
-                  ) : <div className="mb-3" />}
 
                   <div className="mt-auto d-flex justify-content-end gap-2">
                     <Link to={`/rooms/${rid}`} className="btn btn-outline-ghost">

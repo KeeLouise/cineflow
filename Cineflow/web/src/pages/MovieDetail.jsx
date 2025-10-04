@@ -332,7 +332,7 @@ export default function MovieDetail() {
 
             {/* Primary actions */}
             <div className="actions mt-3 d-flex flex-wrap gap-2 align-items-center">
-              <Link to="/" className="btn btn-ghost">
+              <Link to="/dashboard" className="btn btn-ghost">
                 ← Back
               </Link>
 
