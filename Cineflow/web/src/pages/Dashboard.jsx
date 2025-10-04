@@ -1,3 +1,4 @@
+// src/pages/Dashboard.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchMoodDiscover } from "@/api/movies";
@@ -6,7 +7,6 @@ import { resendVerificationEmail } from "@/api/account";
 import SkeletonRow from "@/components/SkeletonRow.jsx";
 import "@/styles/home.css";
 
-/* Poster card */
 function PosterCard({ m }) {
   return (
     <article className="poster-card">
@@ -76,10 +76,10 @@ const API_BASE = "/api";
 const REGION = "GB";
 
 export default function Dashboard() {
-  // Signed-in user (for email verification banner)
+  // signed-in user (banner)
   const [me, setMe] = useState(null);
 
-  // Mood/list
+  // mood/list
   const [mood, setMood] = useState("feelgood");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -87,23 +87,23 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // Providers map
+  // providers map + error
   const [providersMap, setProvidersMap] = useState({});
   const [provLoading, setProvLoading] = useState(true);
   const [provErr, setProvErr] = useState("");
 
-  // Applied filters
+  // applied filters
   const [appliedTmdbMin, setAppliedTmdbMin] = useState(0);
   const [appliedPickedProviders, setAppliedPickedProviders] = useState([]);
   const [appliedIncludeRentBuy, setAppliedIncludeRentBuy] = useState(false);
 
-  // Staged filters (UI)
+  // staged filters
   const [stagedMood, setStagedMood] = useState("feelgood");
   const [stagedTmdbMin, setStagedTmdbMin] = useState(0);
   const [stagedPickedProviders, setStagedPickedProviders] = useState([]);
   const [stagedIncludeRentBuy, setStagedIncludeRentBuy] = useState(false);
 
-  // Apply/Reset
+  // apply/reset
   const [filterStamp, setFilterStamp] = useState(0);
   const applyFilters = () => {
     setMood(stagedMood);
@@ -125,11 +125,11 @@ export default function Dashboard() {
     setFilterStamp((s) => s + 1);
   };
 
-  // Infinite scroll & abort
+  // infinite scroll & abort
   const sentinelRef = useRef(null);
   const inFlightRef = useRef(null);
 
-  // Load profile (for email verify banner)
+  // profile for banner
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -143,111 +143,78 @@ export default function Dashboard() {
     return () => { alive = false; };
   }, []);
 
-  // --- Providers (fetch once; map names to ids) with robust JSON guard + fallbacks
-  const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").replace(/[’'"]/g, "").trim();
+  // providers fetch
+  useEffect(() => {
+    let mounted = true;
 
-useEffect(() => {
-  let mounted = true;
+    const norm = (s) =>
+      (s || "").toLowerCase().replace(/\s+/g, " ").replace(/[’'"]/g, "").trim();
 
-  const norm = (s) =>
-    (s || "")
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .replace(/[’'"]/g, "")
-      .trim();
-
-  async function tryFetchProviders(url) {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status} at ${url}`);
-    const ct = (res.headers.get("content-type") || "").toLowerCase();
-    if (!ct.includes("application/json")) {
-      const txt = await res.text();
-      throw new Error(
-        `Non-JSON response at ${url.split("?")[0]}: ${txt.slice(0, 120)}…`
-      );
+    async function getJson(url) {
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status} at ${url}`);
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if (!ct.includes("application/json")) {
+        const txt = await res.text();
+        throw new Error(`Non-JSON response at ${url.split("?")[0]}: ${txt.slice(0, 120)}…`);
+      }
+      return res.json();
     }
-    return res.json();
-  }
 
-  (async () => {
-    try {
-      setProvLoading(true);
-      setProvidersError("");
-
-      // 1) Preferred, plural route
-      const base = `${API_BASE}/movies/providers/?region=${encodeURIComponent(
-        REGION
-      )}`;
-
-      // 2) Fallback, singular (in case backend is wired that way)
-      const alt = `${API_BASE}/movie/providers/?region=${encodeURIComponent(
-        REGION
-      )}`;
-
-      let data = null;
+    (async () => {
       try {
-        data = await tryFetchProviders(base);
-      } catch (e1) {
-        // try fallback once
-        data = await tryFetchProviders(alt);
+        setProvLoading(true);
+        setProvErr("");
+
+        const base = `${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`;
+        const alt  = `${API_BASE}/movie/providers/?region=${encodeURIComponent(REGION)}`;
+
+        let data;
+        try { data = await getJson(base); }
+        catch { data = await getJson(alt); }
+
+        const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+        const map = {};
+        ALLOWED_PROVIDERS.forEach((p) => {
+          const row = list.find((r) => p.labels.some((lbl) => norm(lbl) === norm(r?.provider_name)));
+          if (row?.provider_id != null) map[p.key] = String(row.provider_id);
+        });
+
+        if (mounted) setProvidersMap(map);
+      } catch (e) {
+        if (mounted) {
+          setProvidersMap({});
+          setProvErr(e?.message || "Could not load providers; provider filtering disabled.");
+        }
+      } finally {
+        if (mounted) setProvLoading(false);
       }
+    })();
 
-      const list = Array.isArray(data?.results)
-        ? data.results
-        : Array.isArray(data)
-        ? data
-        : [];
+    return () => { mounted = false; };
+  }, []);
 
-      const map = {};
-      ALLOWED_PROVIDERS.forEach((p) => {
-        const match = list.find((row) =>
-          p.labels.some((lbl) => norm(lbl) === norm(row?.provider_name))
-        );
-        if (match?.provider_id != null) map[p.key] = String(match.provider_id);
-      });
-
-      if (mounted) {
-        setProvidersMap(map);
-      }
-    } catch (err) {
-      if (mounted) {
-        setProvidersMap({});
-        setProvidersError(
-          (err && err.message) ||
-            "Could not load providers. Filtering will be limited."
-        );
-      }
-    } finally {
-      if (mounted) setProvLoading(false);
-    }
-  })();
-
-  return () => {
-    mounted = false;
-  };
-}, []);
-
-  // Build providers param
+  // build providers param
   const providersParam = useMemo(() => {
     const ids = (appliedPickedProviders || []).map((k) => providersMap[k]).filter(Boolean);
-    if (!ids.length) return "";
-    return Array.from(new Set(ids)).join("|");
+    return ids.length ? Array.from(new Set(ids)).join("|") : "";
   }, [appliedPickedProviders, providersMap]);
 
-  // Request params
+  // request params
   const commonParams = useMemo(() => {
     const base = {
       region: REGION,
       vote_average_gte: appliedTmdbMin || undefined,
       types: appliedIncludeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free",
-      broad: appliedPickedProviders.length ? 1 : 0,
-      force_providers: appliedPickedProviders.length ? 1 : 0,
+      // turn on broader monetization/provider hard-gate only if we DO have mapped IDs
+      broad: providersParam ? 1 : 0,
+      force_providers: providersParam ? 1 : 0,
     };
     if (providersParam) base.providers = providersParam;
     return base;
-  }, [appliedTmdbMin, providersParam, appliedIncludeRentBuy, appliedPickedProviders.length]);
+  }, [appliedTmdbMin, appliedIncludeRentBuy, providersParam]);
 
-  // Fetch initial + on apply
+  // initial+apply fetch
   useEffect(() => {
     if (inFlightRef.current) inFlightRef.current.abort();
     const controller = new AbortController();
@@ -286,7 +253,7 @@ useEffect(() => {
     };
   }, [mood, filterStamp, commonParams]);
 
-  // Load more (reserve space to avoid layout shift)
+  // load more
   useEffect(() => {
     if (!hasMore) return;
     const el = sentinelRef.current;
@@ -323,14 +290,14 @@ useEffect(() => {
           })();
         }
       },
-      { root: null, rootMargin: "900px 0px", threshold: 0 } // a bit more aggressive prefetch
+      { root: null, rootMargin: "900px 0px", threshold: 0 }
     );
 
     io.observe(el);
     return () => io.disconnect();
   }, [hasMore, page, loading, mood, items, commonParams]);
 
-  // Toggle staged provider
+  // toggle provider
   const toggleProviderStaged = (key) => {
     setStagedPickedProviders((prev) => {
       const s = new Set(prev);
@@ -366,16 +333,14 @@ useEffect(() => {
     return `/mood/${encodeURIComponent(mood)}/see-all?${qs.toString()}`;
   }, [mood, appliedTmdbMin, providersParamForSeeAll, appliedIncludeRentBuy]);
 
-  const providerButtonDisabled = (key) =>
-    provLoading || (!providersMap[key] && !provErr); // disable only while loading or before we know failure
+  // Only disable during provider loading
+  const providerButtonDisabled = provLoading;
 
   return (
     <>
       <div className="page-bg" aria-hidden="true" />
-
       <div className="glass-dashboard">
         <div className="container-xxl--wide py-5">
-          {/* Email verification banner */}
           {me && me.email_verified === false && (
             <div className="alert alert-warning d-flex align-items-center justify-content-between">
               <div>
@@ -438,19 +403,18 @@ useEffect(() => {
                   <div className="d-flex flex-wrap gap-2">
                     {ALLOWED_PROVIDERS.map((p) => {
                       const active = stagedPickedProviders.includes(p.key);
-                      const disabled = providerButtonDisabled(p.key);
-                      const title =
-                        provLoading
-                          ? "Loading providers…"
-                          : (!providersMap[p.key] && provErr ? "Providers endpoint unavailable; filter by provider is disabled" : p.labels[0]);
-
+                      const title = provLoading
+                        ? "Loading providers…"
+                        : (!providersMap[p.key] && provErr
+                            ? "Provider IDs unavailable (backend endpoint down). You can still toggle, but filtering won't apply."
+                            : p.labels[0]);
                       return (
                         <button
                           key={p.key}
                           type="button"
                           className={`btn btn-sm ${active ? "btn-info text-dark" : "btn-outline-info"}`}
                           onClick={() => toggleProviderStaged(p.key)}
-                          disabled={disabled || loading}
+                          disabled={providerButtonDisabled || loading}
                           title={title}
                         >
                           {p.labels[0]}
@@ -505,7 +469,6 @@ useEffect(() => {
                   className="btn btn-outline-warning btn-sm"
                   onClick={resetFilters}
                   disabled={loading}
-                  title="Reset all filters"
                 >
                   Reset
                 </button>
@@ -514,7 +477,6 @@ useEffect(() => {
                   className="btn btn-primary btn-sm"
                   onClick={applyFilters}
                   disabled={loading}
-                  title="Apply filters"
                 >
                   Apply
                 </button>
@@ -538,13 +500,7 @@ useEffect(() => {
                 </div>
               </section>
 
-              <div
-                ref={sentinelRef}
-                className="infinite-sentinel"
-                aria-hidden="true"
-                style={{ height: 1 }}
-              />
-              {/* reserve space to avoid layout shift when the line appears/disappears */}
+              <div ref={sentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
               <div style={{ minHeight: 24 }} aria-live="polite" className="d-flex justify-content-center">
                 {loading && hasMore ? <span className="text-muted small">Loading more…</span> : null}
               </div>
@@ -578,9 +534,7 @@ useEffect(() => {
           style={{ height: "75vh" }}
         >
           <div className="offcanvas-header">
-            <h5 className="offcanvas-title" id="filtersOffcanvasLabel">
-              Filters
-            </h5>
+            <h5 className="offcanvas-title" id="filtersOffcanvasLabel">Filters</h5>
             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close" />
           </div>
           <div className="offcanvas-body">
@@ -593,9 +547,7 @@ useEffect(() => {
                 disabled={loading}
               >
                 {MOODS.map((m) => (
-                  <option key={m.key} value={m.key}>
-                    {m.label}
-                  </option>
+                  <option key={m.key} value={m.key}>{m.label}</option>
                 ))}
               </select>
             </div>
@@ -605,19 +557,18 @@ useEffect(() => {
               <div className="d-flex flex-wrap gap-2">
                 {ALLOWED_PROVIDERS.map((p) => {
                   const active = stagedPickedProviders.includes(p.key);
-                  const disabled = providerButtonDisabled(p.key);
-                  const title =
-                    provLoading
-                      ? "Loading providers…"
-                      : (!providersMap[p.key] && provErr ? "Providers endpoint unavailable; filter by provider is disabled" : p.labels[0]);
-
+                  const title = provLoading
+                    ? "Loading providers…"
+                    : (!providersMap[p.key] && provErr
+                        ? "Provider IDs unavailable (backend endpoint down). You can still toggle, but filtering won't apply."
+                        : p.labels[0]);
                   return (
                     <button
                       key={p.key}
                       type="button"
                       className={`btn btn-sm ${active ? "btn-info text-dark" : "btn-outline-info"}`}
                       onClick={() => toggleProviderStaged(p.key)}
-                      disabled={disabled || loading}
+                      disabled={provLoading || loading}
                       title={title}
                     >
                       {p.labels[0]}
@@ -640,9 +591,7 @@ useEffect(() => {
                   disabled={loading}
                 >
                   {TMDB_MIN_OPTIONS.map((o) => (
-                    <option key={String(o.value)} value={String(o.value)}>
-                      {o.label}
-                    </option>
+                    <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
                   ))}
                 </select>
               </div>
@@ -665,16 +614,8 @@ useEffect(() => {
             </div>
 
             <div className="d-flex justify-content-between align-items-center mt-4">
-              <button type="button" className="btn btn-outline-light" onClick={resetFilters}>
-                Reset
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                data-bs-dismiss="offcanvas"
-                onClick={applyFilters}
-                disabled={loading}
-              >
+              <button type="button" className="btn btn-outline-light" onClick={resetFilters}>Reset</button>
+              <button type="button" className="btn btn-primary" data-bs-dismiss="offcanvas" onClick={applyFilters} disabled={loading}>
                 Apply
               </button>
             </div>
