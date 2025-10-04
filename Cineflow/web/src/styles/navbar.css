@@ -140,7 +140,7 @@ body {
 
   /* Make brand/logo and toggler sit on one line nicely */
   .navbar .navbar-brand img.logo-img {
-    height: 32px;
+    height: 75px;
     width: auto;
   }
 }
