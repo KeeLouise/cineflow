@@ -1,15 +1,11 @@
-// src/main.jsx
-import * as React from "react";
+import React from "react";
 import ReactDOM from "react-dom/client";
-
-// Expose React for any legacy chunks compiled with the classic runtime
-if (typeof window !== "undefined") {
-  window.React = window.React || React;
-}
-
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import App from "@/App";
+import PrivateRoute from "@/components/PrivateRoute";
+import AuthProvider from "@/auth/AuthContext";
+
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -22,13 +18,11 @@ import Profile from "@/pages/Profile";
 import MovieDetail from "@/pages/MovieDetail";
 import SeeAllPage from "@/pages/SeeAllPage";
 import VerifyEmail from "@/pages/VerifyEmail";
-import PrivateRoute from "@/components/PrivateRoute";
-import AuthProvider from "@/auth/AuthContext";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
-
 import NotFound from "@/pages/NotFound";
 import ServerError from "@/pages/ServerError";
+
 
 const router = createBrowserRouter([
   {

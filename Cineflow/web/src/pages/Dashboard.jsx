@@ -42,8 +42,6 @@ function PosterCard({ m }) {
   );
 }
 
-const [providersError, setProvidersError] = useState("");
-
 const MOODS = [
   { key: "feelgood", label: "Feel-Good" },
   { key: "heartwarming", label: "Heartwarming" },
