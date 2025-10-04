@@ -319,17 +319,21 @@ class UserProfileMeSerializer(serializers.ModelSerializer):
             instance.username = username
             update_fields.append("username")
 
-        for fld in ("first_name", "last_name", "email"):
+        for fld in ("first_name", "last_name"):
             if fld in validated_data:
-                val = validated_data[fld]
-                if fld == "email":
-                    val = (val or "").strip().lower()
-                    if User.objects.filter(email__iexact=val).exclude(pk=instance.pk).exists():
-                        raise serializers.ValidationError({"email": "This email is already taken."})
-                setattr(instance, fld, val)
+                setattr(instance, fld, validated_data[fld])
                 update_fields.append(fld)
-
+        
+        if "email" in validated_data:
+            new_email = (validated_data["email"] or "").strip().lower()
+            current_email = (instance.email or "").strip().lower()
+            if new_email != current_email:
+                if new_email and User.objects.filter(email__iexact=new_email).exclude(pk=instance.pk).exists():
+                    raise serializers.ValidationError({"email": "This email is already taken."})
+                instance.email = new_email
+                update_fields.append("email")
+        
         if update_fields:
             instance.save(update_fields=update_fields)
-
+        
         return instance
