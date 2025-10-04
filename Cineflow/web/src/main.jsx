@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import App from "@/App";
+import PrivateRoute from "@/components/PrivateRoute";
+import AuthProvider from "@/auth/AuthContext";
+
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -15,13 +18,11 @@ import Profile from "@/pages/Profile";
 import MovieDetail from "@/pages/MovieDetail";
 import SeeAllPage from "@/pages/SeeAllPage";
 import VerifyEmail from "@/pages/VerifyEmail";
-import PrivateRoute from "@/components/PrivateRoute";
-import AuthProvider from "@/auth/AuthContext";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
-
 import NotFound from "@/pages/NotFound";
 import ServerError from "@/pages/ServerError";
+
 
 const router = createBrowserRouter([
   {

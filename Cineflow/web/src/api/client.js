@@ -1,17 +1,15 @@
 import axios from "axios";
 
 const raw =
-  (typeof import.meta !== "undefined" && import.meta.env && (
-    import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_BASE
-  )) ?? "/api";
+  (typeof import.meta !== "undefined" &&
+    import.meta.env &&
+    (import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_BASE)) ||
+  "/api";
 
-const apiBase = String(raw).replace(/\/+$/, "");
-export const API_BASE = apiBase;
+export const API_BASE = String(raw).replace(/\/+$/, "");
 
-const api = axios.create({ baseURL: apiBase });
+const api = axios.create({ baseURL: API_BASE });
 
-
-// --- Public endpoints (no Authorization header required) - KR 02/09/2025
 const PUBLIC_PREFIXES = [
   "/movies/now_playing/",
   "/movies/streaming_trending/",
@@ -23,23 +21,17 @@ const PUBLIC_PREFIXES = [
 ];
 
 function stripApiPrefix(u = "") {
-  // normalize leading "/api" once, whether full or not
   return u.startsWith("/api") ? u.slice(4) || "/" : u;
 }
-
 function isPublicPath(url = "") {
   if (!url) return false;
   const path = stripApiPrefix(url);
   if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return true;
-  if (/^\/movies\/\d+\/?$/.test(path)) return true; 
+  if (/^\/movies\/\d+\/?$/.test(path)) return true;
   return false;
 }
+const isTokenEndpoint = (url = "") => url.includes("/token/");
 
-// Utility: identify endpoints that it should never try to refresh for - KR 29/08/2025
-const isTokenEndpoint = (url = "") =>
-  url.includes("/api/token/") || url.includes("/token/");
-
-// Utility: dev/HMR/static requests to ignore - KR 29/08/2025
 const isHmrOrStatic = (url = "") =>
   url.startsWith("/@") ||
   url.includes("@react-refresh") ||
@@ -47,8 +39,6 @@ const isHmrOrStatic = (url = "") =>
   url.endsWith(".map") ||
   url.endsWith(".ico");
 
-// --- Request interceptor ---
-// Attach access token to every request IF it's protected - KR 02/09/2025
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("access");
   const url = config?.url || "";
@@ -59,64 +49,50 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// prevents multiple refresh requests - KR 21/08/2025
 let isRefreshing = false;
-let pendingQueue = [];
-
-// single-shot redirect guard to avoid loops - KR 29/08/2025
+let queue = [];
 let didRedirectToLogin = false;
 
-// Utility: process queued requests after refresh completes - KR 21/08/2025
-const processQueue = (error, token = null) => {
-  pendingQueue.forEach(({ resolve, reject, original }) => {
-    if (error) {
-      reject(error);
-    } else {
+const flushQueue = (error, token = null) => {
+  queue.forEach(({ resolve, reject, original }) => {
+    if (error) reject(error);
+    else {
       original.headers = original.headers || {};
       original.headers.Authorization = `Bearer ${token}`;
       resolve(api(original));
     }
   });
-  pendingQueue = [];
+  queue = [];
 };
 
-// --- Response interceptor ---
-// Handles refresh token flow safely - KR 21/08/2025
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config || {};
     const status = error.response?.status;
 
-    // Normalize URL: Axios keeps baseURL and url separate - KR 02/09/2025
     const base = typeof original.baseURL === "string" ? original.baseURL : "";
     const path = typeof original.url === "string" ? original.url : "";
     const fullUrl = `${base || ""}${path || ""}`;
 
-    // If this isn't an API call or is dev HMR/static, fail fast - KR 29/08/2025
     if (!fullUrl.includes("/api/") || isHmrOrStatic(fullUrl)) {
       return Promise.reject(error);
     }
-
-    // Never refresh or redirect for PUBLIC endpoints - KR 02/09/2025
     if (isPublicPath(fullUrl)) {
       return Promise.reject(error);
     }
 
-    // Only attempt refresh for 401s from protected API that aren't token endpoints - KR 29/08/2025
     if (status === 401 && !original._retry && !isTokenEndpoint(fullUrl)) {
       original._retry = true;
 
-      // If a refresh is already in progress, queue this request - KR 21/08/2025
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
-          pendingQueue.push({ resolve, reject, original });
+          queue.push({ resolve, reject, original });
         });
       }
 
       const refresh = localStorage.getItem("refresh");
       if (!refresh) {
-        // No refresh token -> hard sign out - KR 20/08/2025
         if (!didRedirectToLogin && !location.pathname.startsWith("/login")) {
           didRedirectToLogin = true;
           localStorage.removeItem("access");
@@ -128,24 +104,17 @@ api.interceptors.response.use(
 
       isRefreshing = true;
       try {
-        // request a new access token from Django using the refresh token - KR 19/08/2025
-        const { data } = await axios.post(`${apiBase}/token/refresh/`, { refresh });
-
-        // save and use the new access token - KR 20/08/2025
+        const { data } = await axios.post(`${API_BASE}/token/refresh/`, { refresh });
         localStorage.setItem("access", data.access);
         original.headers = original.headers || {};
         original.headers.Authorization = `Bearer ${data.access}`;
 
-        // process the queue with the new token - KR 20/08/2025
-        processQueue(null, data.access);
-
-        // retry the original request - KR 20/08/2025
+        flushQueue(null, data.access);
         return api(original);
       } catch (e) {
-        // refresh failed -> sign out to avoid loops - KR 20/08/2025
         localStorage.removeItem("access");
         localStorage.removeItem("refresh");
-        processQueue(e, null);
+        flushQueue(e, null);
         if (!didRedirectToLogin && !location.pathname.startsWith("/login")) {
           didRedirectToLogin = true;
           window.location.href = "/login";
@@ -160,8 +129,8 @@ api.interceptors.response.use(
   }
 );
 
-if (typeof window !== "undefined" && import.meta.env.PROD) {
-  console.log("[API BASE]", apiBase);
+if (typeof window !== "undefined" && import.meta.env?.PROD) {
+  console.log("[API BASE]", API_BASE);
 }
 
 export default api;

@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.contrib.auth import get_user_model
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -17,6 +17,7 @@ UserModel = get_user_model()
 def me_profile(request):
     user = request.user
     prof, _ = UserProfile.objects.get_or_create(user=user)
+
 
     if request.method == "GET":
         ser = UserProfileMeSerializer(user, context={"request": request})
