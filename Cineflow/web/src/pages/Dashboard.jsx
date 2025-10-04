@@ -56,7 +56,7 @@ const MOODS = [
 ];
 
 const TMDB_MIN_OPTIONS = [
-  { value: 0, label: "Any rating" },
+  { value: 0,   label: "Any rating" },
   { value: 5.0, label: "≥ 5.0" },
   { value: 6.0, label: "≥ 6.0" },
   { value: 6.5, label: "≥ 6.5" },
@@ -66,9 +66,9 @@ const TMDB_MIN_OPTIONS = [
 ];
 
 const ALLOWED_PROVIDERS = [
-  { key: "netflix", labels: ["Netflix"] },
-  { key: "disney_plus", labels: ["Disney+", "Disney Plus", "Disney Plus UK", "Star on Disney+"] },
-  { key: "prime_video", labels: ["Amazon Prime Video", "Prime Video"] },
+  { key: "netflix",        labels: ["Netflix"] },
+  { key: "disney_plus",    labels: ["Disney+", "Disney Plus", "Disney Plus UK", "Star on Disney+"] },
+  { key: "prime_video",    labels: ["Amazon Prime Video", "Prime Video"] },
   { key: "paramount_plus", labels: ["Paramount+", "Paramount Plus"] },
 ];
 
@@ -76,7 +76,7 @@ const API_BASE = "/api";
 const REGION = "GB";
 
 export default function Dashboard() {
-  // Signed-in user (for email verification banner); null means unknown or unauth
+  // Signed-in user (for email verification banner)
   const [me, setMe] = useState(null);
 
   // Mood/list
@@ -90,6 +90,7 @@ export default function Dashboard() {
   // Providers map
   const [providersMap, setProvidersMap] = useState({});
   const [provLoading, setProvLoading] = useState(true);
+  const [provErr, setProvErr] = useState("");
 
   // Applied filters
   const [appliedTmdbMin, setAppliedTmdbMin] = useState(0);
@@ -128,7 +129,7 @@ export default function Dashboard() {
   const sentinelRef = useRef(null);
   const inFlightRef = useRef(null);
 
-  // Load profile for banner (ignore errors; never render Login here)
+  // Load profile (for email verify banner)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -139,39 +140,76 @@ export default function Dashboard() {
         if (alive) setMe(null);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
-  // Providers (fetch once; map names to ids)
+  // --- Providers (fetch once; map names to ids) with robust JSON guard + fallbacks
   const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").replace(/[’'"]/g, "").trim();
+
   useEffect(() => {
     let mounted = true;
+
+    async function fetchJsonGuard(url) {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        // Try to surface server-provided text for easier debugging
+        const txt = await res.text();
+        throw new Error(`HTTP ${res.status} at ${url}: ${txt.slice(0, 160)}`);
+      }
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.toLowerCase().includes("application/json")) {
+        const txt = await res.text();
+        throw new Error(`Non-JSON response at ${url}: ${txt.slice(0, 160)}`);
+      }
+      return res.json();
+    }
+
+    const endpoints = [
+      `${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`,
+      `${API_BASE}/providers/?region=${encodeURIComponent(REGION)}`,   // fallback
+      `${API_BASE}/movie/providers/?region=${encodeURIComponent(REGION)}`, // fallback
+    ];
+
     (async () => {
       try {
+        setProvErr("");
         setProvLoading(true);
-        const res = await fetch(`${API_BASE}/movies/providers/?region=${encodeURIComponent(REGION)}`);
-        if (!res.ok) throw new Error(`Providers HTTP ${res.status}`);
-        const data = await res.json();
-        const list = data?.results || [];
 
+        let data = null;
+        let lastErr = null;
+        for (const url of endpoints) {
+          try {
+            data = await fetchJsonGuard(url);
+            break;
+          } catch (e) {
+            lastErr = e;
+          }
+        }
+        if (!data) throw lastErr || new Error("No providers endpoint returned JSON.");
+
+        const list = data?.results || data?.providers || [];
         const map = {};
         ALLOWED_PROVIDERS.forEach((p) => {
           const match = list.find((row) => p.labels.some((lbl) => norm(lbl) === norm(row?.provider_name)));
-          if (match?.provider_id) map[p.key] = String(match.provider_id);
+          if (match?.provider_id != null) map[p.key] = String(match.provider_id);
         });
 
-        if (mounted) setProvidersMap(map);
-      } catch {
-        if (mounted) setProvidersMap({});
+        if (mounted) {
+          setProvidersMap(map);
+          setProvErr(Object.keys(map).length ? "" : "No known providers found for this region.");
+        }
+      } catch (e) {
+        if (mounted) {
+          setProvidersMap({});
+          setProvErr(String(e?.message || e));
+          // Keep UI usable even if providers fail; users can still browse mood without provider lock.
+        }
       } finally {
         if (mounted) setProvLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+
+    return () => { mounted = false; };
   }, []);
 
   // Build providers param
@@ -233,7 +271,7 @@ export default function Dashboard() {
     };
   }, [mood, filterStamp, commonParams]);
 
-  // Load more
+  // Load more (reserve space to avoid layout shift)
   useEffect(() => {
     if (!hasMore) return;
     const el = sentinelRef.current;
@@ -270,7 +308,7 @@ export default function Dashboard() {
           })();
         }
       },
-      { root: null, rootMargin: "600px 0px", threshold: 0 }
+      { root: null, rootMargin: "900px 0px", threshold: 0 } // a bit more aggressive prefetch
     );
 
     io.observe(el);
@@ -311,7 +349,10 @@ export default function Dashboard() {
     }
     qs.set("types", appliedIncludeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free");
     return `/mood/${encodeURIComponent(mood)}/see-all?${qs.toString()}`;
-  }, [REGION, mood, appliedTmdbMin, providersParamForSeeAll, appliedIncludeRentBuy]);
+  }, [mood, appliedTmdbMin, providersParamForSeeAll, appliedIncludeRentBuy]);
+
+  const providerButtonDisabled = (key) =>
+    provLoading || (!providersMap[key] && !provErr); // disable only while loading or before we know failure
 
   return (
     <>
@@ -319,7 +360,7 @@ export default function Dashboard() {
 
       <div className="glass-dashboard">
         <div className="container-xxl--wide py-5">
-          {/* Email verification banner (only if profile loaded and says unverified) */}
+          {/* Email verification banner */}
           {me && me.email_verified === false && (
             <div className="alert alert-warning d-flex align-items-center justify-content-between">
               <div>
@@ -381,8 +422,13 @@ export default function Dashboard() {
                   <label className="form-label text-secondary small d-block">Providers</label>
                   <div className="d-flex flex-wrap gap-2">
                     {ALLOWED_PROVIDERS.map((p) => {
-                      const disabled = provLoading || !providersMap[p.key];
                       const active = stagedPickedProviders.includes(p.key);
+                      const disabled = providerButtonDisabled(p.key);
+                      const title =
+                        provLoading
+                          ? "Loading providers…"
+                          : (!providersMap[p.key] && provErr ? "Providers endpoint unavailable; filter by provider is disabled" : p.labels[0]);
+
                       return (
                         <button
                           key={p.key}
@@ -390,13 +436,18 @@ export default function Dashboard() {
                           className={`btn btn-sm ${active ? "btn-info text-dark" : "btn-outline-info"}`}
                           onClick={() => toggleProviderStaged(p.key)}
                           disabled={disabled || loading}
-                          title={disabled ? "Not available in this region" : p.labels[0]}
+                          title={title}
                         >
                           {p.labels[0]}
                         </button>
                       );
                     })}
                   </div>
+                  {!!provErr && !provLoading && (
+                    <div className="small text-warning mt-2" role="status" aria-live="polite">
+                      {provErr}
+                    </div>
+                  )}
                 </div>
 
                 <div className="col-md-2">
@@ -472,8 +523,16 @@ export default function Dashboard() {
                 </div>
               </section>
 
-              <div ref={sentinelRef} className="infinite-sentinel" aria-hidden="true" style={{ height: 1 }} />
-              {loading && <div className="text-muted mt-2">Loading more…</div>}
+              <div
+                ref={sentinelRef}
+                className="infinite-sentinel"
+                aria-hidden="true"
+                style={{ height: 1 }}
+              />
+              {/* reserve space to avoid layout shift when the line appears/disappears */}
+              <div style={{ minHeight: 24 }} aria-live="polite" className="d-flex justify-content-center">
+                {loading && hasMore ? <span className="text-muted small">Loading more…</span> : null}
+              </div>
 
               <div className="d-flex justify-content-center mt-3">
                 <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
@@ -530,8 +589,13 @@ export default function Dashboard() {
               <label className="form-label small text-secondary d-block">Providers</label>
               <div className="d-flex flex-wrap gap-2">
                 {ALLOWED_PROVIDERS.map((p) => {
-                  const disabled = provLoading || !providersMap[p.key];
                   const active = stagedPickedProviders.includes(p.key);
+                  const disabled = providerButtonDisabled(p.key);
+                  const title =
+                    provLoading
+                      ? "Loading providers…"
+                      : (!providersMap[p.key] && provErr ? "Providers endpoint unavailable; filter by provider is disabled" : p.labels[0]);
+
                   return (
                     <button
                       key={p.key}
@@ -539,17 +603,20 @@ export default function Dashboard() {
                       className={`btn btn-sm ${active ? "btn-info text-dark" : "btn-outline-info"}`}
                       onClick={() => toggleProviderStaged(p.key)}
                       disabled={disabled || loading}
-                      title={disabled ? "Not available in this region" : p.labels[0]}
+                      title={title}
                     >
                       {p.labels[0]}
                     </button>
                   );
                 })}
               </div>
+              {!!provErr && !provLoading && (
+                <div className="small text-warning mt-2">{provErr}</div>
+              )}
             </div>
 
             <div className="row g-3">
-              <div className="col-12">
+              <div className="col-6">
                 <label className="form-label small text-secondary">TMDB rating</label>
                 <select
                   className="form-select form-select-sm bg-dark text-light border-secondary"
@@ -564,21 +631,21 @@ export default function Dashboard() {
                   ))}
                 </select>
               </div>
-            </div>
-
-            <div className="mt-3 d-flex gap-4">
-              <div className="form-check form-switch">
-                <input
-                  className="form-check-input"
-                  type="checkbox"
-                  id="mobileBuyRent"
-                  checked={stagedIncludeRentBuy}
-                  onChange={(e) => setStagedIncludeRentBuy(e.target.checked)}
-                  disabled={loading}
-                />
-                <label className="form-check-label" htmlFor="mobileBuyRent">
-                  Include buy/rent results
-                </label>
+              <div className="col-6">
+                <label className="form-label small text-secondary d-block">Options</label>
+                <div className="form-check form-switch mt-1">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="mobileBuyRent"
+                    checked={stagedIncludeRentBuy}
+                    onChange={(e) => setStagedIncludeRentBuy(e.target.checked)}
+                    disabled={loading}
+                  />
+                  <label className="form-check-label" htmlFor="mobileBuyRent">
+                    Include buy/rent results
+                  </label>
+                </div>
               </div>
             </div>
 
