@@ -1,20 +1,115 @@
-// MovieDetail.jsx - Detail page with poster-derived colours - KR 26/08/2025
+// MovieDetail.jsx — Detail page with poster-derived colours (mobile-safe) — KR
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchMovieDetail } from "@/api/movies";
 import { fetchMyWatchlists, addMovieToWatchlist } from "@/api/watchlists";
 import { looksLoggedIn } from "@/api/auth";
-import SkeletonRow from "@/components/SkeletonRow.jsx"; // shimmer loaders - KR 26/08/2025
+import SkeletonRow from "@/components/SkeletonRow.jsx";
 import "@/styles/movie.css";
 
-// util: format 'YYYY-MM-DD' -> 'DD/MM/YYYY' - KR 26/08/2025
+/* ---------- Mobile-safe poster palette hook ----------
+   1) Try server endpoint (/api/movies/poster_palette/) first (no CORS/canvas)
+   2) Fallback: client extraction from a small TMDB image (w185)
+      - crossOrigin set BEFORE src (required on iOS Safari)
+      - try window.ColorThief if available, else average pixels via canvas
+------------------------------------------------------ */
+function usePosterPalette(posterPath) {
+  const [palette, setPalette] = React.useState(null);
+
+  React.useEffect(() => {
+    let alive = true;
+    if (!posterPath) {
+      setPalette(null);
+      return () => {};
+    }
+
+    (async () => {
+      // 1) Server-side palette (preferred)
+      try {
+        const res = await fetch(
+          `/api/movies/poster_palette/?path=${encodeURIComponent(`/t/p/w500${posterPath}`)}`
+        );
+        if (res.ok) {
+          const { palette: server = [] } = await res.json();
+          if (alive && server?.length) {
+            setPalette(server);
+            return;
+          }
+        }
+      } catch {
+        /* continue to client fallback */
+      }
+
+      // 2) Client fallback — small image + strict CORS handling
+      try {
+        const url = `https://image.tmdb.org/t/p/w185${posterPath}`;
+        const img = new Image();
+        img.crossOrigin = "anonymous";      // must set before src on iOS
+        img.referrerPolicy = "no-referrer"; // avoid referrer-related blocks
+        img.decoding = "sync";
+        img.src = url;
+
+        // Ensure decode before sampling
+        await (img.decode?.() ||
+          new Promise((res, rej) => {
+            img.onload = res;
+            img.onerror = rej;
+          }));
+
+        if (window.ColorThief) {
+          const thief = new window.ColorThief();
+          const primary = thief.getColor(img);
+          const pals = thief.getPalette(img, 5) || [];
+          const merged = [primary, ...pals].filter(Boolean);
+          if (alive && merged.length) {
+            setPalette(merged);
+            return;
+          }
+        }
+
+        // 3) Average pixels as last resort (tiny canvas sample)
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const W = 50,
+          H = 50;
+        canvas.width = W;
+        canvas.height = H;
+        ctx.drawImage(img, 0, 0, W, H);
+        const { data } = ctx.getImageData(0, 0, W, H);
+
+        let r = 0,
+          g = 0,
+          b = 0,
+          n = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i];
+          g += data[i + 1];
+          b += data[i + 2];
+          n++;
+        }
+        const avg = [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+        if (alive) setPalette([avg]);
+      } catch {
+        if (alive) setPalette(null);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [posterPath]);
+
+  return palette; // [[r,g,b], ...] or null
+}
+
+// util: format 'YYYY-MM-DD' -> 'DD/MM/YYYY'
 const formatDate = (iso) => {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 };
 
-// map a provider name to a link (home for big 4, otherwise JustWatch search) - KR 26/08/2025
+// map a provider name to a link (home for big 4, otherwise JustWatch search)
 const providerLink = (name, title, region = "IE") => {
   const n = (name || "").toLowerCase();
   if (n.includes("netflix")) return "https://www.netflix.com/";
@@ -26,25 +121,24 @@ const providerLink = (name, title, region = "IE") => {
 };
 
 export default function MovieDetail() {
-  const { id } = useParams();               // movie TMDB id - KR 26/08/2025
-  const [data, setData] = useState(null);   // detail + credits + videos + providers - KR 26/08/2025
+  const { id } = useParams();
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
   // --- Watchlist UI state ---
-  const authed = looksLoggedIn();                              // true if user is logged in
-  const [lists, setLists] = useState([]);                      // user's watchlists for the <select>
-  const [listsLoading, setListsLoading] = useState(false);     // show a spinner while loading lists
-  const [listsError, setListsError] = useState(null);          // store any error text when loading lists
+  const authed = looksLoggedIn();
+  const [lists, setLists] = useState([]);
+  const [listsLoading, setListsLoading] = useState(false);
+  const [listsError, setListsError] = useState(null);
 
-  const [selectedListId, setSelectedListId] = useState("");    // the list id chosen in <select>
-  const [saving, setSaving] = useState(false);                 // true while we call backend to save
-  const [saveMsg, setSaveMsg] = useState("");                  // success message like “Added!”
-  const [saveError, setSaveError] = useState("");              // error message
+  const [selectedListId, setSelectedListId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const [pickerOpen, setPickerOpen] = useState(false);         //show/hide inline watchlist picker - KR 28/09/2025
-
-  // fetch movie detail on mount/id change - KR 26/08/2025
+  // fetch movie detail
   useEffect(() => {
     let active = true;
     (async () => {
@@ -59,109 +153,96 @@ export default function MovieDetail() {
         if (active) setLoading(false);
       }
     })();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [id]);
 
+  // fetch user's watchlists (if authed)
   useEffect(() => {
-  if (!authed) return;                                      // only fetch lists if authed is true
+    if (!authed) return;
+    let alive = true;
+    setListsLoading(true);
+    setListsError(null);
 
-  let alive = true;
-  setListsLoading(true);
-  setListsError(null);
-
-  (async () => {
-    try {
-      const data = await fetchMyWatchlists();               // GET /api/watchlists/
-      if (!alive) return;                                   // ignore late responses
-      setLists(data || []);
-      // if there is at least one list, preselect it for convenience
-      if (data && data.length > 0) {
-        setSelectedListId(String(data[0].id));
-      }
-    } catch (err) {
-      if (!alive) return;
-      setListsError(err.message || "Failed to load your watchlists.");
-    } finally {
-      if (alive) setListsLoading(false);                    // stops spinner
-    }
-  })();
-
-  return () => { alive = false; };                          // cleanup if component unmounts
-}, [authed]);
-
-async function handleAddToWatchlist() {
-  setSaveMsg("");                                            // clear previous success
-  setSaveError("");                                          // clear previous error
-
-  // must pick a list
-  if (!selectedListId) {
-    setSaveError("Please select a watchlist first.");
-    return;
-  }
-
-  // build the movie payload from the data we already fetched above
-  const moviePayload = {
-    id: Number(id),                         // TMDB movie id from the route param (string -> number)
-    title: data.title || "",                // title from the loaded movie detail
-    poster_path: data.poster_path || "",    // poster from the loaded movie detail
-  };
-
-  try {
-    setSaving(true);
-    await addMovieToWatchlist(selectedListId, moviePayload); // POST /api/watchlists/:id/items/
-    setSaveMsg("Added to your watchlist!");
-    setPickerOpen(false);
-  } catch (err) {
-    // backend might return 400 if duplicate, or 404 if wrong list id
-    setSaveError(err.message || "Could not add to watchlist.");
-  } finally {
-    setSaving(false);
-  }
-}
-
-  // after data loads, ask backend to extract poster palette, then set CSS vars on :root - KR 26/08/2025
-  useEffect(() => {
-    let active = true;
-    const path = data?.poster_path;
     (async () => {
       try {
-        if (!path) return;
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = `https://image.tmdb.org/t/p/w500${path}`;
-        if (img.decode) { try { await img.decode(); } catch {} }
-        let start = "rgb(20,20,20)";
-        let end = "rgb(0,0,0)";
-        let accent = "rgb(35,35,35)";
-        try {
-          const { default: ColorThief } = await import("colorthief");
-          const ct = new ColorThief();
-          const palette = ct.getPalette(img, 3) || [];
-          if (palette[0]) start = `rgb(${palette[0].join(",")})`;
-          if (palette[1]) end = `rgb(${palette[1].join(",")})`;
-          if (palette[2]) accent = `rgb(${palette[2].join(",")})`;
-        } catch {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          canvas.width = img.naturalWidth || 1;
-          canvas.height = img.naturalHeight || 1;
-          ctx.drawImage(img, 0, 0);
-          const arr = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-          let r = 0, g = 0, b = 0, c = 0;
-          for (let i = 0; i < arr.length; i += 40) { r += arr[i]; g += arr[i + 1]; b += arr[i + 2]; c++; }
-          const avg = [Math.round(r / c), Math.round(g / c), Math.round(b / c)];
-          start = `rgb(${avg.join(",")})`;
+        const data = await fetchMyWatchlists();
+        if (!alive) return;
+        setLists(data || []);
+        if (data && data.length > 0) {
+          setSelectedListId(String(data[0].id));
         }
-        if (active) {
-          const rootStyle = document.documentElement.style;
-          rootStyle.setProperty("--movie-bg-start", start);
-          rootStyle.setProperty("--movie-bg-end", end);
-          rootStyle.setProperty("--movie-accent", accent);
-        }
-      } catch {}
+      } catch (err) {
+        if (!alive) return;
+        setListsError(err.message || "Failed to load your watchlists.");
+      } finally {
+        if (alive) setListsLoading(false);
+      }
     })();
-    return () => { active = false; };
-  }, [data]);
+
+    return () => {
+      alive = false;
+    };
+  }, [authed]);
+
+  async function handleAddToWatchlist() {
+    setSaveMsg("");
+    setSaveError("");
+
+    if (!selectedListId) {
+      setSaveError("Please select a watchlist first.");
+      return;
+    }
+
+    const moviePayload = {
+      id: Number(id),
+      title: data.title || "",
+      poster_path: data.poster_path || "",
+    };
+
+    try {
+      setSaving(true);
+      await addMovieToWatchlist(selectedListId, moviePayload);
+      setSaveMsg("Added to your watchlist!");
+      setPickerOpen(false);
+    } catch (err) {
+      setSaveError(err.message || "Could not add to watchlist.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // derive palette + set CSS vars (for gradient background)
+  const poster_path = data?.poster_path || null;
+  const palette = usePosterPalette(poster_path);
+  useEffect(() => {
+    let start = "rgb(20,20,20)";
+    let end = "rgb(0,0,0)";
+    let accent = "rgb(35,35,35)";
+
+    if (Array.isArray(palette) && palette.length) {
+      const p0 = palette[0] || [20, 20, 20];
+      const p1 = palette[1] || p0;
+      const p2 = palette[2] || p0;
+
+      const soften = (arr, mult = 0.9) => {
+        const [r, g, b] = arr;
+        return `rgb(${Math.round(r * mult)}, ${Math.round(g * mult)}, ${Math.round(
+          b * mult
+        )})`;
+      };
+
+      start = soften(p0, 0.9);
+      end = soften(p1, 0.7);
+      accent = soften(p2, 1.0);
+    }
+
+    const root = document.documentElement.style;
+    root.setProperty("--movie-bg-start", start);
+    root.setProperty("--movie-bg-end", end);
+    root.setProperty("--movie-accent", accent);
+  }, [palette]);
 
   if (loading) {
     return (
@@ -175,14 +256,15 @@ async function handleAddToWatchlist() {
     return (
       <div className="container py-5">
         <div className="alert alert-danger mb-4">{err || "Not found"}</div>
-        <Link to="/" className="btn btn-outline-secondary">← Back home</Link>
+        <Link to="/" className="btn btn-outline-secondary">
+          ← Back home
+        </Link>
       </div>
     );
   }
 
   const {
     title,
-    poster_path,
     overview,
     release_date,
     runtime,
@@ -191,45 +273,44 @@ async function handleAddToWatchlist() {
     vote_count,
     credits = { cast: [], crew: [] },
     videos = { results: [] },
-    watch_providers = { results: {} }, // if backend older than providers-normalised - KR 26/08/2025
-    providers,                          // preferred (if backend added merged['providers']) - KR 26/08/2025
+    watch_providers = { results: {} },
+    providers,
   } = data;
 
-  // region fallback chain for provider blocks - KR 26/08/2025
+  // region fallback chain for provider blocks
   const ieProviders =
-    providers ||
-    watch_providers.results?.IE ||
-    watch_providers.results?.US ||
-    {};
+    providers || watch_providers.results?.IE || watch_providers.results?.US || {};
 
-  const cast = (credits.cast || []).slice(0, 14); // trim cast strip - KR 26/08/2025
+  const cast = (credits.cast || []).slice(0, 14);
   const trailer = (videos.results || []).find(
     (v) => v.site === "YouTube" && v.type === "Trailer"
   );
 
-  // page wrapper for gradient - KR 26/08/2025
   return (
     <div className="movie-page">
       <div className="container py-5">
         <div className="row g-4 align-items-start">
-          <div className="col-12 col-md-auto">
+          {/* Poster column — centered on mobile */}
+          <div className="col-12 col-md-auto text-center text-md-start">
             {poster_path ? (
               <img
-                className="movie-poster"
+                className="movie-poster mx-auto mx-md-0"
                 src={`https://image.tmdb.org/t/p/w500${poster_path}`}
                 alt={title}
+                crossOrigin="anonymous"
               />
             ) : (
-              <div className="movie-poster fallback d-flex align-items-center justify-content-center text-muted">
+              <div className="movie-poster fallback d-flex align-items-center justify-content-center text-muted mx-auto mx-md-0">
                 No Image
               </div>
             )}
           </div>
 
+          {/* Text/content column */}
           <div className="col">
             <h1 className="movie-title mb-2">{title}</h1>
 
-            {/* Meta chips - KR 26/08/2025 */}
+            {/* Meta chips */}
             <div className="movie-meta mb-3">
               <span className="chip">Release Date: {formatDate(release_date)}</span>
               {runtime ? <span className="chip">{runtime} min</span> : null}
@@ -245,113 +326,126 @@ async function handleAddToWatchlist() {
                 </span>
               ) : null}
             </div>
-            {/* Overview - KR 26/08/2025 */}
+
+            {/* Overview */}
             <p className="movie-overview">{overview || "No overview available."}</p>
 
-            {/* Primary actions - KR 26/08/2025 */}
-<div className="actions mt-3 d-flex flex-wrap gap-2 align-items-center">
-  <Link to="/" className="btn btn-ghost">← Back</Link>
+            {/* Primary actions */}
+            <div className="actions mt-3 d-flex flex-wrap gap-2 align-items-center">
+              <Link to="/" className="btn btn-ghost">
+                ← Back
+              </Link>
 
-  {/* Inline “Add to Watchlist” beside Back button, dropdown appears on click - KR 28/09/2025 */}
-  {authed ? (
-    <div className="position-relative d-inline-block">
-      <button
-        type="button"
-        className="btn btn-primary"
-        onClick={() => {
-          setSaveMsg("");
-          setSaveError("");
-          setPickerOpen((open) => !open);
-        }}
-        aria-expanded={pickerOpen ? "true" : "false"}
-        aria-controls="watchlist-picker"
-      >
-        Add to Watchlist
-      </button>
-
-      {pickerOpen && (
-        <div
-          id="watchlist-picker"
-          className="card p-2 position-absolute z-3 shadow"
-          style={{ minWidth: 280, top: 0, left: "100%", marginLeft: 12 }}
-        >
-          {listsLoading && <div className="text-muted">Loading your lists…</div>}
-          {listsError && <div className="text-danger mb-2">Error: {listsError}</div>}
-
-          {!listsLoading && !listsError && (
-            <>
-              {lists.length === 0 ? (
-                <div className="text-muted">
-                  You don’t have any watchlists yet. Create one on the{" "}
-                  <a href="/watchlists">Watchlists</a> page.
-                </div>
-              ) : (
-                <div className="d-flex gap-2 align-items-center">
-                  <select
-                    className="form-select w-auto"
-                    value={selectedListId}
-                    onChange={(e) => {
-                      setSaveMsg("");
-                      setSaveError("");
-                      setSelectedListId(e.target.value);
-                    }}
-                    disabled={saving}
-                  >
-                    {lists.map((wl) => (
-                      <option key={wl.id} value={wl.id}>
-                        {wl.name}
-                      </option>
-                    ))}
-                  </select>
-
+              {/* Watchlist picker */}
+              {authed ? (
+                <div className="position-relative d-inline-block">
                   <button
                     type="button"
                     className="btn btn-primary"
-                    onClick={handleAddToWatchlist}
-                    disabled={saving || !selectedListId}
-                    aria-busy={saving ? "true" : "false"}
+                    onClick={() => {
+                      setSaveMsg("");
+                      setSaveError("");
+                      setPickerOpen((open) => !open);
+                    }}
+                    aria-expanded={pickerOpen ? "true" : "false"}
+                    aria-controls="watchlist-picker"
                   >
-                    {saving ? "Adding…" : "Add"}
+                    Add to Watchlist
                   </button>
 
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => setPickerOpen(false)}
-                  >
-                    Cancel
-                  </button>
+                  {pickerOpen && (
+                    <div
+                      id="watchlist-picker"
+                      className="card p-2 position-absolute z-3 shadow"
+                      // Safer placement on small screens: drop below, align right
+                      style={{
+                        minWidth: 280,
+                        top: "calc(100% + 8px)",
+                        right: 0,
+                      }}
+                    >
+                      {listsLoading && (
+                        <div className="text-muted">Loading your lists…</div>
+                      )}
+                      {listsError && (
+                        <div className="text-danger mb-2">Error: {listsError}</div>
+                      )}
+
+                      {!listsLoading && !listsError && (
+                        <>
+                          {lists.length === 0 ? (
+                            <div className="text-muted">
+                              You don’t have any watchlists yet. Create one on the{" "}
+                              <a href="/watchlists">Watchlists</a> page.
+                            </div>
+                          ) : (
+                            <div className="d-flex gap-2 align-items-center">
+                              <select
+                                className="form-select w-auto"
+                                value={selectedListId}
+                                onChange={(e) => {
+                                  setSaveMsg("");
+                                  setSaveError("");
+                                  setSelectedListId(e.target.value);
+                                }}
+                                disabled={saving}
+                                aria-label="Choose a watchlist"
+                              >
+                                {lists.map((wl) => (
+                                  <option key={wl.id} value={wl.id}>
+                                    {wl.name}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleAddToWatchlist}
+                                disabled={saving || !selectedListId}
+                                aria-busy={saving ? "true" : "false"}
+                              >
+                                {saving ? "Adding…" : "Add"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                onClick={() => setPickerOpen(false)}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {saveMsg && <div className="text-success mt-2">{saveMsg}</div>}
+                      {saveError && <div className="text-danger mt-2">{saveError}</div>}
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <a href="/login" className="btn btn-outline-secondary">
+                  Log in to save
+                </a>
               )}
-            </>
-          )}
-
-          {saveMsg && <div className="text-success mt-2">{saveMsg}</div>}
-          {saveError && <div className="text-danger mt-2">{saveError}</div>}
-        </div>
-      )}
-    </div>
-  ) : (
-    <a href="/login" className="btn btn-outline-secondary">Log in to save</a>
-  )}
-</div>
+            </div>
           </div>
-
         </div>
       </div>
 
-      {/* Content sections - KR 26/08/2025 */}
+      {/* Content sections */}
       <div className="container section-stack">
-        {/* Where to Watch (clickable chips) - KR 26/08/2025 */}
+        {/* Where to Watch */}
         {(ieProviders.flatrate?.length ||
           ieProviders.ads?.length ||
           ieProviders.free?.length ||
           ieProviders.rent?.length ||
-          ieProviders.buy?.length) ? (
+          ieProviders.buy?.length) && (
           <section className="providers-block card-block glass">
             <h2 className="h5 mb-3">Where to Watch</h2>
 
-            {/* Included with subscription - KR 26/08/2025 */}
             {(ieProviders.flatrate || []).length > 0 && (
               <div className="provider-row">
                 <div className="label">Included</div>
@@ -377,7 +471,6 @@ async function handleAddToWatchlist() {
               </div>
             )}
 
-            {/* Ad-supported - KR 26/08/2025 */}
             {(ieProviders.ads || []).length > 0 && (
               <div className="provider-row">
                 <div className="label">Ad-supported</div>
@@ -403,7 +496,6 @@ async function handleAddToWatchlist() {
               </div>
             )}
 
-            {/* Free - KR 26/08/2025 */}
             {(ieProviders.free || []).length > 0 && (
               <div className="provider-row">
                 <div className="label">Free</div>
@@ -429,7 +521,6 @@ async function handleAddToWatchlist() {
               </div>
             )}
 
-            {/* Rent - KR 26/08/2025 */}
             {(ieProviders.rent || []).length > 0 && (
               <div className="provider-row">
                 <div className="label">Rent</div>
@@ -455,7 +546,6 @@ async function handleAddToWatchlist() {
               </div>
             )}
 
-            {/* Buy - KR 26/08/2025 */}
             {(ieProviders.buy || []).length > 0 && (
               <div className="provider-row">
                 <div className="label">Buy</div>
@@ -481,10 +571,10 @@ async function handleAddToWatchlist() {
               </div>
             )}
           </section>
-        ) : null}
+        )}
 
-        {/* Trailer (YouTube) - KR 26/08/2025 */}
-        {trailer ? (
+        {/* Trailer */}
+        {trailer && (
           <section className="card-block glass">
             <h2 className="h5 mb-3">Trailer</h2>
             <div className="trailer-wrapper">
@@ -496,10 +586,10 @@ async function handleAddToWatchlist() {
               />
             </div>
           </section>
-        ) : null}
+        )}
 
-        {/* Top Cast strip - KR 26/08/2025 */}
-        {cast.length ? (
+        {/* Top Cast */}
+        {cast.length > 0 && (
           <section className="card-block glass">
             <h2 className="h5 mb-3">Top Cast</h2>
             <div className="h-scroll cast-strip">
@@ -525,7 +615,7 @@ async function handleAddToWatchlist() {
               ))}
             </div>
           </section>
-        ) : null}
+        )}
       </div>
     </div>
   );
