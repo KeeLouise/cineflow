@@ -55,16 +55,6 @@ const MOODS = [
   { key: "dark_gritty", label: "Dark & Gritty" },
 ];
 
-const DECADES = [
-  { value: "", label: "Any decade" },
-  { value: "2020s", label: "2020s" },
-  { value: "2010s", label: "2010s" },
-  { value: "2000s", label: "2000s" },
-  { value: "1990s", label: "1990s" },
-  { value: "1980s", label: "1980s" },
-  { value: "1970s", label: "1970s" },
-  { value: "1960s", label: "1960s" },
-];
 
 const TMDB_MIN_OPTIONS = [
   { value: 0, label: "Any rating" },
@@ -103,14 +93,12 @@ export default function Dashboard() {
   const [provLoading, setProvLoading] = useState(true);
 
   // Applied filters
-  const [appliedDecade, setAppliedDecade] = useState("");
   const [appliedTmdbMin, setAppliedTmdbMin] = useState(0);
   const [appliedPickedProviders, setAppliedPickedProviders] = useState([]);
   const [appliedIncludeRentBuy, setAppliedIncludeRentBuy] = useState(false);
 
   // Staged filters (UI)
   const [stagedMood, setStagedMood] = useState("feelgood");
-  const [stagedDecade, setStagedDecade] = useState("");
   const [stagedTmdbMin, setStagedTmdbMin] = useState(0);
   const [stagedPickedProviders, setStagedPickedProviders] = useState([]);
   const [stagedIncludeRentBuy, setStagedIncludeRentBuy] = useState(false);
@@ -201,7 +189,6 @@ export default function Dashboard() {
   const commonParams = useMemo(() => {
     const base = {
       region: REGION,
-      decade: appliedDecade,
       vote_average_gte: appliedTmdbMin || undefined,
       types: appliedIncludeRentBuy ? "ads,buy,flatrate,free,rent" : "flatrate,ads,free",
       broad: appliedPickedProviders.length ? 1 : 0,
@@ -325,7 +312,6 @@ export default function Dashboard() {
   const seeAllHref = useMemo(() => {
     const qs = new URLSearchParams();
     qs.set("region", REGION);
-    if (appliedDecade) qs.set("decade", appliedDecade);
     if (appliedTmdbMin && Number(appliedTmdbMin) > 0) {
       qs.set("vote_average_gte", String(appliedTmdbMin));
     }
@@ -422,22 +408,6 @@ export default function Dashboard() {
                       );
                     })}
                   </div>
-                </div>
-
-                <div className="col-md-2">
-                  <label className="form-label text-secondary small">Decade</label>
-                  <select
-                    className="form-select form-select-sm bg-dark text-light border-secondary"
-                    value={stagedDecade}
-                    onChange={(e) => setStagedDecade(e.target.value)}
-                    disabled={loading}
-                  >
-                    {DECADES.map((d) => (
-                      <option key={d.value || "any"} value={d.value}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 <div className="col-md-2">
