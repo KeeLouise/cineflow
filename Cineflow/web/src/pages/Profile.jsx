@@ -254,13 +254,14 @@ export default function Profile() {
               <label className="form-label d-block">Avatar</label>
               {imgSrc ? (
                 <img
-                  src={imgSrc}
-                  alt="Avatar"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src =
-                      "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
-                      encodeURIComponent(me.username || "User");
+    src={imgSrc}
+    alt="Avatar"
+    className="avatar avatar-lg"
+    onError={(e) => {
+      e.currentTarget.onerror = null;
+      e.currentTarget.src =
+        "https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=" +
+        encodeURIComponent(me.username || "User");
                   }}
                   style={{
                     width: 88,
@@ -271,9 +272,10 @@ export default function Profile() {
                   }}
                 />
               ) : (
-                <div className="text-muted" style={{ fontSize: 14 }}>
-                  No avatar
-                </div>
+                <div className="avatar avatar-lg avatar-fallback">
+    {(me?.username?.trim()?.charAt(0)?.toUpperCase() || "U")}
+  </div>
+              
               )}
             </div>
 
