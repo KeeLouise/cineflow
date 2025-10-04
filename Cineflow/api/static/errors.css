@@ -1,0 +1,47 @@
+:root{
+  --bg-1:#0b0e13; --bg-2:#0d1118; --card:#0f1420; --card-br:#1e2433;
+  --text:#e2e8f0; --muted:#94a3b8; --brand:#9fb7ff; --accent:#7c5cff; --accent-2:#5eead4;
+  --ring: rgba(124, 92, 255, .4);
+}
+
+.err-bg{
+  min-height:100svh;
+  background:
+    radial-gradient(1200px 600px at -10% -20%, rgba(124,92,255,.22), transparent 50%),
+    radial-gradient(900px 500px at 120% 10%, rgba(94,234,212,.14), transparent 50%),
+    linear-gradient(180deg, var(--bg-1), var(--bg-2));
+  display:grid; place-items:center; padding:24px;
+}
+
+.err-card{
+  width:min(720px, 92vw);
+  background: color-mix(in oklab, var(--card) 94%, white 6%);
+  border:1px solid var(--card-br);
+  border-radius:16px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.45);
+  overflow:hidden;
+  animation: errIn .35s ease both;
+}
+@keyframes errIn{ from{opacity:0; transform: translateY(6px)} to{opacity:1; transform:none} }
+
+.err-head{ padding:22px 22px 8px; border-bottom:1px solid var(--card-br); }
+.brand{ display:inline-flex; align-items:center; gap:10px; color:var(--brand); font-weight:700; letter-spacing:.4px; text-decoration:none; }
+.brand-dot{ width:10px; height:10px; border-radius:50%; background:linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 12px var(--accent); }
+.err-title{ color:var(--text); margin:12px 0 2px; font-size:22px; font-weight:700; }
+.err-sub{ color: var(--muted); margin: 0 0 8px; font-size:14px; }
+
+.err-body{ padding:22px; }
+.err-code{ font-size:64px; font-weight:900; letter-spacing:2px; line-height:1; background:linear-gradient(135deg, #9fb7ff, #7c5cff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.err-help{ color:var(--muted); margin:12px 0 0; }
+
+.err-actions{ display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+.btn{ border:0; border-radius:12px; padding:12px 16px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:10px; }
+.btn-primary{ color:white; background: linear-gradient(135deg, var(--accent), #5b4ee6); box-shadow: 0 8px 24px rgba(124,92,255,.35), inset 0 0 0 1px rgba(255,255,255,.05); }
+.btn-primary:hover{ filter: brightness(1.05); }
+.btn-ghost{ background: transparent; color: var(--muted); border:1px solid var(--card-br); }
+.btn-ghost:hover{ background: #0e1524; color: var(--text); }
+
+@media (max-width: 480px){
+  .err-code{ font-size:48px; }
+  .err-title{ font-size:20px; }
+}

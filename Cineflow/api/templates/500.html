@@ -1,0 +1,26 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Server error • cinechill</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link href="{% static 'css/errors.css' %}" rel="stylesheet">
+</head>
+<body class="err-bg">
+  <div class="err-card">
+    <div class="err-head">
+      <span class="brand"><span class="brand-dot"></span>cinechill</span>
+      <h1 class="err-title">Something went wrong</h1>
+      <p class="err-sub">An unexpected error occurred.</p>
+    </div>
+    <div class="err-body">
+      <div class="err-code">500</div>
+      <p class="err-help">Please try again in a moment.</p>
+      <div class="err-actions">
+        <a class="btn btn-primary" href="/">Go home</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
