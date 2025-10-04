@@ -128,7 +128,7 @@
   box-shadow: 0 14px 32px rgba(0,0,0,0.45);
   list-style: none;
   padding: 6px;
-  z-index: 20;
+  z-index: 1000;
   max-height: 320px;
   overflow: auto;
   transform: translateZ(0);
@@ -159,6 +159,7 @@
 .cta-item {
   display: flex;
   align-items: center;
+  text-align: center;
   justify-content: space-between;
   gap: .75rem;
   padding: .9rem 1rem;
