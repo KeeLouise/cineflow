@@ -62,31 +62,27 @@ export default function Navbar() {
   }
 
   const avatarEl = useMemo(() => {
-    const size = 28;
-    const initials = (me?.username?.trim()?.charAt(0)?.toUpperCase() || "U");
-    if (me?.avatar) {
-      return (
-        <img
-          src={me.avatar}
-          alt={me?.username || "Profile"}
-          className="rounded-circle"
-          width={size}
-          height={size}
-          style={{ objectFit: "cover" }}
-          onError={(e) => {
-            e.currentTarget.onerror = null;
-            const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(me?.username || "User")}&size=64&background=7c5cff&color=fff`;
-            e.currentTarget.src = fallback;
-          }}
-        />
-      );
-    }
+  if (me?.avatar) {
     return (
-      <div className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" aria-label="Avatar">
-        {initials}
-      </div>
+      <img
+        src={me.avatar}
+        alt={me?.username || "Profile"}
+        className="avatar avatar-sm"
+        onError={(e) => {
+          e.currentTarget.onerror = null;
+          const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(me?.username || "User")}&size=64&background=7c5cff&color=fff`;
+          e.currentTarget.src = fallback;
+        }}
+      />
     );
-  }, [me?.avatar, me?.username]);
+  }
+  const initials = (me?.username?.trim()?.charAt(0)?.toUpperCase() || "U");
+  return (
+    <div className="avatar avatar-sm avatar-fallback" aria-label="Avatar">
+      {initials}
+    </div>
+  );
+}, [me?.avatar, me?.username]);
 
   return (
     <nav className="navbar navbar-expand-lg px-3 big-navbar navbar-thin">
