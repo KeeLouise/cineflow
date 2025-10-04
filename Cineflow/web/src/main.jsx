@@ -1,4 +1,7 @@
 import React from "react";
+if (typeof window !== "undefined") {
+window.React = window.React || React;
+}
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
