@@ -43,6 +43,19 @@
   box-shadow: 0 10px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
+.hero-glass,
+.hero-search,
+.cta-band,
+.section-card {
+  overflow: visible;
+}
+
+.searchbar-wrapper {
+  position: relative;
+  isolation: isolate;      
+  z-index: 10;           
+}
+
 /* Headline & subheading inside hero */
 .hero-search .display-6 {
   font-size: clamp(1.35rem, 2.6vw, 1.85rem);
@@ -113,6 +126,22 @@
   opacity: .9;
 }
 @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+
+.searchbar-wrapper .typeahead-menu,
+.searchbar-wrapper .search-suggestions,
+.searchbar-wrapper .autocomplete-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 3000;          
+  background: rgba(18,18,22,.98);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
 
 /* Suggestions dropdown (attached to input) */
 .search-suggestions {
@@ -212,6 +241,11 @@
   .search-input { height: 40px; padding: 0 2.2rem 0 2rem; }
   .search-suggestions { top: calc(40px + 8px); }
 
+  .searchbar-wrapper .typeahead-menu,
+  .searchbar-wrapper .search-suggestions,
+  .searchbar-wrapper .autocomplete-menu {
+    max-height: 65vh;
+    overflow: auto;}
   .cta-band { padding: 1rem 0 .5rem; }
   .cta-inline { grid-template-columns: 1fr; gap: .6rem; }
   .cta-item { padding: .8rem .9rem; border-radius: 12px; }

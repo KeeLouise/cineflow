@@ -24,6 +24,8 @@ footer {
   min-height: 100vh;
   padding-bottom: 24px;
   overflow-x: hidden;
+  position: relative;
+  z-index: 0; 
 }
 
 /* Hero */
@@ -61,8 +63,33 @@ footer {
   color: var(--wl-text);
 }
 
+.wl-searchbox,
+.wl-create,
+.wl-search {
+  position: relative;
+  overflow: visible;
+  isolation: isolate;
+  z-index: 5;
+}
+
 /* Create bar */
 .wl-create { padding: 10px; margin-top: -18px; }
+
+.wl-results,
+.wl-typeahead,
+.wl-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 2200;   
+  background: rgba(18,18,22,.98);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
 
 /* Grid */
 .wl-grid {
@@ -71,6 +98,14 @@ footer {
   grid-template-columns: repeat(12, 1fr);
 }
 @media (max-width: 575.98px) { .wl-grid { grid-template-columns: 1fr; } }
+@media (max-width: 575.98px) {
+  .wl-results,
+  .wl-typeahead,
+  .wl-suggestions {
+    max-height: 65vh;
+    overflow: auto;
+  }
+}
 @media (min-width: 576px) and (max-width: 991.98px) { .wl-grid { grid-template-columns: repeat(6, 1fr); } }
 @media (min-width: 992px) { .wl-grid { grid-template-columns: repeat(12, 1fr); } }
 
