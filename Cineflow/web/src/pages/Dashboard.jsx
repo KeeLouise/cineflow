@@ -18,6 +18,18 @@ function PosterCard({ m }) {
               src={`https://image.tmdb.org/t/p/w500${m.poster_path}`}
               alt={m.title}
               loading="lazy"
+              onError={(e) => {
+                // try a smaller size once, then fallback tile - KR 04/10/2025
+                const el = e.currentTarget;
+                if (!el.dataset._retry) {
+                  el.dataset._retry = "1";
+                  el.src = `https://image.tmdb.org/t/p/w342${m.poster_path}`;
+                } else {
+                  el.style.display = "none";
+                  const parent = el.closest(".poster-media");
+                  if (parent) parent.classList.add("no-image");
+                }
+              }}
             />
           ) : (
             <div className="poster-fallback d-flex align-items-center justify-content-center text-muted">
@@ -68,7 +80,6 @@ const TMDB_MIN_OPTIONS = [
 const REGION = "GB";
 
 export default function Dashboard() {
-  // signed-in user (for email verify banner)
   const [me, setMe] = useState(null);
 
   // list state
@@ -83,7 +94,7 @@ export default function Dashboard() {
   const [appliedTmdbMin, setAppliedTmdbMin] = useState(0);
   const [appliedIncludeRentBuy, setAppliedIncludeRentBuy] = useState(false);
 
-  // staged filters (UI)
+  // staged filters
   const [stagedMood, setStagedMood] = useState("feelgood");
   const [stagedTmdbMin, setStagedTmdbMin] = useState(0);
   const [stagedIncludeRentBuy, setStagedIncludeRentBuy] = useState(false);
@@ -107,7 +118,6 @@ export default function Dashboard() {
     setFilterStamp((s) => s + 1);
   };
 
-  // infinite scroll & abort
   const sentinelRef = useRef(null);
   const inFlightRef = useRef(null);
 
@@ -237,169 +247,172 @@ export default function Dashboard() {
     <>
       <div className="page-bg" aria-hidden="true" />
 
-      <div className="glass-dashboard">
-        <div className="container-xxl--wide py-5">
-          {/* Email verification banner */}
-          {me && me.email_verified === false && (
-            <div className="alert alert-warning d-flex align-items-center justify-content-between">
-              <div>
-                <strong>Verify your email.</strong> We’ve sent a link to {me.email}. You’ll need to verify before enabling 2FA.
+      {/* guard wrapper ensures full-viewport centering */}
+      <main className="w-100" style={{ minHeight: "100vh" }}>
+        <div className="glass-dashboard">
+          {/* mx-auto explicitly centers regardless of parent flex/grid */}
+          <div className="container-xxl--wide mx-auto px-3 py-5">
+            {/* Email verification banner */}
+            {me && me.email_verified === false && (
+              <div className="alert alert-warning d-flex align-items-center justify-content-between">
+                <div>
+                  <strong>Verify your email.</strong> We’ve sent a link to {me.email}. You’ll need to verify before enabling 2FA.
+                </div>
+                <button
+                  className="btn btn-outline-ghost"
+                  onClick={async () => {
+                    try {
+                      await resendVerificationEmail();
+                      alert("Verification email sent.");
+                    } catch (e) {
+                      alert(e?.response?.data?.detail || "Could not send verification email.");
+                    }
+                  }}
+                >
+                  Resend
+                </button>
               </div>
-              <button
-                className="btn btn-outline-ghost"
-                onClick={async () => {
-                  try {
-                    await resendVerificationEmail();
-                    alert("Verification email sent.");
-                  } catch (e) {
-                    alert(e?.response?.data?.detail || "Could not send verification email.");
-                  }
-                }}
-              >
-                Resend
-              </button>
-            </div>
-          )}
+            )}
 
-          <header className="d-flex align-items-center justify-content-between mb-4">
-            <h1 className="m-0">Your Dashboard</h1>
-            <div className="d-flex align-items-center gap-2">
-              <Link to="/" className="link-ghost">← Home</Link>
-              <Link to={seeAllHref} className="btn btn-sm btn-outline-light">See all</Link>
-              <button
-                className="btn btn-sm btn-primary d-md-none"
-                type="button"
-                data-bs-toggle="offcanvas"
-                data-bs-target="#filtersOffcanvas"
-                aria-controls="filtersOffcanvas"
-              >
-                {filtersLabel}
-              </button>
-            </div>
-          </header>
+            <header className="d-flex align-items-center justify-content-between mb-4">
+              <h1 className="m-0">Your Dashboard</h1>
+              <div className="d-flex align-items-center gap-2">
+                <Link to="/" className="link-ghost">← Home</Link>
+                <Link to={seeAllHref} className="btn btn-sm btn-outline-light">See all</Link>
+                <button
+                  className="btn btn-sm btn-primary d-md-none"
+                  type="button"
+                  data-bs-toggle="offcanvas"
+                  data-bs-target="#filtersOffcanvas"
+                  aria-controls="filtersOffcanvas"
+                >
+                  {filtersLabel}
+                </button>
+              </div>
+            </header>
 
-          {/* Filter toolbar (no provider filters) */}
-          <div className="card bg-dark border-0 shadow-sm mb-4 d-none d-md-block">
-            <div className="card-body">
-              <div className="row g-3 align-items-end">
-                <div className="col-md-4">
-                  <label className="form-label text-secondary small">Mood</label>
-                  <select
-                    className="form-select form-select-sm bg-dark text-light border-secondary"
-                    value={stagedMood}
-                    onChange={(e) => setStagedMood(e.target.value)}
-                    disabled={loading}
-                  >
-                    {MOODS.map((m) => (
-                      <option key={m.key} value={m.key}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="col-md-4">
-                  <label className="form-label text-secondary small">TMDB rating</label>
-                  <select
-                    className="form-select form-select-sm bg-dark text-light border-secondary"
-                    value={String(stagedTmdbMin)}
-                    onChange={(e) => setStagedTmdbMin(Number(e.target.value))}
-                    disabled={loading}
-                  >
-                    {TMDB_MIN_OPTIONS.map((o) => (
-                      <option key={String(o.value)} value={String(o.value)}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="col-md-4">
-                  <label className="form-label text-secondary small d-block">Options</label>
-                  <div className="form-check form-switch">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="includeBuyRentSwitch"
-                      checked={stagedIncludeRentBuy}
-                      onChange={(e) => setStagedIncludeRentBuy(e.target.checked)}
+            {/* Filter toolbar (no provider filters) */}
+            <div className="card bg-dark border-0 shadow-sm mb-4 d-none d-md-block">
+              <div className="card-body">
+                <div className="row g-3 align-items-end">
+                  <div className="col-md-4">
+                    <label className="form-label text-secondary small">Mood</label>
+                    <select
+                      className="form-select form-select-sm bg-dark text-light border-secondary"
+                      value={stagedMood}
+                      onChange={(e) => setStagedMood(e.target.value)}
                       disabled={loading}
-                    />
-                    <label className="form-check-label small text-white" htmlFor="includeBuyRentSwitch">
-                      Include buy/rent results
-                    </label>
+                    >
+                      {MOODS.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-md-4">
+                    <label className="form-label text-secondary small">TMDB rating</label>
+                    <select
+                      className="form-select form-select-sm bg-dark text-light border-secondary"
+                      value={String(stagedTmdbMin)}
+                      onChange={(e) => setStagedTmdbMin(Number(e.target.value))}
+                      disabled={loading}
+                    >
+                      {TMDB_MIN_OPTIONS.map((o) => (
+                        <option key={String(o.value)} value={String(o.value)}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-md-4">
+                    <label className="form-label text-secondary small d-block">Options</label>
+                    <div className="form-check form-switch">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="includeBuyRentSwitch"
+                        checked={stagedIncludeRentBuy}
+                        onChange={(e) => setStagedIncludeRentBuy(e.target.checked)}
+                        disabled={loading}
+                      />
+                      <label className="form-check-label small text-white" htmlFor="includeBuyRentSwitch">
+                        Include buy/rent results
+                      </label>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="d-flex justify-content-end gap-2 mt-3">
-                <button
-                  type="button"
-                  className="btn btn-outline-warning btn-sm"
-                  onClick={resetFilters}
-                  disabled={loading}
-                  title="Reset all filters"
-                >
-                  Reset
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={applyFilters}
-                  disabled={loading}
-                  title="Apply filters"
-                >
-                  Apply
-                </button>
+                <div className="d-flex justify-content-end gap-2 mt-3">
+                  <button
+                    type="button"
+                    className="btn btn-outline-warning btn-sm"
+                    onClick={resetFilters}
+                    disabled={loading}
+                    title="Reset all filters"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={applyFilters}
+                    disabled={loading}
+                    title="Apply filters"
+                  >
+                    Apply
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {err && <div className="alert alert-danger mb-3">{err}</div>}
+            {err && <div className="alert alert-danger mb-3">{err}</div>}
 
-          {loading && items.length === 0 ? (
-            <SkeletonRow count={8} />
-          ) : items.length ? (
-            <>
-              <section className="section-card rail">
-                <div className="reel-wrap">
-                  <div className="h-scroll">
-                    {items.map((mv) => (
-                      <PosterCard key={`mood-${mv.id}`} m={mv} />
-                    ))}
+            {loading && items.length === 0 ? (
+              <SkeletonRow count={8} />
+            ) : items.length ? (
+              <>
+                <section className="section-card rail">
+                  <div className="reel-wrap">
+                    <div className="h-scroll">
+                      {items.map((mv) => (
+                        <PosterCard key={`mood-${mv.id}`} m={mv} />
+                      ))}
+                    </div>
                   </div>
+                </section>
+
+                <div
+                  ref={sentinelRef}
+                  className="infinite-sentinel"
+                  aria-hidden="true"
+                  style={{ height: 1 }}
+                />
+                <div style={{ minHeight: 24 }} aria-live="polite" className="d-flex justify-content-center">
+                  {loading && hasMore ? <span className="text-muted small">Loading more…</span> : null}
                 </div>
-              </section>
 
-              <div
-                ref={sentinelRef}
-                className="infinite-sentinel"
-                aria-hidden="true"
-                style={{ height: 1 }}
-              />
-              {/* reserve space to avoid layout shift when the line appears/disappears */}
-              <div style={{ minHeight: 24 }} aria-live="polite" className="d-flex justify-content-center">
-                {loading && hasMore ? <span className="text-muted small">Loading more…</span> : null}
-              </div>
-
-              <div className="d-flex justify-content-center mt-3">
-                <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
-                  See all {MOODS.find((x) => x.key === mood)?.label || "results"}
-                </Link>
-              </div>
-            </>
-          ) : (
-            <div className="text-muted">
-              No picks for this mood. Try another mood or widen rating/options.
-              {!!seeAllHref && (
-                <div className="mt-3">
+                <div className="d-flex justify-content-center mt-3">
                   <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
-                    Open full list
+                    See all {MOODS.find((x) => x.key === mood)?.label || "results"}
                   </Link>
                 </div>
-              )}
-            </div>
-          )}
+              </>
+            ) : (
+              <div className="text-muted">
+                No picks for this mood. Try another mood or widen rating/options.
+                {!!seeAllHref && (
+                  <div className="mt-3">
+                    <Link to={seeAllHref} className="btn btn-outline-light btn-sm">
+                      Open full list
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* MOBILE FILTERS */}
@@ -483,7 +496,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </>
   );
 }
