@@ -1,12 +1,12 @@
 import axios from "axios";
 
-const rawBase =
+const raw =
   (typeof import.meta !== "undefined" &&
     import.meta.env &&
-    (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE)) ||
+    (import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_BASE)) ||
   "/api";
 
-export const API_BASE = String(rawBase).replace(/\/+$/, "");
+export const API_BASE = String(raw).replace(/\/+$/, "");
 
 const api = axios.create({ baseURL: API_BASE });
 
@@ -20,15 +20,18 @@ const PUBLIC_PREFIXES = [
   "/poster_palette/",
 ];
 
-// Helpers
-const stripApiPrefix = (u = "") => (u.startsWith("/api") ? u.slice(4) || "/" : u);
-const isPublicPath = (url = "") => {
-  const path = stripApiPrefix(url || "");
+function stripApiPrefix(u = "") {
+  return u.startsWith("/api") ? u.slice(4) || "/" : u;
+}
+function isPublicPath(url = "") {
+  if (!url) return false;
+  const path = stripApiPrefix(url);
   if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return true;
-  if (/^\/movies\/\d+\/?$/.test(path)) return true; 
+  if (/^\/movies\/\d+\/?$/.test(path)) return true;
   return false;
-};
+}
 const isTokenEndpoint = (url = "") => url.includes("/token/");
+
 const isHmrOrStatic = (url = "") =>
   url.startsWith("/@") ||
   url.includes("@react-refresh") ||
@@ -36,7 +39,6 @@ const isHmrOrStatic = (url = "") =>
   url.endsWith(".map") ||
   url.endsWith(".ico");
 
-// Attach Bearer for protected routes
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("access");
   const url = config?.url || "";
@@ -47,22 +49,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ---- 401 refresh flow (single client) ----
 let isRefreshing = false;
-let pendingQueue = [];
+let queue = [];
 let didRedirectToLogin = false;
 
-const processQueue = (error, token = null) => {
-  pendingQueue.forEach(({ resolve, reject, original }) => {
-    if (error) {
-      reject(error);
-    } else {
+const flushQueue = (error, token = null) => {
+  queue.forEach(({ resolve, reject, original }) => {
+    if (error) reject(error);
+    else {
       original.headers = original.headers || {};
       original.headers.Authorization = `Bearer ${token}`;
       resolve(api(original));
     }
   });
-  pendingQueue = [];
+  queue = [];
 };
 
 api.interceptors.response.use(
@@ -87,7 +87,7 @@ api.interceptors.response.use(
 
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
-          pendingQueue.push({ resolve, reject, original });
+          queue.push({ resolve, reject, original });
         });
       }
 
@@ -108,12 +108,13 @@ api.interceptors.response.use(
         localStorage.setItem("access", data.access);
         original.headers = original.headers || {};
         original.headers.Authorization = `Bearer ${data.access}`;
-        processQueue(null, data.access);
+
+        flushQueue(null, data.access);
         return api(original);
       } catch (e) {
         localStorage.removeItem("access");
         localStorage.removeItem("refresh");
-        processQueue(e, null);
+        flushQueue(e, null);
         if (!didRedirectToLogin && !location.pathname.startsWith("/login")) {
           didRedirectToLogin = true;
           window.location.href = "/login";
@@ -128,7 +129,7 @@ api.interceptors.response.use(
   }
 );
 
-if (typeof window !== "undefined" && import.meta.env.PROD) {
+if (typeof window !== "undefined" && import.meta.env?.PROD) {
   console.log("[API BASE]", API_BASE);
 }
 
